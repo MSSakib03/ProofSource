@@ -36,6 +36,8 @@ class Hub(db.Model):
     custom_points_policy = db.Column(db.String(10), default='project')   # yes | no | project
     bonus_policy = db.Column(db.String(10), default='project')           # yes | no | project
     review_policy = db.Column(db.String(10), default='project')          # yes (required) | no | project
+    # --- v8 ---
+    submission_policy = db.Column(db.String(10), default='project')      # auto | enroll | manual | project
     delete_requested_by = db.Column(db.String(100), nullable=True)
     delete_requested_at = db.Column(db.DateTime, nullable=True)
     delete_reason = db.Column(db.Text, default="")
@@ -81,9 +83,15 @@ class Contest(db.Model):
     delete_requested_by = db.Column(db.String(100), nullable=True)
     delete_requested_at = db.Column(db.DateTime, nullable=True)
     delete_reason = db.Column(db.Text, default="")
+    # --- v8: how eligible pages enter the contest ---
+    #   auto   = every eligible page is listed automatically (original behaviour)
+    #   enroll = semi-automatic: only pages of participants who enrolled are listed automatically
+    #   manual = participants pick and submit their eligible pages themselves
+    submission_mode = db.Column(db.String(10), default='auto')
 
     books = db.relationship('IndexBook', backref='contest', cascade="all, delete-orphan", lazy=True)
     pages = db.relationship('ContestPage', backref='contest', cascade="all, delete-orphan", lazy=True)
+    enrollments = db.relationship('Enrollment', backref='contest', cascade="all, delete-orphan", lazy=True)
 
     @property
     def lang_code(self):
@@ -151,6 +159,10 @@ class ContestPage(db.Model):
     last_rev_id = db.Column(db.BigInteger, nullable=True)
     # --- v7: equal review distribution ---
     assigned_to = db.Column(db.String(100), nullable=True, index=True)
+    # --- v8: a listed page that stopped qualifying is kept as 'reverted' (never deleted) ---
+    reverted_from = db.Column(db.String(30), nullable=True)     # status it had before
+    revert_reason = db.Column(db.String(30), nullable=True)     # not_proofread | ineligible | excluded
+    reverted_at = db.Column(db.DateTime, nullable=True)
 
     def counts_as_accepted(self, contest):
         if self.review_status == 'accepted':
@@ -196,6 +208,29 @@ class SlugAlias(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     old_slug = db.Column(db.String(100), nullable=False, unique=True, index=True)
     contest_id = db.Column(db.Integer, db.ForeignKey('contests.id', ondelete='CASCADE'), nullable=False, index=True)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class Enrollment(db.Model):
+    """Semi-automatic submission: participants who registered for a contest."""
+    __tablename__ = 'enrollments'
+    __table_args__ = (
+        db.UniqueConstraint('contest_id', 'username', name='uq_enrollment_user'),
+        MYSQL_TABLE_ARGS,
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    contest_id = db.Column(db.Integer, db.ForeignKey('contests.id', ondelete='CASCADE'), nullable=False, index=True)
+    username = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ToolAdmin(db.Model):
+    """Tool administrators added from the UI (in addition to PROOFSOURCE_SUPER_ADMINS)."""
+    __tablename__ = 'tool_admins'
+    __table_args__ = MYSQL_TABLE_ARGS
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), nullable=False, unique=True)
+    added_by = db.Column(db.String(100), nullable=False, default="")
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 

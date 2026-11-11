@@ -26,8 +26,43 @@ def _load_super_admins() -> frozenset:
 SUPER_ADMINS = _load_super_admins()
 
 
+_admin_provider = None   # set by the app: returns the tool admins stored in the database
+
+
+def set_admin_provider(fn):
+    global _admin_provider
+    _admin_provider = fn
+
+
 def is_super_admin_name(username) -> bool:
-    return bool(username) and canonical_username(username) in SUPER_ADMINS
+    """Root tool admins (PROOFSOURCE_SUPER_ADMINS) plus the tool admins added from the UI."""
+    if not username:
+        return False
+    name = canonical_username(username)
+    if name in SUPER_ADMINS:
+        return True
+    if _admin_provider is not None:
+        try:
+            return name in _admin_provider()
+        except Exception:
+            return False
+    return False
+
+
+def global_account_exists(username: str):
+    """True / False from Meta-Wiki's global account list; None when it cannot be checked."""
+    try:
+        res = requests.get("https://meta.wikimedia.org/w/api.php", params={
+            "action": "query", "meta": "globaluserinfo", "guiuser": username, "format": "json"
+        }, headers={"User-Agent": USER_AGENT}, timeout=8).json()
+        info = res.get("query", {}).get("globaluserinfo", {})
+        if "missing" in info:
+            return False
+        if info.get("name"):
+            return True
+    except Exception:
+        pass
+    return None
 
 
 # Only Wikisource wikis may be contacted. This blocks SSRF and, above all, prevents a contest

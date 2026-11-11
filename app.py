@@ -8,17 +8,23 @@ import hashlib
 import logging
 import random
 import secrets
+import time
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, quote, urlsplit
 import requests
 from flask import Flask, g, render_template, request, jsonify, session, redirect, url_for, Response, stream_with_context
 from sqlalchemy import func, case, and_, or_
-from models import db, Contest, IndexBook, ContestPage, OAuthLogin, AuditLog, SlugAlias, Hub, migrate_schema
+from models import (db, Contest, IndexBook, ContestPage, OAuthLogin, AuditLog, SlugAlias, Hub, Enrollment,
+                    ToolAdmin, migrate_schema)
 import db_config
 import security
 from security import limiter
+import wiki_engine
 from wiki_engine import (
+    SUPER_ADMINS as ROOT_ADMINS,
     is_super_admin_name,
+    canonical_username,
+    global_account_exists,
     normalize_wiki_domain,
     is_user_wiki_admin,
     identify_bot_users,
@@ -180,6 +186,26 @@ def get_valid_access_token():
 
 def purge_expired_logins():
     OAuthLogin.query.filter(OAuthLogin.created_at < datetime.utcnow() - LOGIN_LIFETIME).delete(synchronize_session=False)
+
+
+# ---------- tool admins (root admins from PROOFSOURCE_SUPER_ADMINS + admins added in the UI) ----------
+_TOOL_ADMIN_CACHE = {"at": -1e9, "names": frozenset()}
+TOOL_ADMIN_CACHE_SECONDS = 30   # other uWSGI workers pick up changes within this time
+
+
+def tool_admin_names() -> frozenset:
+    now = time.monotonic()
+    if now - _TOOL_ADMIN_CACHE["at"] > TOOL_ADMIN_CACHE_SECONDS:
+        names = frozenset(canonical_username(u) for (u,) in db.session.query(ToolAdmin.username).all())
+        _TOOL_ADMIN_CACHE.update(at=now, names=names)
+    return _TOOL_ADMIN_CACHE["names"]
+
+
+def invalidate_tool_admin_cache():
+    _TOOL_ADMIN_CACHE.update(at=-1e9, names=frozenset())
+
+
+wiki_engine.set_admin_provider(tool_admin_names)
 
 def get_oauth_creds() -> dict:
     tok = get_valid_access_token()
@@ -377,6 +403,8 @@ def locked_fields(c: Contest) -> list:
         out.append("allow_custom_points")
     if (c.hub.bonus_policy or 'project') == 'no':
         out.append("max_bonus_points")
+    if (c.hub.submission_policy or 'project') in SUBMISSION_MODES:
+        out.append("submission_mode")
     return out
 
 
@@ -401,6 +429,8 @@ def apply_central_rules(c: Contest):
         c.allow_custom_points = False
     if (h.bonus_policy or 'project') == 'no':
         c.max_bonus_points = 0
+    if (h.submission_policy or 'project') in SUBMISSION_MODES:
+        c.submission_mode = h.submission_policy
     c.approval_status = h.approval_status or c.approval_status
 
 
@@ -445,6 +475,32 @@ def find_contest_by_slug(slug: str):
 #  Sync (incremental, never destructive on partial failure)
 # =====================================================================
 
+# Page lifecycle
+#   unproofread     placeholder (e.g. a reservation); not part of the contest
+#   eligible        meets the counting rules but is not submitted yet (enrol / manual submission)
+#   pending_review, accepted, needs_fix, rejected      listed in the contest
+#   reverted        was listed, then stopped qualifying (e.g. set back to "Not proofread" on the
+#                   wiki): kept and logged forever, 0 points, never reviewed
+LISTED_STATUSES = ('pending_review', 'accepted', 'needs_fix', 'rejected')
+SUBMISSION_MODES = ('auto', 'enroll', 'manual')
+SYNC_ACTOR = "ProofSource (sync)"
+SUBMIT_GRACE = timedelta(hours=24)   # manual submissions stay open one day after the contest ends
+
+
+def submission_mode(c) -> str:
+    m = (getattr(c, "submission_mode", None) or "auto")
+    return m if m in SUBMISSION_MODES else "auto"
+
+
+def enrolled_names(c: Contest) -> set:
+    return {u.strip().lower() for (u,) in db.session.query(Enrollment.username).filter(Enrollment.contest_id == c.id)}
+
+
+def is_enrolled(c: Contest, user: str) -> bool:
+    return bool(user) and db.session.query(Enrollment.id).filter(
+        Enrollment.contest_id == c.id, func.lower(Enrollment.username) == user.strip().lower()).first() is not None
+
+
 def _reset_page(p_obj, level=1):
     p_obj.wiki_level = level
     p_obj.proofreader = None
@@ -457,6 +513,52 @@ def _reset_page(p_obj, level=1):
     p_obj.jury_note = None
     p_obj.locked_by_jury = None
     p_obj.jury_lock_expires = None
+
+
+def _clear_revert(p_obj):
+    p_obj.reverted_from = None
+    p_obj.revert_reason = None
+    p_obj.reverted_at = None
+
+
+def _list_page(p_obj, points: int):
+    """Puts a page into the contest (review queue). Used by sync, enrolment and manual submit."""
+    p_obj.review_status = 'pending_review'
+    p_obj.base_points = points
+    p_obj.bonus_points = 0
+    p_obj.reviewed_by = None
+    p_obj.reviewed_at = None
+    _clear_revert(p_obj)
+
+
+def _drop_page(contest: Contest, p_obj, reason: str, level=None):
+    """A page stopped qualifying. Listed pages are never removed: they become 'reverted' (0 points,
+    out of review) and the change is logged. Unsubmitted ('eligible') pages simply go away."""
+    if p_obj.review_status in LISTED_STATUSES:
+        old = p_obj.review_status
+        p_obj.reverted_from = old
+        p_obj.revert_reason = reason
+        p_obj.reverted_at = datetime.utcnow()
+        p_obj.review_status = 'reverted'
+        p_obj.base_points = 0
+        p_obj.bonus_points = 0
+        p_obj.locked_by_jury = None
+        p_obj.jury_lock_expires = None
+        p_obj.assigned_to = None
+        if level is not None:
+            p_obj.wiki_level = level
+        log_action(contest.id, "page_reverted", p_obj.page_title, old=old, new="reverted",
+                   details={"reason": reason, "proofreader": p_obj.proofreader, "wiki_level": p_obj.wiki_level},
+                   username=SYNC_ACTOR)
+    elif p_obj.review_status == 'reverted':
+        if level is not None:
+            p_obj.wiki_level = level
+        if reason == 'excluded':
+            p_obj.revert_reason = reason
+    elif p_obj.review_status == 'eligible':
+        _reset_page(p_obj, level if level is not None else (p_obj.wiki_level or 1))
+    elif level is not None:
+        p_obj.wiki_level = level
 
 
 def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = False) -> bool:
@@ -482,33 +584,39 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
     bot_usernames = identify_bot_users(contest.wiki_domain, candidate_users)
     blocked_users = excluded_usernames.union(bot_usernames)
     book_pts = get_book_points(contest, book)
+    mode = submission_mode(contest)
+    enrolled = enrolled_names(contest) if mode == "enroll" else set()
+
+    def auto_listed(user: str) -> bool:
+        return mode == "auto" or (mode == "enroll" and user.strip().lower() in enrolled)
 
     for page_num, lp in live_map.items():
         p_obj = existing_pages.get(page_num)
         if lp.get("unchanged"):
             # nothing changed on the wiki; only re-apply exclusions that admins may have edited
-            if p_obj and p_obj.review_status != 'unproofread' and (
+            if p_obj and p_obj.review_status not in ('unproofread', 'reverted') and (
                     page_num in excluded_page_nums or (p_obj.proofreader or "").lower() in excluded_usernames):
-                _reset_page(p_obj, p_obj.wiki_level or 1)
+                _drop_page(contest, p_obj, "excluded")
             continue
 
         proofreader_name = (lp.get("proofreader") or "").strip()
         is_excluded = page_num in excluded_page_nums or proofreader_name.lower() in blocked_users
 
         if not is_excluded and lp.get("eligible") and lp["level"] in (3, 4):
+            when = lp.get("proofread_time") or datetime.utcnow()
             if not p_obj:
                 p_obj = ContestPage(
                     contest_id=contest.id, book_id=book.id, page_number=page_num,
                     page_title=lp["page_title"], wiki_level=lp["level"], proofreader=proofreader_name,
-                    validator=lp.get("validator"), proofread_rev_id=lp.get("rev_id"),
-                    proofread_time=lp.get("proofread_time") or datetime.utcnow(),
-                    review_status='pending_review', base_points=book_pts)
+                    validator=lp.get("validator"), proofread_rev_id=lp.get("rev_id"), proofread_time=when,
+                    review_status='pending_review' if auto_listed(proofreader_name) else 'eligible',
+                    base_points=book_pts if auto_listed(proofreader_name) else 0)
                 db.session.add(p_obj)
             else:
                 p_obj.page_title = lp["page_title"]
                 p_obj.wiki_level = lp["level"]
                 p_obj.proofread_rev_id = lp.get("rev_id")
-                if not same_user(p_obj.proofreader, proofreader_name) and p_obj.review_status != 'unproofread':
+                if not same_user(p_obj.proofreader, proofreader_name) and p_obj.review_status in LISTED_STATUSES:
                     # a different person now owns the proofread revision -> review again
                     p_obj.review_status = 'pending_review'
                     p_obj.reviewed_by = None
@@ -517,24 +625,38 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
                 p_obj.proofreader = proofreader_name
                 if lp.get("validator"):
                     p_obj.validator = lp.get("validator")
-                if p_obj.review_status in ('unproofread', 'needs_fix'):
+                if p_obj.review_status in ('unproofread', 'eligible'):
+                    p_obj.proofread_time = when
+                    if auto_listed(proofreader_name):
+                        _list_page(p_obj, book_pts)
+                    else:
+                        p_obj.review_status, p_obj.base_points = 'eligible', 0
+                elif p_obj.review_status == 'reverted':
+                    # proofread again after a revert: back into the contest, reviewed afresh
+                    log_action(contest.id, "page_restored", p_obj.page_title, old="reverted", new="pending_review",
+                               details={"proofreader": proofreader_name}, username=SYNC_ACTOR)
+                    _list_page(p_obj, book_pts)
+                    p_obj.proofread_time = when
+                elif p_obj.review_status == 'needs_fix':
                     p_obj.review_status = 'pending_review'
                     p_obj.base_points = book_pts
-                    p_obj.proofread_time = lp.get("proofread_time") or datetime.utcnow()
+                    p_obj.proofread_time = when
                 elif p_obj.review_status in ('accepted', 'pending_review'):
                     p_obj.base_points = book_pts
             p_obj.last_rev_id = lp.get("rev_latest")
         else:
             if p_obj:
-                if p_obj.review_status != 'unproofread':
-                    _reset_page(p_obj, lp.get("level", 1))
+                level = lp.get("level", 1)
+                reason = "excluded" if is_excluded else ("not_proofread" if level < 3 else "ineligible")
+                _drop_page(contest, p_obj, reason, level)
                 p_obj.last_rev_id = lp.get("rev_latest")
 
     # pages that disappeared from the wiki listing: only trust that if the listing was complete
     if complete:
         for page_num, p_obj in existing_pages.items():
-            if (page_num not in live_map or page_num in excluded_page_nums) and p_obj.review_status != 'unproofread':
-                _reset_page(p_obj, 1)
+            if (page_num not in live_map or page_num in excluded_page_nums) and \
+                    p_obj.review_status not in ('unproofread', 'reverted'):
+                _drop_page(contest, p_obj, "excluded" if page_num in excluded_page_nums else "ineligible")
                 p_obj.last_rev_id = None
 
     db.session.commit()
@@ -584,9 +706,12 @@ def book_stats_map(contest_id: int) -> dict:
             .group_by(ContestPage.book_id, ContestPage.review_status).all())
     out = {}
     for book_id, st, n in rows:
-        d = out.setdefault(book_id, {"listed": 0, "accepted": 0, "pending": 0, "rejected": 0, "needs_fix": 0})
-        if st != 'unproofread':
+        d = out.setdefault(book_id, {"listed": 0, "accepted": 0, "pending": 0, "rejected": 0, "needs_fix": 0,
+                                     "reverted": 0})
+        if st in LISTED_STATUSES:
             d["listed"] += n
+        if st == 'reverted':
+            d["reverted"] += n
         if st == 'accepted':
             d["accepted"] += n
         elif st == 'pending_review':
@@ -608,9 +733,10 @@ def compute_contest_leaderboard(contest: Contest) -> list:
                 func.sum(case((ContestPage.review_status == 'needs_fix', 1), else_=0)),
                 func.sum(case((ContestPage.review_status == 'rejected', 1), else_=0)),
                 func.sum(case((acc, ContestPage.bonus_points), else_=0)),
-                func.sum(case((acc, ContestPage.base_points + ContestPage.bonus_points), else_=0)))
+                func.sum(case((acc, ContestPage.base_points + ContestPage.bonus_points), else_=0)),
+                func.sum(case((ContestPage.review_status == 'reverted', 1), else_=0)))
             .filter(ContestPage.contest_id == contest.id,
-                    ContestPage.review_status != 'unproofread',
+                    ContestPage.review_status.in_(LISTED_STATUSES + ('reverted',)),
                     ContestPage.proofreader.isnot(None))
             .group_by(ContestPage.proofreader).all())
 
@@ -618,7 +744,7 @@ def compute_contest_leaderboard(contest: Contest) -> list:
     if contest.validate_points and contest.validate_points > 0:
         vrows = (db.session.query(ContestPage.validator, func.count(ContestPage.id))
                  .filter(ContestPage.contest_id == contest.id,
-                         ContestPage.review_status != 'unproofread',
+                         ContestPage.review_status.in_(LISTED_STATUSES),
                          ContestPage.wiki_level == 4,
                          ContestPage.validator.isnot(None))
                  .group_by(ContestPage.validator).all())
@@ -633,14 +759,15 @@ def compute_contest_leaderboard(contest: Contest) -> list:
         key = u.strip().lower()
         if key not in stats:
             stats[key] = {"username": u, "submitted": 0, "accepted": 0, "validated": 0, "pending": 0,
-                          "needs_fix": 0, "rejected": 0, "bonus": 0, "points": 0}
+                          "needs_fix": 0, "rejected": 0, "bonus": 0, "points": 0, "reverted": 0}
         return stats[key]
 
-    for u, sub, acc_n, pen, nf, rej, bonus, pts in rows:
+    for u, sub, acc_n, pen, nf, rej, bonus, pts, rev in rows:
         if not u or u.lower() in blocked_low:
             continue
         s = ensure(u)
-        s["submitted"] += int(sub or 0)
+        s["reverted"] += int(rev or 0)
+        s["submitted"] += int(sub or 0) - int(rev or 0)   # reverted pages no longer count as proofread
         s["accepted"] += int(acc_n or 0)
         s["pending"] += 0 if not contest.is_review_enabled else int(pen or 0)
         s["needs_fix"] += int(nf or 0)
@@ -683,7 +810,7 @@ def compute_daily_activity(contest: Contest) -> list:
     day = func.date(ContestPage.proofread_time)
     acc = _accepted_expr(contest)
     rows = (db.session.query(day, func.count(ContestPage.id), func.sum(case((acc, 1), else_=0)))
-            .filter(ContestPage.contest_id == contest.id, ContestPage.review_status != 'unproofread',
+            .filter(ContestPage.contest_id == contest.id, ContestPage.review_status.in_(LISTED_STATUSES),
                     ContestPage.proofread_time.isnot(None))
             .group_by(day).order_by(day).all())
     result = [{"date": str(d)[:10], "proofread": int(n), "accepted": int(a or 0)} for d, n, a in rows if d]
@@ -958,7 +1085,7 @@ def api_list_contests():
     for cid, st, n in (db.session.query(ContestPage.contest_id, ContestPage.review_status, func.count(ContestPage.id))
                        .group_by(ContestPage.contest_id, ContestPage.review_status).all()):
         d = counts.setdefault(cid, {"listed": 0, "accepted": 0})
-        if st != 'unproofread':
+        if st in LISTED_STATUSES:
             d["listed"] += n
         if st == 'accepted':
             d["accepted"] += n
@@ -1090,6 +1217,7 @@ def api_create_contest():
         announcement_en=clip(data.get("announcement_en"), LEN_TEXT),
         announcement_bn=clip(data.get("announcement_bn"), LEN_TEXT),
         review_assignment="equal" if data.get("review_assignment") == "equal" else "open",
+        submission_mode=data.get("submission_mode") if data.get("submission_mode") in SUBMISSION_MODES else "auto",
         allow_custom_points=bool(data.get("allow_custom_points", True)),
         last_synced_at=datetime.utcnow())
     db.session.add(c)
@@ -1132,7 +1260,7 @@ def contest_payload(c: Contest, current_user):
         effective_pages = max(0, b.total_pages - excl_in_range)
         if b.is_active:
             total_book_pages += effective_pages
-        st = bstats.get(b.id, {"listed": 0, "accepted": 0, "pending": 0, "rejected": 0, "needs_fix": 0})
+        st = bstats.get(b.id, {"listed": 0, "accepted": 0, "pending": 0, "rejected": 0, "needs_fix": 0, "reverted": 0})
         accepted = st["accepted"] + (0 if c.is_review_enabled else st["pending"])
         bs, be = b.window(c)
         books_data.append({
@@ -1141,12 +1269,13 @@ def contest_payload(c: Contest, current_user):
             "custom_points": b.custom_points, "excluded_pages": b.excluded_pages or "",
             "is_active": b.is_active, "listed": st["listed"], "accepted": accepted,
             "pending": st["pending"] if c.is_review_enabled else 0, "rejected": st["rejected"],
-            "start_iso": iso(b.start_time), "end_iso": iso(b.end_time),
+            "reverted": st["reverted"], "start_iso": iso(b.start_time), "end_iso": iso(b.end_time),
             "effective_start_iso": iso(bs), "effective_end_iso": iso(be),
         })
 
-    totals = {"listed": 0, "accepted": 0, "pending": 0}
+    totals = {"listed": 0, "accepted": 0, "pending": 0, "reverted": 0}
     for st in bstats.values():
+        totals["reverted"] += st["reverted"]
         totals["listed"] += st["listed"]
         totals["accepted"] += st["accepted"]
         totals["pending"] += st["pending"]
@@ -1155,8 +1284,12 @@ def contest_payload(c: Contest, current_user):
         totals["pending"] = 0
     rejected_hold_count = ContestPage.query.filter_by(contest_id=c.id, review_status='rejected', wiki_level=3).count()
 
-    my_needs_fix, my_pages_count = [], 0
+    mode = submission_mode(c)
+    my_needs_fix, my_pages_count, enrolled_me, my_eligible = [], 0, False, 0
     if current_user:
+        enrolled_me = mode == "enroll" and is_enrolled(c, current_user)
+        if mode == "manual":
+            my_eligible = _eligible_query(c, current_user).count()
         my_needs_fix = [
             {"id": p.id, "page_title": p.page_title, "proofreader": p.proofreader, "jury_note": p.jury_note}
             for p in ContestPage.query.filter_by(contest_id=c.id, review_status='needs_fix', proofreader=current_user).limit(200).all()]
@@ -1164,6 +1297,17 @@ def contest_payload(c: Contest, current_user):
 
     leaderboard = compute_contest_leaderboard(c)
     stale = (not c.last_synced_at) or (now - c.last_synced_at).total_seconds() > 300
+    titles = {b.id: b.title for b in c.books}
+    reverted = [{
+        "id": p.id, "page_title": p.page_title, "book_title": titles.get(p.book_id, ""), "page_number": p.page_number,
+        "proofreader": p.proofreader, "reverted_from": p.reverted_from, "reason": p.revert_reason or "ineligible",
+        "wiki_level": p.wiki_level, "reverted_iso": iso(p.reverted_at)}
+        for p in ContestPage.query.filter_by(contest_id=c.id, review_status='reverted')
+                                  .order_by(ContestPage.reverted_at.desc(), ContestPage.id.desc()).limit(500).all()]
+    enrolled = []
+    if mode == "enroll":
+        enrolled = [{"username": e.username, "iso": iso(e.created_at)}
+                    for e in Enrollment.query.filter_by(contest_id=c.id).order_by(Enrollment.created_at.asc()).limit(5000).all()]
 
     return {
         "contest": {
@@ -1199,6 +1343,12 @@ def contest_payload(c: Contest, current_user):
             "last_backup_iso": iso(c.last_backup_at) if is_adm else None,
             "backup_reminder": backup_reminder(c, now) if is_adm else None,
             "needs_sync": stale and c.approval_status == "approved",
+            "submission_mode": mode,
+            "submission_choice": (c.hub.submission_policy or "project") if c.hub else "project",
+            "is_enrolled": enrolled_me, "enrolled_count": len(enrolled),
+            "my_eligible_count": my_eligible,
+            "can_enroll": mode == "enroll" and c.approval_status == "approved" and now <= c.end_time,
+            "can_submit": mode == "manual" and c.approval_status == "approved" and now <= c.end_time + SUBMIT_GRACE,
             "sync_running": bool(c.sync_started_at and (now - c.sync_started_at).total_seconds() < 600),
         },
         "stats": {
@@ -1206,8 +1356,10 @@ def contest_payload(c: Contest, current_user):
             "total_book_pages": total_book_pages,
             "listed_pages": totals["listed"], "accepted_pages": totals["accepted"],
             "pending_pages": totals["pending"], "rejected_hold_count": rejected_hold_count,
-            "participants": len(leaderboard),
+            "participants": len(leaderboard), "reverted_pages": totals["reverted"],
         },
+        "reverted": reverted,
+        "enrolled": enrolled,
         "books": books_data,
         "leaderboard": leaderboard,
         "jury_stats": compute_jury_statistics(c) if c.is_review_enabled else [],
@@ -1253,7 +1405,7 @@ def api_sync_contest(cid):
 
 
 CONFIG_FIELDS_TEXT = ["title", "description", "wiki_domain", "jury_mode", "reject_action", "admins", "juries",
-                      "excluded_users", "announcement_en", "announcement_bn", "review_assignment"]
+                      "excluded_users", "announcement_en", "announcement_bn", "review_assignment", "submission_mode"]
 CONFIG_FIELDS_INT = ["proofread_points", "validate_points", "max_bonus_points"]
 CONFIG_FIELDS_BOOL = ["jury_gets_points", "review_enabled", "bulk_review_enabled", "allow_custom_points"]
 BOOL_DEFAULTS = {"review_enabled": True, "allow_custom_points": True}
@@ -1268,6 +1420,8 @@ def api_update_contest_config(cid):
     locked = set(locked_fields(c))
     for f in locked:
         data.pop(f, None)
+    if data.get("submission_mode") not in (None,) + SUBMISSION_MODES:
+        return err("invalid_value")
     if data.get("review_assignment") not in (None, "open", "equal") or \
             data.get("jury_mode") not in (None,) + JURY_MODES or \
             data.get("reject_action") not in (None,) + REJECT_ACTIONS:
@@ -1354,7 +1508,9 @@ def api_update_contest_config(cid):
         c.last_synced_at = None
     db.session.commit()
 
-    if {"review_assignment", "juries", "review_enabled"} & set(changes):
+    if "submission_mode" in changes and apply_submission_mode(c):
+        db.session.commit()
+    if {"review_assignment", "juries", "review_enabled", "submission_mode"} & set(changes):
         assign_pending(c, rebalance=True)
 
     if (data.get("books") or "").strip():
@@ -1471,7 +1627,9 @@ def api_remove_contest_book(cid, bid):
     mode = json_body().get("mode", "keep_points")
     if mode == "keep_points":
         book.is_active = False
-        ContestPage.query.filter_by(book_id=book.id, review_status='unproofread').delete()
+        # keep everything that was ever listed (incl. reverted); unsubmitted pages go with the book
+        ContestPage.query.filter(ContestPage.book_id == book.id,
+                                 ContestPage.review_status.in_(['unproofread', 'eligible'])).delete(synchronize_session=False)
     else:
         db.session.delete(book)
     log_action(cid, "book_remove", book.title, details={"mode": mode})
@@ -1510,7 +1668,7 @@ def api_reserve_contest_page(cid):
               .filter(ContestPage.book_id == book.id, ContestPage.user_lock_expires > now).all())
     reserved_nums = {n for n, u in locked if u != current_user}
     submitted_nums = [n for (n,) in db.session.query(ContestPage.page_number)
-                      .filter(ContestPage.book_id == book.id, ContestPage.review_status != 'unproofread').all()]
+                      .filter(ContestPage.book_id == book.id, ContestPage.review_status != 'unproofread').all()]   # incl. eligible/reverted
     submitted_nums += [n for n, _ in locked]
 
     available_nums = [n for n in range(1, max_p + 1)
@@ -1539,13 +1697,116 @@ def api_reserve_contest_page(cid):
     return jsonify({"success": True, "page_title": page_title, "edit_url": edit_url})
 
 
+def _eligible_query(c: Contest, username: str):
+    """Pages of `username` that meet the counting rules but were not submitted yet."""
+    return ContestPage.query.filter(ContestPage.contest_id == c.id, ContestPage.review_status == 'eligible',
+                                    func.lower(ContestPage.proofreader) == username.strip().lower())
+
+
+def _list_eligible(c: Contest, pages) -> int:
+    n = 0
+    for p in pages:
+        if p.review_status == 'eligible':
+            _list_page(p, get_book_points(c, p.book))
+            n += 1
+    return n
+
+
+def apply_submission_mode(c: Contest):
+    """After the mode changes, pages already waiting as 'eligible' follow the new rule."""
+    mode = submission_mode(c)
+    if mode == "manual":
+        return 0
+    q = ContestPage.query.filter(ContestPage.contest_id == c.id, ContestPage.review_status == 'eligible')
+    if mode == "enroll":
+        names = list(enrolled_names(c))
+        if not names:
+            return 0
+        q = q.filter(func.lower(ContestPage.proofreader).in_(names))
+    return _list_eligible(c, q.all())
+
+
+@app.route("/api/contests/<int:cid>/enroll", methods=["POST"])
+def api_enroll(cid):
+    """Semi-automatic submission: from now on this participant's eligible pages are listed automatically
+    (including pages they already proofread in this contest)."""
+    c = Contest.query.get_or_404(cid)
+    user = get_current_user()
+    if not user:
+        return err("auth_required", 401)
+    if submission_mode(c) != "enroll":
+        return err("enrollment_closed")
+    if c.approval_status != "approved":
+        return err("contest_awaiting_approval")
+    if datetime.utcnow() > c.end_time:
+        return err("contest_ended")
+    if is_enrolled(c, user):
+        return jsonify({"success": True, "already": True, "listed": 0})
+    db.session.add(Enrollment(contest_id=c.id, username=user))
+    listed = _list_eligible(c, _eligible_query(c, user).all())
+    log_action(c.id, "enroll", user, details={"listed_now": listed}, username=user)
+    db.session.commit()
+    try:
+        assign_pending(c)
+    except Exception:
+        db.session.rollback()
+    return jsonify({"success": True, "listed": listed})
+
+
+@app.route("/api/contests/<int:cid>/my-eligible", methods=["GET"])
+def api_my_eligible(cid):
+    """Manual submission: the logged-in user's pages that qualify but are not submitted yet."""
+    c = Contest.query.get_or_404(cid)
+    user = get_current_user()
+    if not user:
+        return err("auth_required", 401)
+    titles = {b.id: b.title for b in c.books}
+    rows = _eligible_query(c, user).order_by(ContestPage.book_id, ContestPage.page_number).limit(5000).all()
+    return jsonify({"success": True, "mode": submission_mode(c), "pages": [{
+        "id": p.id, "page_title": p.page_title, "book_title": titles.get(p.book_id, ""), "page_number": p.page_number,
+        "wiki_level": p.wiki_level, "proofread_iso": iso(p.proofread_time),
+        "points": get_book_points(c, p.book)} for p in rows]})
+
+
+@app.route("/api/contests/<int:cid>/submit", methods=["POST"])
+def api_submit_pages(cid):
+    """Manual submission of selected eligible pages (only the proofreader can submit their pages)."""
+    c = Contest.query.get_or_404(cid)
+    user = get_current_user()
+    if not user:
+        return err("auth_required", 401)
+    if submission_mode(c) != "manual":
+        return err("manual_submission_off")
+    if c.approval_status != "approved":
+        return err("contest_awaiting_approval")
+    if datetime.utcnow() > c.end_time + SUBMIT_GRACE:
+        return err("contest_ended")
+    raw_ids = json_body().get("page_ids") or []
+    if not isinstance(raw_ids, list) or not raw_ids:
+        return err("nothing_selected")
+    ids = {to_int(x, 0) for x in raw_ids[:5000]}
+    pages = _eligible_query(c, user).filter(ContestPage.id.in_(ids)).all()   # foreign/listed ids are ignored
+    submitted = _list_eligible(c, pages)
+    if submitted:
+        log_action(c.id, "manual_submit", user, details={"pages": submitted, "titles": [p.page_title for p in pages][:50]},
+                   username=user)
+    db.session.commit()
+    if submitted:
+        try:
+            assign_pending(c)
+        except Exception:
+            db.session.rollback()
+    return jsonify({"success": True, "submitted": submitted, "skipped": len(ids) - submitted})
+
+
 def _user_pages_query(c: Contest, username: str):
     """A participant's own contest work: pages they proofread, plus pages they validated only when
     validation earns points (never a jury's in-tool work when juries get no validation points)."""
     cond = ContestPage.proofreader == username
     if validation_visible(c, username):
         cond = or_(cond, and_(ContestPage.validator == username, ContestPage.wiki_level == 4))
-    return ContestPage.query.filter(ContestPage.contest_id == c.id, ContestPage.review_status != 'unproofread', cond)
+    return ContestPage.query.filter(ContestPage.contest_id == c.id,
+                                    ContestPage.review_status.in_(LISTED_STATUSES + ('reverted',)), cond)
 
 
 @app.route("/api/contests/<int:cid>/user/<path:username>/pages", methods=["GET"])
@@ -1693,7 +1954,7 @@ def _review_query(c: Contest, reviewer: str, book_id=None, status="pending_revie
     now = datetime.utcnow()
     q = ContestPage.query.filter(
         ContestPage.contest_id == c.id,
-        ContestPage.review_status != 'unproofread',
+        ContestPage.review_status.in_(LISTED_STATUSES),
         ContestPage.proofreader.isnot(None),
         func.lower(ContestPage.proofreader) != (reviewer or "").strip().lower(),
         or_(ContestPage.locked_by_jury.is_(None), ContestPage.locked_by_jury == reviewer,
@@ -1734,6 +1995,7 @@ def api_jury_next_page(cid):
     if specific_page_id:
         next_page = ContestPage.query.filter(
             ContestPage.id == specific_page_id, ContestPage.contest_id == cid,
+            ContestPage.review_status.in_(LISTED_STATUSES),
             func.lower(ContestPage.proofreader) != (reviewer or "").lower()).first()
     else:
         if after_book:
@@ -1872,7 +2134,7 @@ def api_jury_submit(cid):
     page = ContestPage.query.filter_by(id=to_int(data.get("page_id"), 0), contest_id=cid).first_or_404()
     if same_user(page.proofreader, reviewer):
         return err("own_page_review")
-    if page.review_status == 'unproofread':
+    if page.review_status not in LISTED_STATUSES:   # unsubmitted or reverted pages are never reviewed
         return err("page_not_reviewable")
     if page.locked_by_jury and not same_user(page.locked_by_jury, reviewer) \
             and page.jury_lock_expires and page.jury_lock_expires > datetime.utcnow():
@@ -1936,7 +2198,7 @@ def api_bulk_review(cid):
     done, skipped_own, unchanged, failed = [], [], [], []
     for pid in ids:
         page = ContestPage.query.filter_by(id=pid, contest_id=cid).first()
-        if not page or page.review_status == 'unproofread':
+        if not page or page.review_status not in LISTED_STATUSES:
             failed.append({"id": pid, "error_code": "page_not_reviewable"})
             continue
         if same_user(page.proofreader, reviewer):
@@ -2101,7 +2363,7 @@ def api_restore(cid):
     try:
         res = backup_engine.restore_contest(db, c, payload, {
             "Contest": Contest, "IndexBook": IndexBook, "ContestPage": ContestPage,
-            "AuditLog": AuditLog, "Hub": Hub}, user)
+            "AuditLog": AuditLog, "Hub": Hub, "Enrollment": Enrollment}, user)
     except Exception:
         log.exception("restore failed for contest %s", c.id)
         return err("restore_failed", 500)
@@ -2127,6 +2389,54 @@ def api_audit(cid):
          "created_iso": iso(a.created_at)} for a in rows]})
 
 
+def _tool_admins_payload():
+    rows = ToolAdmin.query.order_by(ToolAdmin.created_at.asc()).all()
+    return {"success": True,
+            "root": sorted(ROOT_ADMINS),
+            "admins": [{"username": a.username, "added_by": a.added_by, "iso": iso(a.created_at)} for a in rows]}
+
+
+@app.route("/api/admin/tool-admins", methods=["GET", "POST"])
+def api_tool_admins():
+    user = get_current_user()
+    if not is_super_admin(user):
+        return err("super_admin_only", 403)
+    if request.method == "GET":
+        return jsonify(_tool_admins_payload())
+    name = canonical_username(clip(json_body().get("username"), 120))
+    if name.lower().startswith("user:"):
+        name = canonical_username(name[5:])
+    if not name or len(name) > 85 or any(ch in name for ch in "#<>[]|{}/@:"):
+        return err("invalid_username")
+    if name in ROOT_ADMINS or ToolAdmin.query.filter(func.lower(ToolAdmin.username) == name.lower()).first():
+        return err("already_tool_admin")
+    if global_account_exists(name) is False:
+        return err("user_not_found")
+    db.session.add(ToolAdmin(username=name, added_by=user))
+    log_action(None, "tool_admin_add", name, username=user)
+    db.session.commit()
+    invalidate_tool_admin_cache()
+    return jsonify(_tool_admins_payload())
+
+
+@app.route("/api/admin/tool-admins/<path:username>", methods=["DELETE"])
+def api_tool_admin_remove(username):
+    user = get_current_user()
+    if not is_super_admin(user):
+        return err("super_admin_only", 403)
+    name = canonical_username(username)
+    if name in ROOT_ADMINS:
+        return err("cannot_remove_root_admin")
+    row = ToolAdmin.query.filter(ToolAdmin.username == name).first()
+    if not row:
+        return err("not_found", 404)
+    db.session.delete(row)
+    log_action(None, "tool_admin_remove", name, username=user)
+    db.session.commit()
+    invalidate_tool_admin_cache()
+    return jsonify(_tool_admins_payload())
+
+
 @app.route("/api/admin/snapshots", methods=["GET", "POST"])
 def api_snapshots():
     user = get_current_user()
@@ -2150,6 +2460,7 @@ def _delete_contest(c: Contest, actor: str, reason: str = "") -> str:
                                                          "reason": reason or c.delete_reason, "backup": os.path.basename(path)},
                username=actor)
     SlugAlias.query.filter_by(contest_id=c.id).delete()
+    Enrollment.query.filter_by(contest_id=c.id).delete(synchronize_session=False)
     ContestPage.query.filter_by(contest_id=c.id).delete(synchronize_session=False)
     IndexBook.query.filter_by(contest_id=c.id).delete(synchronize_session=False)
     db.session.delete(c)
@@ -2287,7 +2598,8 @@ def sync_children(h: Hub, projects: list, actor: str):
     wanted = {p["wiki_domain"]: p for p in projects}
     for dom, c in existing.items():
         if dom not in wanted:
-            if ContestPage.query.filter(ContestPage.contest_id == c.id, ContestPage.review_status != 'unproofread').count():
+            if ContestPage.query.filter(ContestPage.contest_id == c.id,
+                                        ContestPage.review_status.in_(LISTED_STATUSES + ('reverted',))).count():
                 raise ValueError("project_has_data")
             log_action(c.id, "project_removed", dom, username=actor)
             db.session.delete(c)
@@ -2312,7 +2624,10 @@ def sync_children(h: Hub, projects: list, actor: str):
 
 def propagate_central(h: Hub, dates_changed: bool, points_changed: bool):
     for c in h.contests:
+        old_mode = submission_mode(c)
         apply_central_rules(c)
+        if submission_mode(c) != old_mode:
+            apply_submission_mode(c)
         if dates_changed:
             ContestPage.query.filter_by(contest_id=c.id).update({"last_rev_id": None}, synchronize_session=False)
             c.last_synced_at = None
@@ -2349,6 +2664,10 @@ def _central_fields_from(data: dict, h: Hub):
             if data[f] not in POLICY_VALUES:
                 raise ValueError("invalid_value")
             setattr(h, f, data[f])
+    if "submission_policy" in data:
+        if data["submission_policy"] not in ("project",) + SUBMISSION_MODES:
+            raise ValueError("invalid_value")
+        h.submission_policy = data["submission_policy"]
 
 
 def central_brief(h: Hub, now=None) -> dict:
@@ -2462,13 +2781,16 @@ def api_get_central(slug):
         bstats = book_stats_map(c.id)
         listed = sum(v["listed"] for v in bstats.values())
         accepted = sum(v["accepted"] + (0 if c.is_review_enabled else v["pending"]) for v in bstats.values())
+        reverted = sum(v["reverted"] for v in bstats.values())
+        totals["reverted"] = totals.get("reverted", 0) + reverted
         books = len([b for b in c.books if b.is_active])
         totals["listed"] += listed
         totals["accepted"] += accepted
         totals["books"] += books
         projects.append({"contest_id": c.id, "slug": c.slug, "lang_code": c.lang_code, "wiki_domain": c.wiki_domain,
                          "title": c.title, "admins_list": split_users(c.admins), "books": books, "listed": listed,
-                         "accepted": accepted, "participants": len(board), "points": sum(r["points"] for r in board),
+                         "accepted": accepted, "reverted": reverted, "participants": len(board),
+                         "points": sum(r["points"] for r in board), "submission_mode": submission_mode(c),
                          "review_enabled": c.is_review_enabled, "is_admin": is_contest_admin(c, user)})
         for r in board:
             key = r["username"].strip().lower()   # SUL: one global account name on every wiki
@@ -2490,6 +2812,7 @@ def api_get_central(slug):
             "proofread_points": h.proofread_points, "validate_points": h.validate_points or 0,
             "custom_points_policy": h.custom_points_policy or "project", "bonus_policy": h.bonus_policy or "project",
             "review_policy": h.review_policy or "project",
+            "submission_policy": h.submission_policy or "project",
             "start_time": h.start_time.strftime(DT_FMT_IN) if h.start_time else "",
             "end_time": h.end_time.strftime(DT_FMT_IN) if h.end_time else "",
             "admins": h.admins or "", "admins_list": split_users(h.admins), "created_by": h.created_by,
@@ -2501,6 +2824,7 @@ def api_get_central(slug):
         "projects": projects,
         "leaderboard": board,
         "stats": {"participants": len(board), "listed": totals["listed"], "accepted": totals["accepted"],
+                  "reverted": totals.get("reverted", 0),
                   "books": totals["books"], "projects": len(projects),
                   "daily": sorted(daily.values(), key=lambda x: x["date"])[-30:]},
     })

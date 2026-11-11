@@ -63,7 +63,7 @@ CONTEST_FIELDS = [
     "slug", "title", "description", "wiki_domain", "proofread_points", "validate_points",
     "max_bonus_points", "jury_mode", "jury_gets_points", "reject_action", "created_by", "admins",
     "juries", "excluded_users", "approval_status", "approved_by", "review_enabled",
-    "bulk_review_enabled", "announcement_en", "announcement_bn",
+    "bulk_review_enabled", "announcement_en", "announcement_bn", "submission_mode",
 ]
 CONTEST_DT_FIELDS = ["start_time", "end_time", "last_synced_at", "created_at", "last_backup_at"]
 
@@ -73,8 +73,9 @@ BOOK_DT_FIELDS = ["start_time", "end_time", "created_at"]
 PAGE_FIELDS = [
     "page_number", "page_title", "wiki_level", "proofreader", "validator", "proofread_rev_id",
     "review_status", "reviewed_by", "base_points", "bonus_points", "jury_note", "last_rev_id",
+    "reverted_from", "revert_reason",
 ]
-PAGE_DT_FIELDS = ["proofread_time", "reviewed_at"]
+PAGE_DT_FIELDS = ["proofread_time", "reviewed_at", "reverted_at"]
 
 
 def _checksum(data: dict) -> str:
@@ -120,7 +121,9 @@ def export_contest(contest, ContestPage, AuditLog, page_chunk: int = 2000, secre
         for a in AuditLog.query.filter_by(contest_id=contest.id).order_by(AuditLog.id.asc()).all()
     ]
 
-    data = {"contest": c, "books": books, "pages": pages, "audit": audit}
+    enrollments = [{"username": e.username, "created_at": _dt(e.created_at)}
+                   for e in getattr(contest, "enrollments", None) or []]
+    data = {"contest": c, "books": books, "pages": pages, "audit": audit, "enrollments": enrollments}
     checksum = _checksum(data)
     out = {
         "format": "proofsource-backup",
@@ -136,7 +139,7 @@ def export_contest(contest, ContestPage, AuditLog, page_chunk: int = 2000, secre
     return out
 
 
-VALID_PAGE_STATUSES = {"unproofread", "pending_review", "accepted", "needs_fix", "rejected"}
+VALID_PAGE_STATUSES = {"unproofread", "eligible", "pending_review", "accepted", "needs_fix", "rejected", "reverted"}
 
 
 def _page_row_problem(p) -> str:
@@ -237,6 +240,7 @@ def restore_contest(db, contest, payload, models, username: str) -> dict:
     Caller must have validated the payload. A safety JSON of the current state is written first.
     """
     IndexBook, ContestPage, AuditLog = models["IndexBook"], models["ContestPage"], models["AuditLog"]
+    Enrollment = models.get("Enrollment")
 
     safety = export_contest(contest, ContestPage, AuditLog)
     safety_path = save_json_file(safety, f"pre-restore-contest{contest.id}")
@@ -246,6 +250,15 @@ def restore_contest(db, contest, payload, models, username: str) -> dict:
     try:
         ContestPage.query.filter_by(contest_id=contest.id).delete(synchronize_session=False)
         IndexBook.query.filter_by(contest_id=contest.id).delete(synchronize_session=False)
+        if Enrollment is not None and isinstance(data.get("enrollments"), list):
+            Enrollment.query.filter_by(contest_id=contest.id).delete(synchronize_session=False)
+            seen = set()
+            for e in data["enrollments"]:
+                name = str((e or {}).get("username") or "").strip()[:100]
+                if name and name.lower() not in seen:
+                    seen.add(name.lower())
+                    db.session.add(Enrollment(contest_id=contest.id, username=name,
+                                              created_at=_parse_dt((e or {}).get("created_at")) or datetime.utcnow()))
         db.session.flush()
 
         for f in CONTEST_FIELDS:
