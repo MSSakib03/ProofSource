@@ -15,7 +15,16 @@
 
 ProofSource finds every page that is proofread on Wikisource during a contest, lets reviewers (juries) accept or reject them, and keeps a live leaderboard. It works on any language edition of Wikisource, and several projects can join one **central contest** with a combined leaderboard.
 
-> 📖 This is the **user guide** ([বাংলা সংস্করণ](README_bn.md)). For the technical design, see [ARCHITECTURE.md](ARCHITECTURE.md).
+> 📖 This is the **user guide** ([বাংলা সংস্করণ](README_bn.md)). For the technical design, see [ARCHITECTURE.md](ARCHITECTURE.md); for the security review, [docs/SECURITY_AUDIT.md](docs/SECURITY_AUDIT.md).
+
+<p align="center">
+  <img src="docs/screenshots/home.webp" alt="ProofSource home page" width="49%" />
+  <img src="docs/screenshots/contest.webp" alt="A contest dashboard" width="49%" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/review-dark.webp" alt="The review panel in dark mode" width="74%" />
+  <img src="docs/screenshots/mobile.webp" alt="A contest on a phone" width="23%" />
+</p>
 
 ---
 
@@ -45,7 +54,8 @@ ProofSource finds every page that is proofread on Wikisource during a contest, l
 | 📚 **Flexible books** | Per-book points, excluded pages (`1-5, 12`) and per-book time windows. |
 | 💾 **Backups** | Full JSON backup and restore, CSV exports, automatic snapshots and reminders. |
 | 📝 **Activity log** | Every admin action is recorded and cannot be edited. |
-| 🌙 **Comfortable UI** | English and Bangla, dark mode, mobile friendly, keyboard shortcuts. |
+| 🌙 **Comfortable UI** | Wikimedia (Codex) design, English and Bangla, dark mode, mobile friendly, keyboard shortcuts. |
+| 🔒 **Private & safe** | No third-party CDNs or trackers; OAuth tokens encrypted at rest; CSRF, CSP and signed backups. |
 
 ---
 
@@ -66,7 +76,7 @@ On the home page, contests are grouped into **Active, Upcoming, Ended and Pendin
 ### Taking part
 1. Open the contest from the home page, or use the direct link from the organizers (for example `/contest/bn/wcnov26`).
 2. The **Index Books** tab lists the books in the contest, their points per page and any book-specific time window.
-3. Click **Proofread Any Page** to open a random unproofread page on Wikisource. You can pick a book first. The page is reserved for you for 20 minutes.
+3. Click **Proofread Any Page** (you need to be logged in) to open a random unproofread page on Wikisource. You can pick a book first. The page is reserved for you for 20 minutes.
 4. Proofread it on Wikisource as usual and save it as **Proofread**. The tool picks it up automatically. Press the sync button (↻) to refresh immediately.
 
 ### My Pages
@@ -192,7 +202,7 @@ Visible to admins only. It records who changed what and when, with old and new v
 At the bottom of the configuration page:
 - **Download full backup (JSON):** the complete contest, restorable. A copy is also kept on the server.
 - **Download all pages (CSV):** for spreadsheets.
-- **Restore:** choose a JSON backup. It is verified first, then press **Restore this backup**. A safety copy of the current data is saved automatically. Only an intact backup of this same contest is accepted.
+- **Restore:** choose a JSON backup. It is verified first, then press **Restore this backup**. A safety copy of the current data is saved automatically. Only an intact backup of this same contest is accepted. Every backup is signed by the server; backups made elsewhere (or old, unsigned ones) can only be restored by the tool admin. A restore never changes the contest's approval, creator, wiki or link.
 - **Reminders:** you are reminded on the dashboard if no backup was taken for 7 days.
 
 ### Deleting a contest
