@@ -30,60 +30,64 @@
 <div id="app" v-cloak class="min-h-screen flex flex-col w-full max-w-[100vw] overflow-x-hidden">
   <a href="#ps-main" class="sr-only focus:not-sr-only focus:absolute focus:z-[80] focus:top-2 focus:left-2 ps-btn ps-btn-primary">{{ t('skipToContent') }}</a>
 
-  <header class="ps-header sticky top-0 z-30">
+  <header class="bg-gradient-to-r from-ws-dark via-ws-chambray to-ws-cerulean dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 text-white border-b border-white/10 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
     <div class="max-w-7xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
-      <div class="flex items-center gap-4 sm:gap-8 min-w-0 self-stretch">
-        <a href="/" @click.prevent="goHome" class="flex items-center gap-2.5 shrink-0 no-underline" aria-label="ProofSource">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="4 12 58 40" class="ps-logo shrink-0" aria-hidden="true">
-            <path d="M7 18.5Q18 14.5 30.5 19.2V46.5Q18 42 7 45.5z" class="fill-white dark:fill-slate-800" stroke="#3366cc" stroke-width="1.6" stroke-linejoin="round"/>
-            <path d="M57 18.5Q46 14.5 33.5 19.2V46.5Q46 42 57 45.5z" class="fill-white dark:fill-slate-800" stroke="#3366cc" stroke-width="1.6" stroke-linejoin="round"/>
-            <g fill="none" stroke-width="2.6" stroke-linecap="round">
-              <path d="M11.5 24.2Q18.5 22.2 26.5 24.6" stroke="#ffa0a0"/>
-              <path d="M11.5 30Q18.5 28 26.5 30.4" stroke="#b0b0ff"/>
-              <path d="M11.5 35.8Q16 34.4 20.5 35.4" stroke="#e8cf3b"/>
-              <path d="M37.5 24.6Q45.5 22.2 52.5 24.2" stroke="#6fd36f"/>
-              <path d="M37.5 30.4Q43 28.7 46.5 29.4" stroke="#6fd36f" opacity=".7"/>
-            </g>
-            <circle cx="51" cy="44.5" r="8.6" fill="#3366cc" class="stroke-white dark:stroke-slate-950" stroke-width="3.2"/>
-            <path d="M47.2 44.7l2.8 2.8 5.1-5.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="flex flex-col leading-none">
-            <span class="ps-wordmark"><b>Proof</b>Source</span>
-            <span class="hidden sm:block text-[10px] tracking-[.14em] uppercase text-slate-500 dark:text-slate-400 mt-1">{{ t('tagline') }}</span>
+      <div class="flex items-center gap-4 sm:gap-7 min-w-0 self-stretch">
+        <a href="/" @click.prevent="goHome" class="flex items-center gap-2.5 shrink-0 no-underline !text-white" aria-label="ProofSource">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="4 12 58 40" class="ps-logo shrink-0" aria-hidden="true">
+  <defs>
+    <linearGradient id="psl" x1="0" x2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#dce8f4"/></linearGradient>
+    <linearGradient id="psr" x1="1" x2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#dce8f4"/></linearGradient>
+  </defs>
+  <path d="M7 18.5Q18 14.5 30.5 19.2V46.5Q18 42 7 45.5z" fill="url(#psl)"/>
+  <path d="M57 18.5Q46 14.5 33.5 19.2V46.5Q46 42 57 45.5z" fill="url(#psr)"/>
+  <g fill="none" stroke="#4D8AC0" stroke-width="2.8" stroke-linecap="round">
+    <path d="M11.5 24.2Q18.5 22.2 26.5 24.6"/>
+    <path d="M11.5 30Q18.5 28 26.5 30.4" opacity=".72"/>
+    <path d="M11.5 35.8Q16 34.4 20.5 35.4" opacity=".48"/>
+    <path d="M37.5 24.6Q45.5 22.2 52.5 24.2"/>
+    <path d="M37.5 30.4Q43 28.7 46.5 29.4" opacity=".72"/>
+    <path d="M37.5 36.1Q40.5 35.2 42.5 35.4" opacity=".48"/>
+  </g>
+  <circle cx="51" cy="44.5" r="8.6" fill="#4D8AC0" style="stroke:var(--ps-logo-ring,#2f4f8c)" stroke-width="3.2"/>
+  <path d="M47.2 44.7l2.8 2.8 5.1-5.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
+          <span class="flex flex-col leading-none min-w-0 max-[380px]:hidden">
+            <span class="ps-wordmark !text-white"><b>Proof</b>Source</span>
+            <span class="hidden sm:block text-[10px] tracking-[.14em] uppercase text-white/70 mt-1">{{ t('tagline') }}</span>
           </span>
         </a>
         <nav class="hidden md:flex items-stretch gap-5 self-stretch" :aria-label="t('contests')">
           <a href="/" @click.prevent="goHome" class="ps-nav-link flex items-center" :class="view === 'home' ? 'is-active' : ''">{{ t('contests') }}</a>
           <a v-if="loggedIn" href="/" @click.prevent="openCreateContest" class="ps-nav-link flex items-center" :class="view === 'create' ? 'is-active' : ''">{{ t('newContest') }}</a>
           <a v-if="loggedIn" href="/" @click.prevent="openCreateCentral" class="ps-nav-link flex items-center" :class="view === 'central_form' ? 'is-active' : ''">{{ t('newCentral') }}</a>
+          <a v-if="isSuperAdmin" href="/" @click.prevent="openToolAdmins" class="ps-nav-link flex items-center" :class="view === 'tooladmins' ? 'is-active' : ''">{{ t('toolAdmins') }}</a>
         </nav>
       </div>
 
-      <div class="flex items-center gap-1 sm:gap-1.5 shrink-0">
-        <button @click="toggleLang" class="ps-btn ps-btn-quiet" :title="t('switchLanguage')">
-          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="m5 8 6 6"/><path d="m4 14 6-6 2-3"/><path d="M2 5h12"/><path d="M7 2h1"/><path d="m22 22-5-10-5 10"/><path d="M14 18h6"/></svg>
-          <span>{{ lang === 'en' ? 'বাংলা' : 'English' }}</span>
+      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
+        <button @click="toggleLang" class="ps-hbtn" :title="t('switchLanguage')">
+          <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          <span>{{ lang === 'en' ? 'বাংলা' : 'EN' }}</span>
         </button>
-        <button @click="toggleTheme" :title="darkMode ? t('light') : t('dark')" :aria-label="darkMode ? t('light') : t('dark')" class="ps-btn ps-btn-quiet ps-btn-icon">
-          <svg v-if="darkMode" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="4.5"></circle><path d="M12 1.5v2.5M12 20v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M1.5 12H4M20 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"></path></svg>
-          <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+        <button @click="toggleTheme" :title="darkMode ? t('light') : t('dark')" :aria-label="darkMode ? t('light') : t('dark')" class="ps-hbtn">
+          <svg v-if="darkMode" class="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+          <svg v-else class="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+          <span class="hidden sm:inline">{{ darkMode ? t('light') : t('dark') }}</span>
         </button>
 
-        <a v-if="!loggedIn" href="/login" class="ps-btn ps-btn-primary no-underline">
-          <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+        <a v-if="!loggedIn" href="/login" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-white !text-ws-dark hover:bg-slate-100 shadow-sm transition whitespace-nowrap no-underline">
+          <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
           <span>{{ t('loginWikimedia') }}</span>
         </a>
 
-        <div v-else class="flex items-center gap-1 min-w-0">
-          <span class="hidden sm:inline-flex items-center gap-1.5 pl-2 pr-1 text-sm font-semibold max-w-[200px] min-w-0">
-            <svg class="w-4 h-4 text-ws-cerulean dark:text-ws-nature shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"></path></svg>
-            <span class="truncate">{{ currentUser }}</span>
-          </span>
-          <button @click="logoutOAuth" :title="t('logout')" class="ps-btn ps-btn-quiet">{{ t('logout') }}</button>
+        <div v-else class="ps-hbtn !pr-1 !cursor-default max-w-[180px] sm:max-w-none">
+          <svg class="w-3.5 h-3.5 text-ws-nature shrink-0 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+          <span class="font-medium truncate whitespace-nowrap">{{ currentUser }}</span>
+          <button @click="logoutOAuth" :title="t('logout')" class="ml-0.5 px-2 py-0.5 rounded bg-black/25 hover:bg-rose-600 text-white transition text-[11px] whitespace-nowrap shrink-0">{{ t('logout') }}</button>
         </div>
       </div>
     </div>
-    <div class="ps-ribbon" aria-hidden="true"></div>
   </header>
 
   <div v-if="notice" role="status" aria-live="polite" class="fixed bottom-4 right-4 left-4 sm:left-auto sm:max-w-md z-[60] ps-card pl-3 pr-2 py-2.5 text-sm flex items-start gap-2.5 shadow-xl border-l-4"
@@ -106,7 +110,7 @@
         <div class="relative grid md:grid-cols-[1.35fr_1fr] gap-6 p-5 sm:p-8">
           <div class="space-y-4 min-w-0">
             <div class="ps-eyebrow flex items-center gap-2">
-              <span class="ps-dot" style="background: var(--q-none)"></span><span class="ps-dot" style="background: var(--q-problem)"></span><span class="ps-dot" style="background: var(--q-proofread)"></span><span class="ps-dot" style="background: var(--q-validated)"></span>
+              <svg class="w-4 h-4 text-ws-cerulean dark:text-ws-nature" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 5.5Q7 4 11.5 6v13Q7 17 2 18.5z"/><path d="M22 5.5Q17 4 12.5 6v13q4.5-2 9.5-.5z"/></svg>
               <span>{{ t('heroEyebrow') }}</span>
             </div>
             <h1 class="ps-serif text-3xl sm:text-[2.6rem] leading-[1.12] text-slate-900 dark:text-slate-50">{{ t('heroTitle') }}</h1>
@@ -121,6 +125,7 @@
                 <span>{{ t('newCentral') }}</span>
               </button>
               <a v-if="!loggedIn" href="/login" class="ps-btn ps-btn-primary no-underline">{{ t('loginToTakePart') }}</a>
+              <button v-if="isSuperAdmin" @click="openToolAdmins" class="ps-btn md:hidden">{{ t('toolAdmins') }}</button>
               <a href="https://github.com/MSSakib03/ProofSource#readme" target="_blank" rel="noopener" class="ps-btn ps-btn-quiet no-underline">{{ t('howItWorks') }} ↗</a>
             </div>
           </div>
@@ -353,6 +358,17 @@
             </div>
           </div>
 
+          <div class="sm:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-4 space-y-2">
+            <label class="ps-label">{{ t('submissionMode') }}</label>
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              <label v-for="m in ['auto', 'enroll', 'manual']" :key="m" class="flex items-start gap-2 text-xs p-3 rounded-lg border cursor-pointer transition"
+                     :class="[form.submission_mode === m ? 'border-ws-cerulean bg-ws-nature/10' : 'border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700', isLocked('submission_mode') ? 'opacity-60 pointer-events-none' : '']">
+                <input type="radio" v-model="form.submission_mode" :value="m" class="mt-0.5 shrink-0" :disabled="isLocked('submission_mode')" />
+                <span><strong class="block text-sm mb-0.5">{{ t('mode_' + m) }}</strong><span class="text-slate-600 dark:text-slate-400">{{ t('mode_' + m + '_desc') }}</span></span>
+              </label>
+            </div>
+          </div>
+
           <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="ps-label">{{ t('announcementEn') }}</label>
@@ -459,7 +475,7 @@
           <label class="ps-label">{{ t('restoreTitle') }}</label>
           <p class="text-[11px] text-slate-500">{{ t('restoreDesc') }}</p>
           <input type="file" accept=".json,application/json" @change="onRestoreFile" class="block w-full text-xs file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-200 dark:file:bg-slate-800 file:text-xs" />
-          <div v-if="restore.checked" class="text-xs p-3 rounded-lg border" :class="restore.problems.length ? 'border-rose-500 bg-rose-100 dark:bg-rose-900' : 'border-emerald-500 bg-emerald-100 dark:bg-emerald-900'">
+          <div v-if="restore.checked" class="text-xs p-3 rounded-lg border" :class="restore.problems.length ? 'border-rose-500/40 bg-rose-500/5' : 'border-emerald-500/40 bg-emerald-500/5'">
             <div v-if="restore.problems.length" class="text-rose-700 dark:text-rose-300">
               {{ t('restoreInvalid') }}: <span v-for="p in restore.problems" :key="p" class="font-mono mr-2">{{ t('bk_' + p) }}</span>
             </div>
@@ -484,7 +500,7 @@
 
     <div v-if="view === 'contest' && active" class="space-y-4 ps-view">
 
-      <div v-if="active.contest.approval_status === 'pending'" class="bg-amber-100 dark:bg-amber-900 border border-amber-500 dark:border-amber-400/60 rounded-lg px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
+      <div v-if="active.contest.approval_status === 'pending'" class="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2.5 flex flex-wrap items-center justify-between gap-3">
         <div class="flex items-center gap-3 text-xs text-amber-800 dark:text-amber-300">
           <svg class="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="10"></circle>
@@ -506,7 +522,7 @@
         </div>
       </div>
 
-      <div v-if="active.contest.delete_request" class="rounded-xl px-4 py-2.5 border border-rose-500 dark:border-rose-400/60 bg-rose-100 dark:bg-rose-900 text-xs text-rose-800 dark:text-rose-300 flex flex-wrap items-center justify-between gap-2">
+      <div v-if="active.contest.delete_request" class="rounded-xl px-4 py-2.5 border border-rose-500/30 bg-rose-500/10 text-xs text-rose-800 dark:text-rose-300 flex flex-wrap items-center justify-between gap-2">
         <span><b>{{ t('deleteRequested') }}</b> — {{ active.contest.delete_request.by }}, {{ formatDateTime(active.contest.delete_request.iso) }}<span v-if="active.contest.delete_request.reason">: “{{ active.contest.delete_request.reason }}”</span></span>
         <span class="flex gap-2">
           <button v-if="active.contest.can_request_delete" @click="cancelDeleteRequest('contest')" class="px-2.5 py-1 rounded border border-rose-500/40 hover:bg-white/60 dark:hover:bg-slate-900">{{ t('cancelRequest') }}</button>
@@ -515,6 +531,7 @@
       </div>
 
       <section class="ps-card overflow-hidden">
+        <div class="h-1.5 bg-gradient-to-r from-ws-dark via-ws-cerulean to-ws-nature"></div>
         <div class="p-4 sm:p-6 space-y-4">
           <a v-if="active.contest.hub_slug" :href="'/central/' + active.contest.hub_slug" @click.prevent="openCentral(active.contest.hub_slug)" @mouseenter="prefetchCentral(active.contest.hub_slug)"
              class="inline-flex items-center gap-1 text-xs font-bold hover:underline">
@@ -527,12 +544,26 @@
                 <span class="ps-chip !text-ws-cerulean dark:!text-ws-nature"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 5.5Q7 4 11.5 6v13Q7 17 2 18.5z"/><path d="M22 5.5Q17 4 12.5 6v13q4.5-2 9.5-.5z"/></svg>{{ projectLabel(active.contest.wiki_domain) }}</span>
                 <span class="ps-chip" :class="statusClass(active.contest.status)"><span class="ps-dot" :class="statusDot(active.contest.status)"></span>{{ t(active.contest.status) }}</span>
                 <span v-if="!active.contest.review_enabled" class="ps-chip">{{ t('withoutReview') }}</span>
+                <span v-if="active.contest.submission_mode !== 'auto'" class="ps-chip" :title="t('mode_' + active.contest.submission_mode + '_desc')">{{ t('mode_' + active.contest.submission_mode) }}</span>
               </div>
               <h1 class="ps-serif text-2xl sm:text-[2rem] leading-tight text-slate-900 dark:text-slate-50 break-words">{{ active.contest.title }}</h1>
               <p v-if="active.contest.description" @click="descOpen = !descOpen" :class="descOpen ? '' : 'line-clamp-2'"
                  class="text-[15px] text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl cursor-pointer">{{ active.contest.description }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+              <template v-if="active.contest.submission_mode === 'enroll'">
+                <span v-if="active.contest.is_enrolled" class="ps-btn !cursor-default !text-emerald-700 dark:!text-emerald-400 !border-emerald-500/60" :title="t('enrolledHint')">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>{{ t('enrolled') }}
+                </span>
+                <button v-else-if="active.contest.can_enroll" @click="enrollContest" :disabled="busy" class="ps-btn ps-btn-primary" :title="t('mode_enroll_desc')">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2"/><path d="M18 14v6M15 17h6"/></svg>
+                  <span>{{ t('enroll') }}</span>
+                </button>
+              </template>
+              <button v-if="active.contest.submission_mode === 'manual' && active.contest.can_submit" @click="openSubmitDialog" class="ps-btn ps-btn-primary" :title="t('mode_manual_desc')">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+                <span>{{ t('submitPages') }} <span v-if="loggedIn && active.contest.my_eligible_count" class="font-normal tabular-nums">({{ fmtNum(active.contest.my_eligible_count) }})</span></span>
+              </button>
               <button v-if="loggedIn" @click="openUserPages(currentUser)" class="ps-btn">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                 <span>{{ t('myPages') }} <span class="font-normal tabular-nums">({{ fmtNum(active.contest.my_pages_count) }})</span></span>
@@ -591,13 +622,14 @@
         </div>
       </section>
 
-      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 sm:gap-3">
+      <div class="grid grid-cols-2 gap-2.5 sm:gap-3" :class="active.stats.reverted_pages ? 'sm:grid-cols-3 lg:grid-cols-6' : 'sm:grid-cols-5'">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.participants) }}</div></div>
-        <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ active.contest.validation_visible ? t('proofreadListed') : t('proofread') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.listed_pages) }}</div></div>
-        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.accepted_pages) }}</div></div>
-        <div v-if="active.contest.review_enabled" class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.pending_pages) }}</div></div>
+        <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ active.contest.validation_visible ? t('proofreadListed') : t('proofread') }}</div><div class="ps-stat-v text-ws-cerulean dark:text-ws-nature">{{ fmtNum(active.stats.listed_pages) }}</div></div>
+        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(active.stats.accepted_pages) }}</div></div>
+        <div v-if="active.contest.review_enabled" class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v text-amber-600 dark:text-amber-400">{{ fmtNum(active.stats.pending_pages) }}</div></div>
         <div v-else class="ps-stat"><div class="ps-stat-l">{{ t('totalBookPages') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_book_pages) }}</div></div>
-        <div class="ps-stat is-problem col-span-2 sm:col-span-1"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
+        <div class="ps-stat is-problem" :class="active.stats.reverted_pages ? '' : 'col-span-2 sm:col-span-1'"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
+        <button v-if="active.stats.reverted_pages" @click="contestSubTab = 'reverted'" class="ps-stat text-left hover:!border-slate-400" :title="t('revertedHelp')"><div class="ps-stat-l">{{ t('revertedPages') }}</div><div class="ps-stat-v text-slate-500">{{ fmtNum(active.stats.reverted_pages) }}</div></button>
       </div>
 
       <div v-if="announcementHtml" class="ps-announce bg-ws-nature/10 border border-ws-nature/30 rounded-xl px-4 py-3 text-sm text-slate-800 dark:text-slate-200 break-words flex gap-2">
@@ -606,12 +638,12 @@
       </div>
 
       <div v-if="active.contest.backup_reminder" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-xl px-4 py-2.5 text-xs border"
-           :class="active.contest.backup_reminder.level === 'month' ? 'bg-rose-100 dark:bg-rose-900 border-rose-500 dark:border-rose-400/60 text-rose-800 dark:text-rose-300' : 'bg-amber-100 dark:bg-amber-900 border-amber-500 dark:border-amber-400/60 text-amber-800 dark:text-amber-300'">
+           :class="active.contest.backup_reminder.level === 'month' ? 'bg-rose-500/10 border-rose-500/30 text-rose-800 dark:text-rose-300' : 'bg-amber-500/10 border-amber-500/30 text-amber-800 dark:text-amber-300'">
         <span>{{ active.contest.backup_reminder.level === 'month' ? t('backupReminderMonth') : t('backupReminderWeek') }} ({{ fmtNum(active.contest.backup_reminder.days) }} {{ t('days') }})</span>
         <a :href="'/api/contests/' + active.contest.id + '/backup.json'" @click="markBackupSoon" class="font-semibold underline shrink-0">{{ t('downloadJsonBackup') }}</a>
       </div>
 
-      <div v-if="active.needs_fix_alerts.length > 0" class="bg-amber-100 dark:bg-amber-900 border border-amber-500 dark:border-amber-400/60 rounded-lg p-4 space-y-2">
+      <div v-if="active.needs_fix_alerts.length > 0" class="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4 space-y-2">
         <div class="text-sm font-bold text-amber-800 dark:text-amber-300">{{ t('myNeedsFixTitle') }}</div>
         <div v-for="nf in active.needs_fix_alerts" :key="nf.id" class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs bg-white dark:bg-slate-900 px-3 py-2.5 rounded-lg border border-amber-500/20">
           <div class="min-w-0 break-words">
@@ -635,6 +667,9 @@
           </button>
           <button role="tab" :aria-selected="contestSubTab === 'results'" @click="contestSubTab = 'results'" :class="contestSubTab === 'results' ? 'ps-tab is-active' : 'ps-tab'">
             {{ t('resultsAndStats') }}
+          </button>
+          <button v-if="active.reverted && active.reverted.length" role="tab" :aria-selected="contestSubTab === 'reverted'" @click="contestSubTab = 'reverted'" :class="contestSubTab === 'reverted' ? 'ps-tab is-active' : 'ps-tab'">
+            {{ t('revertedPages') }}<span class="ps-count">{{ fmtNum(active.stats.reverted_pages) }}</span>
           </button>
           <button v-if="active.contest.is_admin" role="tab" :aria-selected="contestSubTab === 'audit'" @click="openAuditTab" :class="contestSubTab === 'audit' ? 'ps-tab is-active' : 'ps-tab'">
             {{ t('auditTrail') }}
@@ -667,6 +702,7 @@
                   <th class="py-3.5 px-4 font-medium text-right">{{ t('needsFix') }}</th>
                   <th class="py-3.5 px-4 font-medium text-right">{{ t('rejected') }}</th>
                 </template>
+                <th v-if="hasReverted" class="py-3.5 px-4 font-medium text-right" :title="t('revertedHelp')">{{ t('reverted') }}</th>
                 <th class="py-3.5 px-4 font-medium text-right">{{ t('points') }}</th>
               </tr>
             </thead>
@@ -688,6 +724,7 @@
                   <td class="py-3 px-4 text-right tabular-nums text-xs text-orange-600 dark:text-orange-400">{{ r.needs_fix }}</td>
                   <td class="py-3 px-4 text-right tabular-nums text-xs text-rose-600 dark:text-rose-400">{{ r.rejected }}</td>
                 </template>
+                <td v-if="hasReverted" class="py-3 px-4 text-right tabular-nums text-xs text-slate-500">{{ r.reverted || 0 }}</td>
                 <td class="py-3 px-4 text-right tabular-nums font-bold">{{ r.points }}</td>
               </tr>
             </tbody>
@@ -784,7 +821,38 @@
         </div>
       </div>
 
+      <div v-if="contestSubTab === 'reverted' && active.reverted" class="ps-card overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">{{ t('revertedHelp') }}</div>
+        <div class="overflow-x-auto w-full">
+          <table class="w-full min-w-[640px] text-left border-collapse text-sm">
+            <thead>
+              <tr class="border-b border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
+                <th class="py-3 px-4 font-bold">{{ t('page') }}</th><th class="py-3 px-4 font-bold">{{ t('user') }}</th>
+                <th class="py-3 px-4 font-bold">{{ t('wasStatus') }}</th><th class="py-3 px-4 font-bold">{{ t('reason') }}</th>
+                <th class="py-3 px-4 font-bold text-right">{{ t('when') }}</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
+              <tr v-for="r in active.reverted" :key="r.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
+                <td class="py-2.5 px-4 max-w-[18rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(r.page_title)" target="_blank" rel="noopener" class="font-semibold hover:underline block truncate" :title="r.page_title">{{ r.page_title }}</a></td>
+                <td class="py-2.5 px-4"><button @click="openUserPages(r.proofreader)" class="font-semibold text-ws-cerulean dark:text-ws-nature hover:underline">{{ r.proofreader }}</button></td>
+                <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded-full border text-[11px]" :class="reviewStatusClass(r.reverted_from)">{{ statusLabel(r.reverted_from) }}</span></td>
+                <td class="py-2.5 px-4 text-xs">{{ t('revert_' + r.reason) }}<span v-if="r.reason === 'not_proofread'" class="text-slate-500"> ({{ wikiLevelLabel(r.wiki_level) }})</span></td>
+                <td class="py-2.5 px-4 text-right text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ formatDateTime(r.reverted_iso) }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
       <div v-if="contestSubTab === 'results'" class="space-y-5">
+        <div v-if="active.contest.submission_mode === 'enroll'" class="ps-card p-4 space-y-2">
+          <div class="text-sm font-bold">{{ t('enrolledParticipants') }} ({{ fmtNum(active.enrolled.length) }})</div>
+          <div v-if="active.enrolled.length" class="flex flex-wrap gap-1.5">
+            <button v-for="e in active.enrolled" :key="e.username" @click="openUserPages(e.username)" class="ps-chip hover:!border-ws-cerulean" :title="formatDateTime(e.iso)">{{ e.username }}</button>
+          </div>
+          <div v-else class="text-xs text-slate-500">{{ t('noEnrollmentsYet') }}</div>
+        </div>
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 ps-card p-4">
           <div class="text-sm font-semibold text-ws-dark dark:text-ws-nature">{{ t('resultsGeneratorTitle') }}</div>
           <div class="flex flex-wrap items-center gap-2">
@@ -900,14 +968,14 @@
 
     <!-- ===================== CENTRAL CONTEST ===================== -->
     <div v-if="view === 'central' && central" class="space-y-4 ps-view">
-      <div v-if="central.central.approval_status === 'pending'" class="bg-amber-100 dark:bg-amber-900 border border-amber-500 dark:border-amber-400/60 rounded-lg px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-800 dark:text-amber-300">
+      <div v-if="central.central.approval_status === 'pending'" class="bg-amber-500/10 border border-amber-500/30 rounded-lg px-4 py-2.5 flex flex-wrap items-center justify-between gap-3 text-xs text-amber-800 dark:text-amber-300">
         <div><span class="font-semibold">{{ t('centralPendingTitle') }}</span> — <span class="opacity-80">{{ t('centralPendingDesc') }}</span></div>
         <div v-if="central.central.can_approve" class="flex gap-2">
           <button @click="approveCentral('approved')" class="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-semibold">{{ t('approveContest') }}</button>
           <button @click="approveCentral('rejected')" class="px-3 py-1 bg-rose-600 hover:bg-rose-700 text-white rounded-lg font-semibold">{{ t('reject') }}</button>
         </div>
       </div>
-      <div v-if="central.central.delete_request" class="rounded-xl px-4 py-2.5 border border-rose-500 dark:border-rose-400/60 bg-rose-100 dark:bg-rose-900 text-xs text-rose-800 dark:text-rose-300 flex flex-wrap items-center justify-between gap-2">
+      <div v-if="central.central.delete_request" class="rounded-xl px-4 py-2.5 border border-rose-500/30 bg-rose-500/10 text-xs text-rose-800 dark:text-rose-300 flex flex-wrap items-center justify-between gap-2">
         <span><b>{{ t('deleteRequested') }}</b> — {{ central.central.delete_request.by }}, {{ formatDateTime(central.central.delete_request.iso) }}<span v-if="central.central.delete_request.reason">: “{{ central.central.delete_request.reason }}”</span></span>
         <span class="flex gap-2">
           <button v-if="central.central.can_request_delete" @click="cancelDeleteRequest('central')" class="px-2.5 py-1 rounded border border-rose-500/40">{{ t('cancelRequest') }}</button>
@@ -916,6 +984,7 @@
       </div>
 
       <section class="ps-card overflow-hidden">
+        <div class="h-1.5 bg-gradient-to-r from-ws-dark via-ws-cerulean to-ws-nature"></div>
         <div class="p-4 sm:p-5 space-y-3">
           <div class="flex flex-col md:flex-row md:items-start justify-between gap-3">
             <div class="min-w-0 space-y-1.5">
@@ -954,7 +1023,7 @@
         <div class="ps-stat"><div class="ps-stat-l">{{ t('projectsWordCap') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.projects) }}</div></div>
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.participants) }}</div></div>
         <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.listed) }}</div></div>
-        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.accepted) }}</div></div>
+        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(central.stats.accepted) }}</div></div>
       </div>
 
       <div class="ps-tabs" role="tablist">
@@ -1004,6 +1073,10 @@
             <div><div class="text-[10px] text-slate-500">{{ t('participants') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.participants) }}</div></div>
             <div><div class="text-[10px] text-slate-500">{{ t('proofread') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.listed) }}</div></div>
             <div><div class="text-[10px] text-slate-500">{{ t('points') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.points) }}</div></div>
+          </div>
+          <div v-if="p.reverted || p.submission_mode !== 'auto'" class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
+            <span v-if="p.submission_mode !== 'auto'" class="ps-chip !text-[11px]">{{ t('mode_' + p.submission_mode) }}</span>
+            <span v-if="p.reverted" class="ps-chip !text-[11px]">{{ t('reverted') }}: {{ fmtNum(p.reverted) }}</span>
           </div>
           <div v-if="p.books === 0 && p.is_admin" class="mt-3 text-[11px] text-amber-700 dark:text-amber-300">{{ t('addBooksHint') }}</div>
         </a>
@@ -1089,6 +1162,14 @@
                       class="px-3 py-1.5 border-r last:border-r-0 border-slate-300 dark:border-slate-700 transition">{{ t('pol_' + v) }}</button>
             </div>
           </div>
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs p-3 rounded-lg border border-slate-200 dark:border-slate-800">
+            <span class="font-medium">{{ t('policySubmission') }}</span>
+            <div class="inline-flex flex-wrap rounded-lg border border-slate-300 dark:border-slate-700 overflow-hidden shrink-0">
+              <button v-for="v in ['auto', 'enroll', 'manual', 'project']" :key="v" type="button" @click="cform.submission_policy = v"
+                      :class="cform.submission_policy === v ? 'bg-ws-cerulean text-white' : 'hover:bg-slate-100 dark:hover:bg-slate-800'"
+                      class="px-3 py-1.5 border-r last:border-r-0 border-slate-300 dark:border-slate-700 transition">{{ v === 'project' ? t('pol_project') : t('mode_' + v) }}</button>
+            </div>
+          </div>
         </div>
 
         <div class="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-2">
@@ -1139,7 +1220,7 @@
       </div>
       <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.proofread) }}</div></div>
-        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.accepted) }}</div></div>
+        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(upages.summary.accepted) }}</div></div>
         <template v-if="upages.review_enabled">
           <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pending') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.pending) }}</div></div>
           <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('needsFix') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.needs_fix) }}</div></div>
@@ -1158,9 +1239,10 @@
       <div class="ps-card overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
           <span class="text-xs font-bold text-slate-600 dark:text-slate-400">{{ t('submissions') }} ({{ fmtNum(upages.total) }})</span>
-          <select v-model="upages.status" @change="loadUserPages(1)" class="bg-slate-50 dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2 py-1 text-xs">
+          <select v-model="upages.status" @change="loadUserPages(1)" class="ps-input !w-auto text-xs">
             <option value="all">{{ t('all') }}</option><option value="accepted">{{ t('accepted') }}</option>
             <template v-if="upages.review_enabled"><option value="pending_review">{{ t('pending') }}</option><option value="needs_fix">{{ t('needsFix') }}</option><option value="rejected">{{ t('rejected') }}</option></template>
+            <option value="reverted">{{ t('reverted') }}</option>
           </select>
         </div>
         <div class="overflow-x-auto"><table class="w-full min-w-[520px] text-left text-xs">
@@ -1378,7 +1460,7 @@
                   <div class="font-semibold text-slate-500 mb-1">{{ t('firstRevision') }}</div>
                   <pre class="whitespace-pre-wrap break-words font-sans">{{ juryPage.first_body || '—' }}</pre>
                 </div>
-                <div class="p-3 rounded-lg border border-emerald-500 bg-emerald-100 dark:bg-emerald-900">
+                <div class="p-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5">
                   <div class="font-semibold text-emerald-600 dark:text-emerald-400 mb-1">{{ t('latestRevision') }}</div>
                   <pre class="whitespace-pre-wrap break-words font-sans">{{ juryPage.body }}</pre>
                 </div>
@@ -1443,13 +1525,44 @@
       </div>
     </div>
 
+    <div v-if="view === 'tooladmins'" class="max-w-2xl mx-auto ps-view">
+      <div class="ps-card p-5 sm:p-6 space-y-4">
+        <div class="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
+          <h2 class="ps-serif text-xl text-slate-900 dark:text-slate-50">{{ t('toolAdmins') }}</h2>
+          <button @click="goHome" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">{{ t('backHome') }}</button>
+        </div>
+        <p class="text-sm text-slate-600 dark:text-slate-400">{{ t('toolAdminsHelp') }}</p>
+        <ul class="divide-y divide-slate-200 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg">
+          <li v-for="u in toolAdmins.root" :key="'r' + u" class="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+            <a :href="metaUserUrl(u)" target="_blank" rel="noopener" class="font-semibold hover:underline">{{ u }}</a>
+            <span class="ps-chip">{{ t('permanentAdmin') }}</span>
+          </li>
+          <li v-for="a in toolAdmins.admins" :key="'a' + a.username" class="flex items-center justify-between gap-3 px-3 py-2.5 text-sm">
+            <span class="min-w-0">
+              <a :href="metaUserUrl(a.username)" target="_blank" rel="noopener" class="font-semibold hover:underline">{{ a.username }}</a>
+              <span class="block text-xs text-slate-500">{{ t('addedBy') }} {{ a.added_by }} · {{ formatDateShort(a.iso) }}</span>
+            </span>
+            <button @click="removeToolAdmin(a.username)" class="ps-btn ps-btn-quiet-danger">{{ t('remove') }}</button>
+          </li>
+        </ul>
+        <form @submit.prevent="addToolAdmin" class="flex flex-col sm:flex-row gap-2">
+          <input v-model.trim="newToolAdmin" type="text" class="ps-input" :placeholder="t('wikimediaUsername')" :aria-label="t('wikimediaUsername')" />
+          <button type="submit" :disabled="!newToolAdmin || busy" class="ps-btn ps-btn-primary">{{ t('addToolAdmin') }}</button>
+        </form>
+      </div>
+    </div>
+
   </main>
 
   <footer class="ps-footer mt-8">
-    <div class="ps-ribbon opacity-70" aria-hidden="true"></div>
+    <div class="h-1 bg-gradient-to-r from-ws-dark via-ws-cerulean to-ws-nature" aria-hidden="true"></div>
     <div class="max-w-7xl mx-auto px-3 sm:px-6 py-6 grid gap-4 sm:grid-cols-[1fr_auto] items-start text-xs leading-relaxed">
       <div class="space-y-1">
-        <div class="ps-wordmark !text-base"><b>Proof</b>Source</div>
+        <div class="flex flex-wrap items-baseline gap-x-2">
+          <span class="ps-wordmark !text-base"><b>Proof</b>Source</span>
+          <span class="text-slate-400 dark:text-slate-600" aria-hidden="true">·</span>
+          <span>{{ t('createdByPrefix') }} <a href="https://meta.wikimedia.org/wiki/User:MS_Sakib" target="_blank" rel="noopener author" class="font-semibold">MS Sakib</a></span>
+        </div>
         <p>{{ t('footerAbout') }}</p>
         <p>{{ t('footerTimes') }}</p>
       </div>
@@ -1462,13 +1575,51 @@
     </div>
   </footer>
 
-  <div v-if="confirmBox.open" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" @keydown.esc="confirmBox.open = false" role="dialog" aria-modal="true" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" @keydown.esc="confirmBox.open = false">
+  <div v-if="confirmBox.open" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" @keydown.esc="confirmBox.open = false" role="dialog" aria-modal="true">
     <div class="ps-card max-w-md w-full p-5 space-y-4 shadow-xl">
       <h3 class="font-semibold text-sm">{{ confirmBox.title }}</h3>
       <p class="text-xs text-slate-600 dark:text-slate-400 break-words">{{ confirmBox.message }}</p>
       <div class="flex justify-end gap-2">
         <button @click="confirmBox.open = false" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-white px-3 py-1.5">{{ t('cancel') }}</button>
         <button @click="confirmBox.open = false; confirmBox.onYes()" class="text-xs font-semibold px-3.5 py-1.5 rounded-lg text-white" :class="confirmBox.danger ? 'bg-rose-600 hover:bg-rose-700' : 'bg-ws-cerulean hover:bg-ws-dark'">{{ t('confirm') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div v-if="submitDlg.open" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" @keydown.esc="submitDlg.open = false">
+    <div class="ps-card max-w-2xl w-full max-h-[88vh] flex flex-col shadow-xl">
+      <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex items-start justify-between gap-3">
+        <div class="space-y-1 min-w-0">
+          <h3 class="ps-serif text-xl">{{ t('submitTitle') }}</h3>
+          <p class="text-xs text-slate-600 dark:text-slate-400">{{ t('submitHelp') }}</p>
+        </div>
+        <button @click="submitDlg.open = false" class="ps-btn ps-btn-quiet ps-btn-icon" :aria-label="t('close')">✕</button>
+      </div>
+      <div class="px-4 sm:px-5 py-2 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2 text-sm">
+        <label class="inline-flex items-center gap-2 font-semibold cursor-pointer" :class="submitDlg.pages.length ? '' : 'opacity-50 pointer-events-none'">
+          <input type="checkbox" :checked="submitAllSelected" :indeterminate.prop="submitDlg.selected.length > 0 && !submitAllSelected" @change="toggleSubmitAll" />
+          {{ t('selectAll') }} <span class="font-normal text-slate-500 tabular-nums">({{ fmtNum(submitDlg.selected.length) }} / {{ fmtNum(submitDlg.pages.length) }})</span>
+        </label>
+        <button @click="refreshEligible(true)" :disabled="submitDlg.loading || syncing" class="ps-btn ps-btn-quiet">
+          <svg class="w-4 h-4" :class="{'animate-spin': submitDlg.loading || syncing}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+          <span>{{ t('checkWikiAgain') }}</span>
+        </button>
+      </div>
+      <div class="overflow-y-auto flex-1 min-h-[8rem]">
+        <div v-if="submitDlg.loading && !submitDlg.pages.length" class="p-8 text-center text-sm text-slate-500">{{ t('loadingWord') }}</div>
+        <div v-else-if="!submitDlg.pages.length" class="p-8 text-center text-sm text-slate-600 dark:text-slate-400">{{ t('noEligiblePages') }}</div>
+        <label v-for="p in submitDlg.pages" :key="p.id" class="flex items-center gap-3 px-4 sm:px-5 py-2.5 border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer text-sm">
+          <input type="checkbox" :value="p.id" v-model="submitDlg.selected" class="shrink-0" />
+          <span class="min-w-0 flex-1">
+            <span class="font-semibold block truncate" :title="p.page_title">{{ p.page_title }}</span>
+            <span class="text-xs text-slate-500">{{ wikiLevelLabel(p.wiki_level) }} · {{ formatDateTime(p.proofread_iso) }}</span>
+          </span>
+          <span class="text-xs tabular-nums text-slate-600 dark:text-slate-400 shrink-0">{{ fmtNum(p.points) }} {{ t('pts') }}</span>
+        </label>
+      </div>
+      <div class="p-4 sm:p-5 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2">
+        <button @click="submitDlg.open = false" class="ps-btn">{{ t('cancel') }}</button>
+        <button @click="submitSelected" :disabled="!submitDlg.selected.length || busy" class="ps-btn ps-btn-primary">{{ t('submitN').replace('{n}', fmtNum(submitDlg.selected.length)) }}</button>
       </div>
     </div>
   </div>
@@ -1686,7 +1837,29 @@ const I18N = {
     ofPages: 'of {n} pages proofread', remaining: 'Remaining',
     footerAbout: 'Proofreading contests for the Wikisource community. Log in with your Wikimedia account; the tool never sees your password.',
     footerTimes: 'All dates and times are in UTC.', footerLinks: 'About this tool', sourceCode: 'Source code', reportIssue: 'Report an issue',
-    hostedOnToolforge: 'Hosted on Wikimedia Toolforge', termsOfUse: 'Terms of use'
+    hostedOnToolforge: 'Hosted on Wikimedia Toolforge', termsOfUse: 'Terms of use',
+    createdByPrefix: 'Created by',
+    submissionMode: 'Submission', mode_auto: 'Automatic submission', mode_enroll: 'Semi-automatic (enrol)', mode_manual: 'Manual submission',
+    mode_auto_desc: 'every page that meets the rules is listed automatically',
+    mode_enroll_desc: 'participants press “Enrol” once; only their pages are then listed automatically',
+    mode_manual_desc: 'participants choose and submit their qualifying pages themselves',
+    policySubmission: 'Page submission', enroll: 'Enrol', enrolled: 'Enrolled', enrolledHint: 'Your qualifying pages are listed automatically',
+    enrollDone: 'You are enrolled. {n} of your pages were listed.', enrollDoneNone: 'You are enrolled. Pages you proofread from now on are listed automatically.', enrolledParticipants: 'Enrolled participants', noEnrollmentsYet: 'Nobody has enrolled yet.',
+    submitPages: 'Submit pages', submitTitle: 'Submit your pages',
+    submitHelp: 'These pages qualify for this contest (first proofread by you inside the contest time) but are not submitted yet. Select the ones you want to submit.',
+    selectAll: 'Select all', checkWikiAgain: 'Check the wiki again', noEligiblePages: 'You have no pages waiting to be submitted.',
+    submitN: 'Submit {n} pages', submittedN: '{n} pages submitted', loadingWord: 'Loading…', eligibleStatus: 'Not submitted',
+    reverted: 'Reverted', revertedPages: 'Reverted pages', wasStatus: 'Was', reason: 'Reason', when: 'When',
+    revertedHelp: 'These pages were in the contest but no longer qualify — for example their status was set back to “Not proofread” on the wiki. They stay on record with 0 points and are not reviewed. If they are proofread again they return automatically.',
+    revert_not_proofread: 'Status set back on the wiki', revert_ineligible: 'No longer meets the rules', revert_excluded: 'Excluded by the admins',
+    toolAdmins: 'Tool admins', toolAdminsHelp: 'Tool admins can approve contests, delete contests on request and manage this list. Permanent admins come from the server configuration.',
+    permanentAdmin: 'Permanent', addedBy: 'Added by', wikimediaUsername: 'Wikimedia username', addToolAdmin: 'Add tool admin', toolAdminAdded: 'Tool admin added',
+    removeToolAdminConfirm: 'Remove {u} from the tool admins?', backHome: 'Back',
+    act_page_reverted: 'Page reverted', act_page_restored: 'Page restored', act_enroll: 'Enrolled', act_manual_submit: 'Pages submitted',
+    err_enrollment_closed: 'This contest does not use enrolment', err_contest_ended: 'The contest has ended',
+    err_manual_submission_off: 'This contest does not use manual submission', err_nothing_selected: 'Select at least one page',
+    err_invalid_username: 'That is not a valid username', err_already_tool_admin: 'Already a tool admin', err_user_not_found: 'No such Wikimedia account',
+    err_cannot_remove_root_admin: 'Permanent admins can only be changed in the server configuration', err_not_found: 'Not found'
   },
   bn: {
     contests: 'প্রতিযোগিতাসমূহ', newContest: 'নতুন প্রতিযোগিতা', showLess: 'কম দেখান',
@@ -1842,7 +2015,29 @@ const I18N = {
     ofPages: '/ {n} পাতা সংশোধিত', remaining: 'বাকি',
     footerAbout: 'উইকিসংকলন সম্প্রদায়ের জন্য মুদ্রণ সংশোধন প্রতিযোগিতা। উইকিমিডিয়া অ্যাকাউন্টে লগইন করুন; টুলটি কখনো আপনার পাসওয়ার্ড দেখে না।',
     footerTimes: 'সব তারিখ ও সময় UTC অনুযায়ী।', footerLinks: 'এই টুল সম্পর্কে', sourceCode: 'সোর্স কোড', reportIssue: 'সমস্যা জানান',
-    hostedOnToolforge: 'উইকিমিডিয়া টুলফোর্জে চালিত', termsOfUse: 'ব্যবহারের শর্তাবলি'
+    hostedOnToolforge: 'উইকিমিডিয়া টুলফোর্জে চালিত', termsOfUse: 'ব্যবহারের শর্তাবলি',
+    createdByPrefix: 'তৈরি করেছেন',
+    submissionMode: 'জমাদান পদ্ধতি', mode_auto: 'স্বয়ংক্রিয় জমাদান', mode_enroll: 'আধা স্বয়ংক্রিয় (নিবন্ধন)', mode_manual: 'ম্যানুয়াল জমাদান',
+    mode_auto_desc: 'শর্ত পূরণ করা প্রতিটি পাতা নিজে থেকেই তালিকাভুক্ত হয়',
+    mode_enroll_desc: 'অংশগ্রহণকারী একবার “নিবন্ধন” চাপলে কেবল তাঁর পাতাগুলো নিজে থেকে তালিকাভুক্ত হয়',
+    mode_manual_desc: 'অংশগ্রহণকারী নিজেই শর্ত পূরণ করা পাতাগুলো বেছে জমা দেন',
+    policySubmission: 'পাতা জমাদান', enroll: 'নিবন্ধন করুন', enrolled: 'নিবন্ধিত', enrolledHint: 'শর্ত পূরণ করা আপনার পাতাগুলো নিজে থেকে তালিকাভুক্ত হবে',
+    enrollDone: 'নিবন্ধন সম্পন্ন। আপনার {n}টি পাতা তালিকাভুক্ত হয়েছে।', enrollDoneNone: 'নিবন্ধন সম্পন্ন। এখন থেকে আপনার সংশোধিত পাতা নিজে থেকেই তালিকাভুক্ত হবে।', enrolledParticipants: 'নিবন্ধিত অংশগ্রহণকারী', noEnrollmentsYet: 'এখনো কেউ নিবন্ধন করেননি।',
+    submitPages: 'জমা দিন', submitTitle: 'আপনার পাতা জমা দিন',
+    submitHelp: 'এই পাতাগুলো প্রতিযোগিতার শর্ত পূরণ করেছে (প্রতিযোগিতার সময়ে আপনি প্রথম মুদ্রণ সংশোধন করেছেন), কিন্তু এখনো জমা দেওয়া হয়নি। যেগুলো জমা দিতে চান, বেছে নিন।',
+    selectAll: 'সব বাছাই', checkWikiAgain: 'উইকিতে আবার দেখুন', noEligiblePages: 'জমা দেওয়ার মতো কোনো পাতা অপেক্ষায় নেই।',
+    submitN: '{n}টি পাতা জমা দিন', submittedN: '{n}টি পাতা জমা হয়েছে', loadingWord: 'লোড হচ্ছে…', eligibleStatus: 'জমা দেওয়া হয়নি',
+    reverted: 'ফেরানো', revertedPages: 'ফেরানো পাতা', wasStatus: 'আগের অবস্থা', reason: 'কারণ', when: 'কখন',
+    revertedHelp: 'এই পাতাগুলো প্রতিযোগিতায় ছিল, কিন্তু এখন আর শর্ত পূরণ করে না — যেমন উইকিতে অবস্থা আবার “মুদ্রণ সংশোধন করা হয়নি” করা হয়েছে। এগুলো ০ পয়েন্টসহ রেকর্ডে থাকে এবং পর্যালোচনায় যায় না। আবার মুদ্রণ সংশোধন করা হলে নিজে থেকেই ফিরে আসে।',
+    revert_not_proofread: 'উইকিতে অবস্থা ফিরিয়ে দেওয়া হয়েছে', revert_ineligible: 'এখন আর শর্ত পূরণ করে না', revert_excluded: 'অ্যাডমিনরা বাদ দিয়েছেন',
+    toolAdmins: 'টুল অ্যাডমিন', toolAdminsHelp: 'টুল অ্যাডমিনরা প্রতিযোগিতা অনুমোদন করতে, অনুরোধ অনুযায়ী মুছতে এবং এই তালিকা পরিচালনা করতে পারেন। স্থায়ী অ্যাডমিনরা সার্ভারের কনফিগারেশন থেকে আসেন।',
+    permanentAdmin: 'স্থায়ী', addedBy: 'যোগ করেছেন', wikimediaUsername: 'উইকিমিডিয়া ব্যবহারকারী নাম', addToolAdmin: 'টুল অ্যাডমিন যোগ করুন', toolAdminAdded: 'টুল অ্যাডমিন যোগ হয়েছে',
+    removeToolAdminConfirm: '{u}-কে টুল অ্যাডমিন থেকে সরাবেন?', backHome: 'ফিরে যান',
+    act_page_reverted: 'পাতা ফেরানো হয়েছে', act_page_restored: 'পাতা পুনরায় যুক্ত', act_enroll: 'নিবন্ধন', act_manual_submit: 'পাতা জমা',
+    err_enrollment_closed: 'এই প্রতিযোগিতায় নিবন্ধন পদ্ধতি নেই', err_contest_ended: 'প্রতিযোগিতা শেষ হয়ে গেছে',
+    err_manual_submission_off: 'এই প্রতিযোগিতায় ম্যানুয়াল জমাদান নেই', err_nothing_selected: 'অন্তত একটি পাতা বাছাই করুন',
+    err_invalid_username: 'ব্যবহারকারী নামটি সঠিক নয়', err_already_tool_admin: 'ইতিমধ্যে টুল অ্যাডমিন', err_user_not_found: 'এই নামে কোনো উইকিমিডিয়া অ্যাকাউন্ট নেই',
+    err_cannot_remove_root_admin: 'স্থায়ী অ্যাডমিন কেবল সার্ভারের কনফিগারেশনে বদলানো যায়', err_not_found: 'পাওয়া যায়নি'
   }
 };
 
@@ -1855,6 +2050,7 @@ const MONTHS = {
   bn: ['জানুয়ারি', 'ফেব্রুয়ারি', 'মার্চ', 'এপ্রিল', 'মে', 'জুন', 'জুলাই', 'আগস্ট', 'সেপ্টেম্বর', 'অক্টোবর', 'নভেম্বর', 'ডিসেম্বর']
 };
 const AUDIT_ACTIONS = ['contest_create', 'contest_approval', 'config_change', 'contest_dates_change', 'reviewers_change', 'user_exclusion',
+  'page_reverted', 'page_restored', 'enroll', 'manual_submit',
   'announcement_change', 'points_change', 'book_add', 'book_edit', 'book_remove', 'review_decision', 'bulk_review',
   'batch_revert', 'backup_export', 'backup_restore'];
 
@@ -1900,7 +2096,9 @@ createApp({
       audit: { entries: [], total: 0, page: 1, per: 50, action: '' }, auditActions: AUDIT_ACTIONS,
       bulk: { running: false, progress: 0, result: null, touchWiki: false },
       restore: { checked: false, problems: [], counts: null, exported_at: null, text: '' },
-      confirmBox: { open: false, title: '', message: '', danger: false, onYes: () => {} }
+      confirmBox: { open: false, title: '', message: '', danger: false, onYes: () => {} },
+      isSuperAdmin: false, submitDlg: { open: false, loading: false, pages: [], selected: [] },
+      toolAdmins: { root: [], admins: [] }, newToolAdmin: ''
     };
   },
   computed: {
@@ -1932,6 +2130,8 @@ createApp({
       });
       return rows.sort((a, b) => (b.sort > a.sort ? 1 : -1));
     },
+    hasReverted() { return !!(this.active && this.active.leaderboard.some(r => r.reverted)); },
+    submitAllSelected() { return this.submitDlg.pages.length > 0 && this.submitDlg.selected.length === this.submitDlg.pages.length; },
     homeTotals() {
       const doms = new Set(this.contests.map(c => c.wiki_domain));
       return { pages: this.contests.reduce((n, c) => n + (c.listed_pages || 0), 0), projects: doms.size };
@@ -2015,26 +2215,27 @@ createApp({
     },
     statusClass(st) {
       return {
-        running: '!text-emerald-700 dark:!text-emerald-400 !border-emerald-500/40 !bg-emerald-50 dark:!bg-emerald-900/40',
-        upcoming: '!text-ws-cerulean dark:!text-ws-nature !border-ws-cerulean/40 !bg-sky-50 dark:!bg-slate-900',
-        pending_approval: '!text-amber-700 dark:!text-amber-400 !border-amber-500/40 !bg-amber-50 dark:!bg-amber-900/40',
-        rejected: '!text-rose-700 dark:!text-rose-400 !border-rose-500/40 !bg-rose-50 dark:!bg-rose-900/40'
+        running: '!text-emerald-700 dark:!text-emerald-400 !border-emerald-500/40 !bg-emerald-50 dark:!bg-emerald-950/40',
+        upcoming: '!text-sky-700 dark:!text-sky-400 !border-sky-500/40 !bg-sky-50 dark:!bg-sky-950/40',
+        pending_approval: '!text-amber-700 dark:!text-amber-400 !border-amber-500/40 !bg-amber-50 dark:!bg-amber-950/40',
+        rejected: '!text-rose-700 dark:!text-rose-400 !border-rose-500/40 !bg-rose-50 dark:!bg-rose-950/40'
       }[st] || '';
     },
     statusDot(st) {
-      return { running: 'bg-emerald-600 dark:bg-emerald-400', upcoming: 'bg-ws-cerulean dark:bg-ws-nature',
-               pending_approval: 'bg-amber-400', rejected: 'bg-rose-600 dark:bg-rose-400' }[st] || 'bg-slate-400';
+      return { running: 'bg-emerald-500', upcoming: 'bg-sky-500',
+               pending_approval: 'bg-amber-500', rejected: 'bg-rose-500' }[st] || 'bg-slate-400';
     },
     rankClass(idx) {
-      return ['bg-[#ffe867] text-slate-900', 'bg-slate-200 text-slate-900 dark:bg-slate-700 dark:text-slate-100',
-              'bg-[#f5c9a0] text-slate-900'][idx] || 'text-slate-500';
+      return ['bg-amber-200 text-amber-900', 'bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100',
+              'bg-orange-200 text-orange-900'][idx] || 'text-slate-500';
     },
     pct(part, whole) { return whole > 0 ? Math.max(0, Math.min(100, Math.round((part / whole) * 100))) : 0; },
     safeHtml(html) { return safeHtml(html); },
     safeUrl(u) { return safeUrl(u); },
     reviewStatusClass(st) {
       return { accepted: 'border-emerald-500/30 text-emerald-700 dark:text-emerald-300', pending_review: 'border-amber-500/30 text-amber-700 dark:text-amber-300',
-               needs_fix: 'border-orange-500/30 text-orange-700 dark:text-orange-300', rejected: 'border-rose-500/30 text-rose-700 dark:text-rose-300' }[st] || 'border-slate-300';
+               needs_fix: 'border-orange-500/30 text-orange-700 dark:text-orange-300', rejected: 'border-rose-500/30 text-rose-700 dark:text-rose-300',
+               reverted: 'border-slate-400/60 text-slate-600 dark:text-slate-400 line-through decoration-slate-400/60' }[st] || 'border-slate-300';
     },
     isExpanded(h) { return this.expanded[h.slug] !== undefined ? this.expanded[h.slug] : h.status === 'running'; },
     toggleTree(slug) { const h = this.centrals.find(x => x.slug === slug); this.expanded = { ...this.expanded, [slug]: !this.isExpanded(h) }; },
@@ -2165,7 +2366,8 @@ createApp({
       if (lvl === 2) return this.t('lvlProblematic'); return this.t('lvlUnproofread');
     },
     statusLabel(st) {
-      return { accepted: this.t('accepted'), pending_review: this.t('pending'), needs_fix: this.t('needsFix'), rejected: this.t('rejected') }[st] || this.t('lvlUnproofread');
+      return { accepted: this.t('accepted'), pending_review: this.t('pending'), needs_fix: this.t('needsFix'), rejected: this.t('rejected'),
+               reverted: this.t('reverted'), eligible: this.t('eligibleStatus') }[st] || this.t('lvlUnproofread');
     },
     toggleLang() { this.lang = this.lang === 'en' ? 'bn' : 'en'; safeStore('ws_lang', this.lang); document.documentElement.lang = this.lang; },
     toggleTheme() { this.darkMode = !this.darkMode; safeStore('ws_theme', this.darkMode ? 'dark' : 'light'); this.applyTheme(); },
@@ -2175,7 +2377,7 @@ createApp({
     // ---------- session / lists ----------
     async loadSession() {
       const r = await this.api('/api/session');
-      this.loggedIn = !!r.data.logged_in; this.currentUser = r.data.current_user || null;
+      this.loggedIn = !!r.data.logged_in; this.currentUser = r.data.current_user || null; this.isSuperAdmin = !!r.data.is_super_admin;
     },
     async logoutOAuth() {
       await this.api('/logout', { method: 'POST' });
@@ -2220,7 +2422,7 @@ createApp({
       const now = new Date(), next = new Date(now.getTime() + 30 * 86400000);
       return { editing: false, slug: '', title: '', description: '', link: '', start_time: now.toISOString().slice(0, 16),
                end_time: next.toISOString().slice(0, 16), proofread_points: 3, validate_points: 0,
-               custom_points_policy: 'project', bonus_policy: 'project', review_policy: 'project',
+               custom_points_policy: 'project', bonus_policy: 'project', review_policy: 'project', submission_policy: 'project',
                admins: this.currentUser || '', projects: [{ wiki_domain: 'bn.wikisource.org', admins: this.currentUser || '' }] };
     },
     openCreateCentral() {
@@ -2232,6 +2434,7 @@ createApp({
       this.cform = { editing: true, slug: c.slug, title: c.title, description: c.description, link: c.link,
                      start_time: c.start_time, end_time: c.end_time, proofread_points: c.proofread_points, validate_points: c.validate_points,
                      custom_points_policy: c.custom_points_policy, bonus_policy: c.bonus_policy, review_policy: c.review_policy,
+                     submission_policy: c.submission_policy || 'project',
                      admins: c.admins, projects: this.central.projects.map(p => ({ wiki_domain: p.wiki_domain, admins: p.admins_list.join(', ') })) };
       this.view = 'central_form';
     },
@@ -2306,7 +2509,8 @@ createApp({
         start_time: now.toISOString().slice(0, 16), end_time: next.toISOString().slice(0, 16),
         proofread_points: 3, validate_points: 0, max_bonus_points: 0, jury_mode: 'in_app_validate', jury_gets_points: false,
         reject_action: 'hold_batch', admins: this.currentUser || '', juries: this.currentUser || '', excluded_users: '', books: '',
-        review_enabled: true, bulk_review_enabled: false, review_assignment: 'open', allow_custom_points: true, announcement_en: '', announcement_bn: ''
+        review_enabled: true, bulk_review_enabled: false, review_assignment: 'open', allow_custom_points: true, announcement_en: '', announcement_bn: '',
+        submission_mode: 'auto'
       };
     },
     openCreateContest() {
@@ -2384,7 +2588,8 @@ createApp({
         reject_action: c.reject_action, admins: c.admins, juries: c.juries, excluded_users: c.excluded_users || '', books: '',
         review_enabled: c.review_enabled, bulk_review_enabled: c.bulk_review_enabled,
         review_assignment: c.review_assignment || 'open', allow_custom_points: c.allow_custom_points,
-        announcement_en: c.announcement_en || '', announcement_bn: c.announcement_bn || ''
+        announcement_en: c.announcement_en || '', announcement_bn: c.announcement_bn || '',
+        submission_mode: c.submission_mode || 'auto'
       };
       this.active.books.forEach(b => { b.start_local = this.isoToLocalInput(b.start_iso); b.end_local = this.isoToLocalInput(b.end_iso); });
       this.restore = { checked: false, problems: [], counts: null, exported_at: null, text: '' };
@@ -2428,6 +2633,74 @@ createApp({
       if (currentView === 'edit_config') this.openEditConfig();
       this.notify(r.ok ? this.t('bookRemoved') : this.errText(r.data), r.ok ? 'success' : 'error');
     },
+    // ---------- submission: enrol (semi-automatic) and manual submit ----------
+    async enrollContest() {
+      if (!this.loggedIn) { window.location.href = '/login'; return; }
+      this.busy = true;
+      const r = await this.api(`/api/contests/${this.active.contest.id}/enroll`, { method: 'POST' });
+      this.busy = false;
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+      this.notify(r.data.listed ? this.t('enrollDone').replace('{n}', this.fmtNum(r.data.listed)) : this.t('enrollDoneNone'), 'success');
+      await this.refreshContest();
+    },
+    async openSubmitDialog() {
+      if (!this.loggedIn) { window.location.href = '/login'; return; }
+      this.submitDlg = { open: true, loading: true, pages: [], selected: [] };
+      await this.refreshEligible(false);
+    },
+    async refreshEligible(fromWiki) {
+      this.submitDlg.loading = true;
+      if (fromWiki) {
+        const s = await this.api(`/api/contests/${this.active.contest.id}/sync`, { method: 'POST', json: { force: true } });
+        if (!s.ok) this.notify(this.errText(s.data), 'error');
+      }
+      const r = await this.api(`/api/contests/${this.active.contest.id}/my-eligible`);
+      this.submitDlg.loading = false;
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+      const ids = new Set(r.data.pages.map(p => p.id));
+      this.submitDlg.pages = r.data.pages;
+      this.submitDlg.selected = this.submitDlg.selected.filter(id => ids.has(id));
+    },
+    toggleSubmitAll() {
+      this.submitDlg.selected = this.submitAllSelected ? [] : this.submitDlg.pages.map(p => p.id);
+    },
+    async submitSelected() {
+      if (!this.submitDlg.selected.length) return;
+      this.busy = true;
+      const r = await this.api(`/api/contests/${this.active.contest.id}/submit`, { method: 'POST', json: { page_ids: this.submitDlg.selected } });
+      this.busy = false;
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+      this.notify(this.t('submittedN').replace('{n}', this.fmtNum(r.data.submitted)), 'success');
+      this.submitDlg.open = false;
+      await this.refreshContest();
+    },
+
+    // ---------- tool admins ----------
+    metaUserUrl(u) { return 'https://meta.wikimedia.org/wiki/User:' + encodeURIComponent(String(u || '').replace(/ /g, '_')); },
+    async openToolAdmins() {
+      const r = await this.api('/api/admin/tool-admins');
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); this.goHome(); return; }
+      this.toolAdmins = { root: r.data.root, admins: r.data.admins };
+      this.newToolAdmin = ''; this.view = 'tooladmins';
+    },
+    async addToolAdmin() {
+      if (!this.newToolAdmin) return;
+      this.busy = true;
+      const r = await this.api('/api/admin/tool-admins', { method: 'POST', json: { username: this.newToolAdmin } });
+      this.busy = false;
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+      this.toolAdmins = { root: r.data.root, admins: r.data.admins }; this.newToolAdmin = '';
+      this.notify(this.t('toolAdminAdded'), 'success');
+    },
+    removeToolAdmin(name) {
+      this.ask(this.t('toolAdmins'), this.t('removeToolAdminConfirm').replace('{u}', name), async () => {
+        const r = await this.api('/api/admin/tool-admins/' + encodeURIComponent(name), { method: 'DELETE' });
+        if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+        this.toolAdmins = { root: r.data.root, admins: r.data.admins };
+        await this.loadSession();
+      }, true);
+    },
+
     async reserveUnproofreadPage() {
       if (!this.loggedIn) { window.location.href = '/login'; return; }
       const r = await this.api(`/api/contests/${this.active.contest.id}/reserve-page`, { method: 'POST', json: { book_id: this.reserveBookId } });
