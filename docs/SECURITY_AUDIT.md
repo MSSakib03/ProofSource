@@ -94,7 +94,9 @@ atomically. Moving to ToolsDB (below) removes the shared-file exposure entirely.
 ### 9. Tool-admin identity (Medium)
 `SUPER_ADMINS = {"ms sakib"}` was compared after lower-casing. MediaWiki usernames are
 case-sensitive after the first letter, so `Ms sakib` or `MS SAKIB` would have matched. Tool admins
-are now matched by exact canonical name and configurable via `PROOFSOURCE_SUPER_ADMINS`.
+are now matched by exact canonical name. Permanent admins come from `PROOFSOURCE_SUPER_ADMINS`;
+more can be added and removed from the UI by tool admins (stored in `tool_admins`, every change in
+the audit log, permanent admins cannot be removed there).
 
 ### 10. Resource abuse (Medium)
 Anonymous clients could `POST /sync {"force": true}` repeatedly (each sync walks wiki histories) and

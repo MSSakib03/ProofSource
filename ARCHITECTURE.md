@@ -10,7 +10,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-236798)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-006699)
 ![Vue](https://img.shields.io/badge/Vue-3-4D8AC0)
-![Tests](https://img.shields.io/badge/tests-67%20passing-2e7d32)
+![Tests](https://img.shields.io/badge/tests-81%20passing-2e7d32)
 
 </div>
 
@@ -18,7 +18,7 @@ ProofSource is a web tool for running **proofreading contests on Wikisource** (a
 
 - **Live:** `https://proofsource.toolforge.org` · **Staging:** `https://proofsource-test.toolforge.org`
 - **Hosting:** Wikimedia Toolforge (Kubernetes webservice, `python3.11`, uWSGI)
-- **Stack:** Python 3.11 · Flask 3.0 · Flask-SQLAlchemy 3.1 (SQLAlchemy 2.x) · **ToolsDB (MariaDB)** in production, SQLite for local development · Vue 3 (self-hosted, single HTML template) · Tailwind CSS built at development time with the Wikimedia **Codex** design tokens (no CDN)
+- **Stack:** Python 3.11 · Flask 3.0 · Flask-SQLAlchemy 3.1 (SQLAlchemy 2.x) · **ToolsDB (MariaDB)** in production, SQLite for local development · Vue 3 (self-hosted, single HTML template) · Tailwind CSS built at development time (original Wikisource-blue theme, Codex-style components; no CDN)
 - **Login:** MediaWiki **OAuth 2.0** (meta.wikimedia.org)
 - **UI languages:** English (default) and Bangla, through one central translation table
 
@@ -108,7 +108,7 @@ Set with `toolforge envvars create NAME VALUE`. Secrets are never stored in code
 | `TOOLSDB_HOST` | ToolsDB host | `tools.db.svc.wikimedia.cloud` |
 | `DATABASE_URL` | Any SQLAlchemy URL; overrides `TOOLSDB_DATABASE` | `sqlite:///proofsource_v5.db` (local development) |
 | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` / `DB_POOL_RECYCLE` | Connection pool per uWSGI worker (ToolsDB allows few connections per tool) | `2` / `3` / `280` s |
-| `PROOFSOURCE_SUPER_ADMINS` | Tool admins, comma-separated, matched **exactly** (canonical username) | `MS Sakib` |
+| `PROOFSOURCE_SUPER_ADMINS` | **Permanent** tool admins, comma-separated, matched exactly (canonical username). More tool admins can be added in the UI (`tool_admins` table). | `MS Sakib` |
 | `PROOFSOURCE_BACKUP_DIR` | Where backups/snapshots go (created 0700, files 0600) | `~/proofsource_backups` |
 | `PROOFSOURCE_SNAPSHOT_HOURS` | Interval between automatic DB snapshots | `12` |
 | `PROOFSOURCE_SNAPSHOT_KEEP` | Number of snapshots kept | `21` |
@@ -137,10 +137,12 @@ Toolforge requirement: `~/www/python/uwsgi.ini` with `buffer-size = 65535`; othe
 
 | Table | Model | Key fields |
 |---|---|---|
-| `contests` | `Contest` | slug, title, wiki_domain, start/end (UTC), proofread/validate/max_bonus points, jury_mode (`in_app_validate` / `accept_reject`), reject_action (`hold_batch` / `instant_revert`), admins, juries, excluded_users, approval_status, **review_enabled**, **bulk_review_enabled**, **review_assignment** (`open`/`equal`), **allow_custom_points**, announcement_en/bn, last_backup_at, sync_started_at, hub_id, delete_requested_by/at/reason |
+| `contests` | `Contest` | slug, title, wiki_domain, start/end (UTC), proofread/validate/max_bonus points, jury_mode (`in_app_validate` / `accept_reject`), reject_action (`hold_batch` / `instant_revert`), admins, juries, excluded_users, approval_status, **review_enabled**, **bulk_review_enabled**, **review_assignment** (`open`/`equal`), **submission_mode** (`auto`/`enroll`/`manual`), **allow_custom_points**, announcement_en/bn, last_backup_at, sync_started_at, hub_id, delete_requested_by/at/reason |
 | `index_books` | `IndexBook` | contest_id, title, base_name, total_pages, custom_points, excluded_pages, is_active, optional own start/end window |
-| `contest_pages` | `ContestPage` | contest_id, book_id, page_number, page_title, wiki_level, proofreader, validator, proofread_rev_id/time, review_status (`unproofread`/`pending_review`/`accepted`/`needs_fix`/`rejected`), reviewed_by/at, base/bonus points, jury_note, jury & user locks, **last_rev_id** (incremental sync), **assigned_to** (equal review) |
-| `hubs` | `Hub` = **Central contest** | slug, title, description, link, start/end, approval_status, proofread/validate points, custom_points_policy / bonus_policy / review_policy (`yes`/`no`/`project`), admins, delete request fields |
+| `contest_pages` | `ContestPage` | contest_id, book_id, page_number, page_title, wiki_level, proofreader, validator, proofread_rev_id/time, review_status (`unproofread`/`eligible`/`pending_review`/`accepted`/`needs_fix`/`rejected`/`reverted`), **reverted_from / revert_reason / reverted_at**, reviewed_by/at, base/bonus points, jury_note, jury & user locks, **last_rev_id** (incremental sync), **assigned_to** (equal review) |
+| `hubs` | `Hub` = **Central contest** | slug, title, description, link, start/end, approval_status, proofread/validate points, custom_points_policy / bonus_policy / review_policy (`yes`/`no`/`project`), **submission_policy** (`auto`/`enroll`/`manual`/`project`), admins, delete request fields |
+| `enrollments` | `Enrollment` | contest_id, username — participants who enrolled (semi-automatic submission) |
+| `tool_admins` | `ToolAdmin` | username, added_by — tool admins added from the UI (on top of `PROOFSOURCE_SUPER_ADMINS`) |
 | `audit_logs` | `AuditLog` | append-only (ORM blocks update/delete); contest_id (no FK, survives deletion), username, action, target, old/new value, details |
 | `slug_aliases` | `SlugAlias` | old slugs keep working after a slug change (301 redirect) |
 | `oauth_logins` | `OAuthLogin` | server-side OAuth tokens |
@@ -174,6 +176,20 @@ Uses the page's **full revision history** (oldest → newest, paged up to 500 re
 - Changing the contest/book window clears `last_rev_id`, so the next sync re-checks every page.
 - `GET /api/contests/<id>` returns **cached** data instantly; the frontend calls `POST /sync` in the background when data is stale (> 5 min).
 
+### 5.2a Page lifecycle and submission modes
+| Status | Meaning | Counted |
+|---|---|---|
+| `unproofread` | placeholder (e.g. a page reservation) | no |
+| `eligible` | meets the rules (§5.1) but not submitted yet — enrol/manual modes | no, not visible |
+| `pending_review` / `accepted` / `needs_fix` / `rejected` | listed in the contest | per review rules |
+| `reverted` | was listed, then stopped qualifying (set back to *Not proofread*, no longer meets the rules, or excluded by admins) | 0 points, never reviewed, kept forever |
+
+- **auto:** eligible pages go straight to `pending_review` (the original behaviour).
+- **enroll:** only pages of enrolled participants (`enrollments`) do; `POST /enroll` also lists the participant's pages that were already waiting.
+- **manual:** pages wait as `eligible`; the proofreader lists them with `POST /submit` (only their own pages; open until 24 h after the end).
+- Changing the mode re-applies it to waiting pages (`apply_submission_mode`). A central contest can force the mode on all projects.
+- A listed page that stops qualifying becomes `reverted` (`_drop_page`): points 0, removed from review queues and locks, `page_reverted` audit entry by `ProofSource (sync)`. If it is proofread again it returns to `pending_review` (`page_restored`). Unsubmitted `eligible` pages that stop qualifying are simply reset.
+
 ### 5.3 Points & leaderboard
 - Book points = custom points (if allowed) else the contest default.
 - Review mode: points count when `accepted`. Non-review mode: `pending_review` also counts.
@@ -198,7 +214,7 @@ Uses the page's **full revision history** (oldest → newest, paged up to 500 re
 ### 5.6 Permissions
 | Role | Determined by | Can |
 |---|---|---|
-| Tool admin (super admin) | `SUPER_ADMINS` | everything; deletes contests on request; DB snapshots |
+| Tool admin (super admin) | `PROOFSOURCE_SUPER_ADMINS` (permanent) + `tool_admins` table | everything; deletes contests on request; DB snapshots; manages the tool-admin list |
 | Wiki sysop | wiki `sysop/bureaucrat/steward` group | auto-approved contests on that wiki; approves pending contests |
 | Contest admin | creator or `admins` list | configure, books, backup/restore, audit log, request deletion |
 | Reviewer (jury) | `juries` list | review queue, bulk review (if enabled) |
@@ -232,6 +248,10 @@ Pages (all render `index.html` with `window.PS_INITIAL` for instant direct links
 
 Auth: `/login`, `/auth/callback`, `/logout`, `GET /api/session`.
 
+Submission: `POST …/enroll`, `GET …/my-eligible`, `POST …/submit`.
+
+Tool admins: `GET/POST /api/admin/tool-admins`, `DELETE /api/admin/tool-admins/<name>`.
+
 Contests: `GET/POST /api/contests`, `GET /api/contests/<id>`, `POST …/sync`, `POST …/config`, `POST …/approve`, `POST …/books`, `POST …/books/<bid>/update|remove`, `POST …/reserve-page`, `GET …/user/<name>/pages`, `GET /api/contests/by-slug/<lang>/<slug>`.
 
 Review: `GET …/jury/next-page` (filters: book_id, status, contributor, scope, page_id, peek), `POST …/jury/lock|preview|submit`, `GET …/bulk/candidates`, `POST …/bulk/review`, `POST …/batch-revert`.
@@ -253,7 +273,7 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 - Dates are always UTC, with Bangla digits and month names in Bangla.
 - Keyboard shortcuts use `event.code` (Alt+A accept, Alt+F needs fix, Alt+R reject, Alt+N next), so they work with Bangla/Avro layouts and never fire inside text fields.
 - Cached contest/central data (localStorage) is shown instantly, then refreshed; links prefetch on hover; there is a top progress bar and fade transitions.
-- Design system: the Wikimedia **Codex** design tokens (progressive blue `#36c`, neutral greys `#202122 … #f8f9fa`, night-mode `#101418`, 2 px radii, system fonts, serif headings like the wikis). `tailwind.config.js` maps Tailwind's palette names onto these tokens, so the markup never hard-codes a colour. The signature motif is the four **ProofreadPage quality colours** (not proofread / problematic / proofread / validated) used in the header ribbon and in every progress bar. Shared classes: `.ps-card`, `.ps-row`, `.ps-stat`, `.ps-btn*` (Codex Button), `.ps-input`/`.ps-label` (Codex TextInput), `.ps-tabs`/`.ps-tab` (Codex Tabs), `.ps-chip`, `.ps-qbar`.
+- Design system: ProofSource's **original colour theme** — the Wikisource-logo blues `ws.dark #294584`, `ws.chambray #375493`, `ws.cerulean #236798`, `ws.bright #006699`, `ws.nature #4D8AC0` on Tailwind slate, with emerald/amber/rose/sky for status — combined with Wikimedia **Codex** component conventions (2–4 px radii, 32 px controls, quiet/progressive buttons, underline tabs, system fonts, serif headings like the wikis). Progress bars show accepted (green) and pending (amber) pages. Shared classes: `.ps-card`, `.ps-row`, `.ps-stat`, `.ps-btn*` (Codex Button), `.ps-input`/`.ps-label` (Codex TextInput), `.ps-tabs`/`.ps-tab` (Codex Tabs), `.ps-chip`, `.ps-qbar`.
 - CSS build (only when the template or `static/src/app.css` changes): `npm install && npm run build:css`; commit `static/css/app.css`. Toolforge deploys need no Node.js.
 
 ---

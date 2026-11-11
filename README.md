@@ -25,6 +25,9 @@ ProofSource finds every page that is proofread on Wikisource during a contest, l
   <img src="docs/screenshots/review-dark.webp" alt="The review panel in dark mode" width="74%" />
   <img src="docs/screenshots/mobile.webp" alt="A contest on a phone" width="23%" />
 </p>
+<p align="center">
+  <img src="docs/screenshots/submit.webp" alt="Manual submission: choosing pages to submit" width="74%" />
+</p>
 
 ---
 
@@ -38,6 +41,7 @@ ProofSource finds every page that is proofread on Wikisource during a contest, l
 - [For contest admins](#for-contest-admins)
 - [Central contests](#central-contests)
 - [For Wikisource administrators](#for-wikisource-administrators)
+- [For tool admins](#for-tool-admins)
 - [FAQ](#faq)
 
 ---
@@ -49,12 +53,14 @@ ProofSource finds every page that is proofread on Wikisource during a contest, l
 | 🔍 **Automatic tracking** | Pages proofread inside the contest window are detected from the wiki history. |
 | ✅ **Review workflow** | Accept, Needs fix or Reject, with notes, quick feedback chips and optional bonus points. |
 | ⚖️ **Fair review distribution** | Open for all reviewers, or pages split equally among them in book order. |
+| 📝 **Three ways to submit** | Automatic, semi-automatic (participants enrol) or manual (participants pick and submit their pages). |
+| ↩️ **Nothing silently disappears** | A page set back to *Not proofread* stays on record as *Reverted* with 0 points. |
 | 📦 **Bulk review** | Select many pages (Shift+click) and accept or reject them at once. |
 | 🌐 **Central contests** | Several wikis under one control panel and a combined leaderboard. |
 | 📚 **Flexible books** | Per-book points, excluded pages (`1-5, 12`) and per-book time windows. |
 | 💾 **Backups** | Full JSON backup and restore, CSV exports, automatic snapshots and reminders. |
 | 📝 **Activity log** | Every admin action is recorded and cannot be edited. |
-| 🌙 **Comfortable UI** | Wikimedia (Codex) design, English and Bangla, dark mode, mobile friendly, keyboard shortcuts. |
+| 🌙 **Comfortable UI** | ProofSource's Wikisource-blue theme with Wikimedia (Codex) style components, English and Bangla, dark mode, mobile friendly, keyboard shortcuts. |
 | 🔒 **Private & safe** | No third-party CDNs or trackers; OAuth tokens encrypted at rest; CSRF, CSP and signed backups. |
 
 ---
@@ -78,6 +84,15 @@ On the home page, contests are grouped into **Active, Upcoming, Ended and Pendin
 2. The **Index Books** tab lists the books in the contest, their points per page and any book-specific time window.
 3. Click **Proofread Any Page** (you need to be logged in) to open a random unproofread page on Wikisource. You can pick a book first. The page is reserved for you for 20 minutes.
 4. Proofread it on Wikisource as usual and save it as **Proofread**. The tool picks it up automatically. Press the sync button (↻) to refresh immediately.
+
+### How your pages enter the contest
+The organizers choose one of three submission modes; the contest page shows which one is used.
+
+| Mode | What you do |
+|---|---|
+| **Automatic submission** | Nothing. Every page of yours that meets the rules is listed automatically. |
+| **Semi-automatic (enrol)** | Press **Enrol** once (next to *My Pages*). From then on your qualifying pages are listed automatically — including the ones you proofread in this contest before enrolling. Pages of people who did not enrol are not listed. |
+| **Manual submission** | Press **Submit pages**. A list of your qualifying pages that are not submitted yet appears; tick the ones you want (or **Select all**) and press **Submit**. Use **Check the wiki again** if a page you just proofread is missing. Submissions stay open until 24 hours after the contest ends. |
 
 ### My Pages
 **My Pages** opens your own page (`…/me`) with:
@@ -106,6 +121,8 @@ A page does **not** count when:
 - ❌ A validated page is moved back to proofread. The credit stays with whoever proofread it first.
 - ❌ The page is later reverted to *Not proofread*.
 - ❌ It is an excluded page (e.g. table of contents), or by an excluded user or a bot.
+
+**Reverted pages.** Once a page is in the contest it is never silently removed. If it later stops qualifying — for example someone sets it back to *Not proofread* on the wiki — it stays on record as **Reverted** with **0 points**, it is not sent for review, and the change is written to the activity log. You can see reverted pages in the **Reverted pages** tab, on the leaderboard and on everyone's page list. If the page is proofread again, it returns to the review queue automatically.
 
 **Points:** in contests *with review*, points are added when a page is **accepted**. In contests *without review*, every eligible page counts directly. Validation earns points only if the contest gives validation points.
 
@@ -167,6 +184,7 @@ Click **Create Contest** on the home page and fill in:
 | Review | *With review*, or *Without review* (like a Proofread Week). |
 | Review distribution | *Open for all* or *Equal share*. |
 | Review mode | Accept/reject in the tool only, or validate directly on Wikisource. |
+| Submission | *Automatic*, *Semi-automatic (enrol)* or *Manual submission* (see [How your pages enter the contest](#how-your-pages-enter-the-contest)). Switching to automatic lists every page that is waiting; switching to semi-automatic lists the waiting pages of enrolled participants. |
 | Rejected pages | Revert in one batch after the contest, or immediately. |
 | Announcements | English and Bangla. |
 | Index pages | One per line, e.g. `Index:Book.djvu` or `নির্ঘণ্ট:বই.pdf`. |
@@ -221,6 +239,7 @@ Use a central contest when several Wikisource projects run one event together, f
    - custom points per book
    - bonus points
    - jury review
+   - page submission (*Automatic / Semi-automatic / Manual / Project decides*)
 4. Under **Included projects**, add each project and its project admins.
 5. Save. One contest is created for each project, and they appear as a tree under the central contest on the home page.
 
@@ -246,6 +265,14 @@ If you are an administrator (sysop) of a Wikisource:
 - You can also approve central contests that include your wiki.
 
 The **Pending Approval** tab on the home page lists everything waiting.
+
+---
+
+## For tool admins
+
+Tool admins can approve any contest, delete contests when their admins ask for it and take database snapshots. Open **Tool admins** in the top menu to see the list:
+- **Permanent** tool admins come from the server configuration (`PROOFSOURCE_SUPER_ADMINS`; by default *MS Sakib*) and cannot be removed from the page.
+- Any tool admin can **add** another tool admin by Wikimedia username, or **remove** one that was added there. Every change is recorded.
 
 ---
 
