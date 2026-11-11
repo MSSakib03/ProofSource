@@ -1,0 +1,30 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+venv/
+.venv/
+env/
+
+# Local SQLite database & backups
+instance/
+*.db
+*.sqlite
+*.sqlite3
+proofsource_backups/
+
+# Secrets & environment
+.env
+.env.*
+.proofsource_secret_key
+
+# Local-only files & packed bundle
+setup_proofsource.py
+_local/
+
+# OS & editors
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

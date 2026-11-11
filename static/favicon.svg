@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <style>
+    .t0{stop-color:#294584}.t1{stop-color:#236798}.bd{fill:#006699}
+    @media (prefers-color-scheme: dark){.t0{stop-color:#236798}.t1{stop-color:#4D8AC0}.bd{fill:#294584}}
+  </style>
+  <defs>
+    <linearGradient id="t" x1="0" y1="0" x2="1" y2="1"><stop offset="0" class="t0"/><stop offset="1" class="t1"/></linearGradient>
+    <linearGradient id="l" x1="0" x2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e1ebf5"/></linearGradient>
+    <linearGradient id="r" x1="1" x2="0"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#e1ebf5"/></linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#t)"/>
+  <path d="M7 18.5Q18 14.5 30.5 19.2V46.5Q18 42 7 45.5z" fill="url(#l)"/>
+  <path d="M57 18.5Q46 14.5 33.5 19.2V46.5Q46 42 57 45.5z" fill="url(#r)"/>
+  <g fill="none" stroke="#4D8AC0" stroke-width="2.8" stroke-linecap="round">
+    <path d="M11.5 24.2Q18.5 22.2 26.5 24.6"/>
+    <path d="M11.5 30Q18.5 28 26.5 30.4" opacity=".72"/>
+    <path d="M11.5 35.8Q16 34.4 20.5 35.4" opacity=".48"/>
+    <path d="M37.5 24.6Q45.5 22.2 52.5 24.2"/>
+    <path d="M37.5 30.4Q43 28.7 46.5 29.4" opacity=".72"/>
+    <path d="M37.5 36.1Q40.5 35.2 42.5 35.4" opacity=".48"/>
+  </g>
+  <circle cx="49" cy="45" r="9" class="bd" stroke="#fff" stroke-width="2.6"/>
+  <path d="M45 45.2l2.9 2.9 5.4-5.6" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
