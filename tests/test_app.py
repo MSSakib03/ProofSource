@@ -1,7 +1,12 @@
 """
 ProofSource automated tests (no network: every wiki call is mocked).
 Run from the repo root:   python3 -m unittest discover -s tests -v
+
+To run the same suite against MariaDB (as on ToolsDB), point it at an empty database:
+    PROOFSOURCE_TEST_DATABASE_URL='mysql+pymysql://user:pw@localhost/s1__proofsource_test?charset=utf8mb4' \
+        python3 -m unittest discover -s tests
 """
+import atexit
 import io
 import os
 import sys
@@ -14,7 +19,8 @@ from datetime import datetime, timedelta
 from unittest import mock
 
 TMP = tempfile.mkdtemp(prefix="ps_test_")
-os.environ["DATABASE_URL"] = "sqlite:///" + os.path.join(TMP, "test.db")
+os.environ["DATABASE_URL"] = os.environ.get("PROOFSOURCE_TEST_DATABASE_URL") or ("sqlite:///" + os.path.join(TMP, "test.db"))
+USING_SQLITE = os.environ["DATABASE_URL"].startswith("sqlite")
 os.environ["PROOFSOURCE_BACKUP_DIR"] = os.path.join(TMP, "backups")
 os.environ["SECRET_KEY"] = "test"
 os.environ["OAUTH2_CLIENT_ID"] = "cid"
@@ -36,6 +42,27 @@ import backup_engine  # noqa: E402
 from models import db, Contest, IndexBook, ContestPage, AuditLog, OAuthLogin, SlugAlias, Hub  # noqa: E402
 
 A.app.config["SESSION_COOKIE_SECURE"] = False
+A.app.config["FORCED_SYNC_MIN_SECONDS"] = 0   # tests sync back to back
+
+from flask.testing import FlaskClient  # noqa: E402
+
+
+class CSRFClient(FlaskClient):
+    """Behaves like the real frontend: sends the session's CSRF token on unsafe requests."""
+    send_csrf = True
+
+    def open(self, *args, **kw):
+        method = (kw.get("method") or "GET").upper()
+        if self.send_csrf and method not in ("GET", "HEAD", "OPTIONS"):
+            with self.session_transaction() as s:
+                tok = s.setdefault("csrf_token", "test-csrf-token")
+            headers = dict(kw.pop("headers", None) or {})
+            headers.setdefault("X-CSRF-Token", tok)
+            kw["headers"] = headers
+        return super().open(*args, **kw)
+
+
+A.app.test_client_class = CSRFClient
 A.is_user_wiki_admin = lambda domain, user: (user or "").lower() == "sysop"
 A.identify_bot_users = lambda domain, users: {u.lower() for u in users if u and u.lower().endswith("bot")}
 A.fetch_index_page_count = lambda domain, base: 100
@@ -75,6 +102,7 @@ class Base(unittest.TestCase):
             migrate_schema()
         self.c = A.app.test_client()
         A.fetch_live_book_pages_from_wiki = live({})
+        A.limiter.reset()
 
     def login(self, name, client=None):
         client = client or self.c
@@ -567,8 +595,8 @@ class MigrationTests(unittest.TestCase):
         self.assertTrue({"review_enabled", "hub_id", "last_backup_at"} <= cols)
 
 
-def tearDownModule():
-    shutil.rmtree(TMP, ignore_errors=True)
+# Cleanup at interpreter exit (not tearDownModule): test_security.py reuses this module's database.
+atexit.register(shutil.rmtree, TMP, ignore_errors=True)
 
 
 if __name__ == "__main__":

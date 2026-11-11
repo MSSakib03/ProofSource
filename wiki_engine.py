@@ -1,30 +1,79 @@
+import logging
+import os
 import re
+import time
 import difflib
 from datetime import datetime
 import requests
 
 USER_AGENT = "ProofSource/5.0 (https://proofsource.toolforge.org; User:MS_Sakib)"
-SUPER_ADMINS = {"ms sakib"}
 
-PAGE_PARSE_REGEX = re.compile(
-    r'^<noinclude><pagequality level="(\d)" user="(.*?)"\s*/>(.*?)</noinclude>(.*?)<noinclude>(.*?)</noinclude>$',
-    re.DOTALL
-)
+
+def canonical_username(name) -> str:
+    """MediaWiki canonical form: '_' -> ' ', single spaces, first letter upper-case.
+    Usernames are case-sensitive after the first letter, so 'MS Sakib' != 'Ms sakib'."""
+    n = re.sub(r"[\s_]+", " ", str(name or "")).strip()
+    return (n[:1].upper() + n[1:]) if n else ""
+
+
+def _load_super_admins() -> frozenset:
+    raw = os.environ.get("PROOFSOURCE_SUPER_ADMINS", "MS Sakib")
+    return frozenset(canonical_username(u) for u in raw.split(",") if u.strip())
+
+
+# Tool admins. Matched EXACTLY (canonical form), never case-insensitively, so a look-alike
+# account such as "Ms sakib" can never gain tool-admin rights.
+SUPER_ADMINS = _load_super_admins()
+
+
+def is_super_admin_name(username) -> bool:
+    return bool(username) and canonical_username(username) in SUPER_ADMINS
+
+
+# Only Wikisource wikis may be contacted. This blocks SSRF and, above all, prevents a contest
+# pointing at a foreign server that would receive reviewers' OAuth tokens or lie about who is
+# a sysop there.
+WIKISOURCE_DOMAIN_RE = re.compile(r"^(?:[a-z0-9-]{1,30}\.)?wikisource\.org$")
+
+
+def normalize_wiki_domain(raw):
+    """Returns the clean domain (e.g. 'bn.wikisource.org') or None if it is not a Wikisource."""
+    d = str(raw or "").strip().lower()
+    for prefix in ("https://", "http://"):
+        if d.startswith(prefix):
+            d = d[len(prefix):]
+    d = d.rstrip("/")
+    return d if WIKISOURCE_DOMAIN_RE.match(d) else None
+
+
+def is_valid_wiki_domain(raw) -> bool:
+    return normalize_wiki_domain(raw) is not None
+
 
 PAGEQUALITY_TAG_REGEX = re.compile(r'<pagequality\s+level=["\'](\d)["\']\s+user=["\'](.*?)["\']\s*/>')
+_PQ_PREFIX_RE = re.compile(r'<noinclude><pagequality level="(\d)" user="')
+_PQ_TAG_END_RE = re.compile(r'"\s*/>')
 
 NS_CACHE = {}
 ADMIN_CACHE = {}
 BOT_CACHE = {}
+ADMIN_CACHE_TTL = 600   # seconds; a removed sysop loses approval rights quickly
+
 
 def get_api_url(wiki_domain: str) -> str:
-    domain = wiki_domain.strip().replace("https://", "").replace("http://", "").rstrip("/")
+    domain = normalize_wiki_domain(wiki_domain)
+    if not domain:
+        raise ValueError("invalid_wiki_domain")
     return f"https://{domain}/w/api.php"
 
 def parse_wiki_timestamp(ts_str: str) -> datetime:
     if not ts_str:
         return datetime.utcfromtimestamp(0)
     return datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%SZ")
+
+MAX_PAGE_NUMBER = 100000
+MAX_EXCLUDED_PAGES = 20000
+
 
 def parse_excluded_pages_spec(spec: str) -> set:
     result = set()
@@ -40,10 +89,12 @@ def parse_excluded_pages_spec(spec: str) -> set:
             if bounds[0].strip().isdigit() and bounds[1].strip().isdigit():
                 start_p = int(bounds[0].strip())
                 end_p = int(bounds[1].strip())
-                if start_p <= end_p and (end_p - start_p) <= 5000:
+                if start_p <= end_p <= MAX_PAGE_NUMBER and (end_p - start_p) <= 5000:
                     result.update(range(start_p, end_p + 1))
-        elif part.isdigit():
+        elif part.isdigit() and int(part) <= MAX_PAGE_NUMBER:
             result.add(int(part))
+        if len(result) > MAX_EXCLUDED_PAGES:
+            break
     return result
 
 def parse_excluded_pages_strict(spec: str, max_page: int = 0):
@@ -58,28 +109,34 @@ def parse_excluded_pages_strict(spec: str, max_page: int = 0):
         m = re.fullmatch(r'(\d+)\s*-\s*(\d+)', part)
         if m:
             a, b = int(m.group(1)), int(m.group(2))
-            if a < 1 or b < a or (b - a) > 5000 or (max_page and a > max_page):
+            if a < 1 or b < a or (b - a) > 5000 or b > MAX_PAGE_NUMBER or (max_page and a > max_page):
                 errors.append(part)
                 continue
             pages.update(range(a, b + 1))
         elif part.isdigit() and int(part) >= 1:
-            if max_page and int(part) > max_page:
+            if (max_page and int(part) > max_page) or int(part) > MAX_PAGE_NUMBER:
                 errors.append(part)
                 continue
             pages.add(int(part))
         else:
-            errors.append(part)
+            errors.append(part[:40])
+        if len(pages) > MAX_EXCLUDED_PAGES or len(errors) > 50:
+            errors.append("too_many")
+            break
     return pages, errors
 
 def is_user_wiki_admin(wiki_domain: str, username: str) -> bool:
     if not username:
         return False
-    u_clean = username.strip()
-    if u_clean.lower() in SUPER_ADMINS:
+    u_clean = canonical_username(username)
+    if is_super_admin_name(u_clean):
         return True
-    cache_key = f"{wiki_domain}:{u_clean.lower()}"
-    if cache_key in ADMIN_CACHE:
-        return ADMIN_CACHE[cache_key]
+    if not is_valid_wiki_domain(wiki_domain):
+        return False
+    cache_key = f"{normalize_wiki_domain(wiki_domain)}:{u_clean}"
+    hit = ADMIN_CACHE.get(cache_key)
+    if hit and time.monotonic() - hit[1] < ADMIN_CACHE_TTL:
+        return hit[0]
     api_url = get_api_url(wiki_domain)
     try:
         res = requests.get(api_url, params={
@@ -93,7 +150,7 @@ def is_user_wiki_admin(wiki_domain: str, username: str) -> bool:
         if users:
             groups = set(users[0].get("groups", []))
             is_sysop = bool(groups.intersection({"sysop", "bureaucrat", "steward"}))
-            ADMIN_CACHE[cache_key] = is_sysop
+            ADMIN_CACHE[cache_key] = (is_sysop, time.monotonic())
             return is_sysop
     except Exception:
         pass
@@ -195,17 +252,43 @@ def normalize_index_title(wiki_domain: str, raw_title: str) -> str:
     base = extract_base_book_name(wiki_domain, raw_title)
     return f"{prefixes['index']}:{base}"
 
+def _split_proofread_page(text: str):
+    """Linear-time equivalent of the old regex
+    ^<noinclude><pagequality level="(\\d)" user="(.*?)"\\s*/>(.*?)</noinclude>(.*?)<noinclude>(.*?)</noinclude>$
+    (DOTALL). The regex backtracked cubically on pages with many <noinclude> tags, so one crafted
+    page on a wiki could freeze a worker during sync (ReDoS)."""
+    m = _PQ_PREFIX_RE.match(text)
+    if not m:
+        return None
+    end_tag = _PQ_TAG_END_RE.search(text, m.end())
+    if not end_tag:
+        return None
+    user = text[m.end():end_tag.start()]
+    h_start = end_tag.end()
+    h_end = text.find("</noinclude>", h_start)
+    if h_end < 0:
+        return None
+    b_start = h_end + len("</noinclude>")
+    b_end = text.find("<noinclude>", b_start)
+    if b_end < 0:
+        return None
+    f_start = b_end + len("<noinclude>")
+    if not text.endswith("</noinclude>") or len(text) - len("</noinclude>") < f_start:
+        return None
+    return {
+        "level": int(m.group(1)),
+        "user": user,
+        "header": text[h_start:h_end],
+        "body": text[b_start:b_end],
+        "footer": text[f_start:len(text) - len("</noinclude>")],
+    }
+
+
 def parse_proofread_page(wikitext: str) -> dict:
-    text = wikitext.strip()
-    match = PAGE_PARSE_REGEX.match(text)
-    if match:
-        return {
-            "level": int(match.group(1)),
-            "user": match.group(2),
-            "header": match.group(3),
-            "body": match.group(4),
-            "footer": match.group(5)
-        }
+    text = (wikitext or "").strip()
+    parsed = _split_proofread_page(text)
+    if parsed:
+        return parsed
     tag_match = PAGEQUALITY_TAG_REGEX.search(text)
     if tag_match:
         return {
@@ -218,7 +301,11 @@ def parse_proofread_page(wikitext: str) -> dict:
     return {"level": 1, "user": "", "header": "", "body": text, "footer": ""}
 
 def build_proofread_wikitext(level: int, username: str, header: str, body: str, footer: str) -> str:
-    return f'<noinclude><pagequality level="{level}" user="{username}" />{header}</noinclude>{body}<noinclude>{footer}</noinclude>'
+    level = int(level)
+    if level not in (0, 1, 2, 3, 4):
+        raise ValueError("invalid_level")
+    user = str(username or "").replace('"', "&quot;")   # keep the attribute well-formed
+    return f'<noinclude><pagequality level="{level}" user="{user}" />{header}</noinclude>{body}<noinclude>{footer}</noinclude>'
 
 def fetch_index_page_count(wiki_domain: str, base_name: str) -> int:
     api_url = get_api_url(wiki_domain)
@@ -488,7 +575,12 @@ def fetch_live_book_pages_from_wiki(wiki_domain: str, base_name: str, start_time
 
     return results, complete
 
+MAX_DIFF_CHARS = 60000
+
+
 def compute_word_diff(first_text: str, latest_text: str) -> list:
+    if len(first_text or "") > MAX_DIFF_CHARS or len(latest_text or "") > MAX_DIFF_CHARS:
+        return []   # difflib is quadratic; very large pages are shown without a word diff
     a = re.split(r'(\s+)', first_text or "")
     b = re.split(r'(\s+)', latest_text or "")
     matcher = difflib.SequenceMatcher(None, a, b)
@@ -697,5 +789,6 @@ def edit_wikisource_live(
             return {"saved_on_wiki": True, "revid": r4["edit"].get("newrevid"), "user": actual_username, "level": target_level}
         err_info = r4.get("error", {}).get("info") or str(r4.get("error") or r4)
         return {"saved_on_wiki": False, "error": err_info}
-    except Exception as e:
-        return {"saved_on_wiki": False, "error": str(e)}
+    except Exception:
+        logging.getLogger("proofsource").exception("wiki edit failed on %s", wiki_domain)
+        return {"saved_on_wiki": False, "error": "Could not reach the wiki. Please try again in a moment."}

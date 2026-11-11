@@ -1,30 +1,52 @@
 """
 Backup, restore and snapshot helpers for ProofSource.
 
-- Contest-level export (JSON = full restorable backup, with SHA-256 checksum).
+- Contest-level export (JSON = full restorable backup, with SHA-256 checksum and an HMAC
+  signature made with the server secret, so only files this server produced can be restored).
 - Validated restore inside one transaction, after a safety snapshot of the current data.
-- Whole-database snapshots (SQLite online backup API) stored OUTSIDE the app folder,
-  so a broken database never takes its backups down with it.
+  Approval, ownership, wiki and slug are never taken from a backup file.
+- Whole-database snapshots stored OUTSIDE the app folder, so a broken database never takes its
+  backups down with it:
+    * SQLite  -> online backup API copy (OAuth tokens stripped from the copy)
+    * MariaDB -> gzip'd JSON dump of every table except OAuth logins (restorable with manage.py)
 """
 import os
 import csv
+import gzip
+import hmac
 import io
 import json
 import glob
 import time
 import hashlib
 import sqlite3
-from datetime import datetime
+from datetime import datetime, date
+from decimal import Decimal
 
 BACKUP_SCHEMA_VERSION = 1
 SNAPSHOT_KEEP = int(os.environ.get("PROOFSOURCE_SNAPSHOT_KEEP", "21"))
 SNAPSHOT_INTERVAL_HOURS = float(os.environ.get("PROOFSOURCE_SNAPSHOT_HOURS", "12"))
 
 
+JSON_BACKUPS_KEEP = int(os.environ.get("PROOFSOURCE_JSON_BACKUPS_KEEP", "10"))
+# Tables never copied into snapshots: OAuth tokens are credentials, not contest data.
+SNAPSHOT_SKIP_TABLES = {"oauth_logins"}
+
+
 def backup_dir() -> str:
     d = os.environ.get("PROOFSOURCE_BACKUP_DIR") or os.path.join(os.path.expanduser("~"), "proofsource_backups")
-    os.makedirs(d, exist_ok=True)
+    os.makedirs(d, mode=0o700, exist_ok=True)
+    try:
+        os.chmod(d, 0o700)   # Toolforge tool homes are readable by other tools by default
+    except OSError:
+        pass
     return d
+
+
+def _private_open(path, mode="w", **kw):
+    """Open a new file readable only by the tool account."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    return os.fdopen(fd, mode, **kw)
 
 
 def _dt(v):
@@ -60,7 +82,12 @@ def _checksum(data: dict) -> str:
     return hashlib.sha256(canon.encode("utf-8")).hexdigest()
 
 
-def export_contest(contest, ContestPage, AuditLog, page_chunk: int = 2000) -> dict:
+def _signature(contest_id, checksum: str, secret: str) -> str:
+    msg = f"proofsource-backup:{contest_id}:{checksum}".encode("utf-8")
+    return hmac.new(secret.encode("utf-8"), msg, hashlib.sha256).hexdigest()
+
+
+def export_contest(contest, ContestPage, AuditLog, page_chunk: int = 2000, secret: str = None) -> dict:
     """Full restorable export. Pages are read in chunks so 50k+ pages don't blow up memory."""
     c = {f: getattr(contest, f) for f in CONTEST_FIELDS}
     c.update({f: _dt(getattr(contest, f)) for f in CONTEST_DT_FIELDS})
@@ -94,18 +121,40 @@ def export_contest(contest, ContestPage, AuditLog, page_chunk: int = 2000) -> di
     ]
 
     data = {"contest": c, "books": books, "pages": pages, "audit": audit}
-    return {
+    checksum = _checksum(data)
+    out = {
         "format": "proofsource-backup",
         "schema_version": BACKUP_SCHEMA_VERSION,
         "contest_id": contest.id,
         "exported_at": _dt(datetime.utcnow()),
         "counts": {"books": len(books), "pages": len(pages), "audit": len(audit)},
-        "checksum": _checksum(data),
+        "checksum": checksum,
         "data": data,
     }
+    if secret:
+        out["signature"] = _signature(contest.id, checksum, secret)
+    return out
 
 
-def validate_backup(payload, expected_contest_id=None) -> list:
+VALID_PAGE_STATUSES = {"unproofread", "pending_review", "accepted", "needs_fix", "rejected"}
+
+
+def _page_row_problem(p) -> str:
+    if not isinstance(p, dict):
+        return "bad_page_row"
+    if not isinstance(p.get("page_number"), int) or not (0 < p["page_number"] <= 100000):
+        return "bad_page_row"
+    if p.get("review_status") not in VALID_PAGE_STATUSES:
+        return "bad_page_row"
+    for f in ("base_points", "bonus_points", "wiki_level"):
+        if p.get(f) is not None and not isinstance(p.get(f), int):
+            return "bad_page_row"
+    if not isinstance(p.get("page_title"), str) or not (0 < len(p["page_title"]) <= 255):
+        return "bad_page_row"
+    return ""
+
+
+def validate_backup(payload, expected_contest_id=None, secret: str = None, allow_unsigned: bool = False) -> list:
     """Return a list of human-readable problems. Empty list = safe to restore."""
     errs = []
     if not isinstance(payload, dict):
@@ -122,15 +171,29 @@ def validate_backup(payload, expected_contest_id=None) -> list:
             errs.append(f"missing_{key}")
     if errs:
         return errs
-    if payload.get("checksum") != _checksum(data):
+    if not isinstance(data.get("books"), list) or not isinstance(data.get("pages"), list) \
+            or not isinstance(data.get("contest"), dict):
+        return errs + ["missing_data"]
+    checksum = _checksum(data)
+    if payload.get("checksum") != checksum:
         errs.append("checksum_mismatch")
+    elif secret and not allow_unsigned:
+        sig = payload.get("signature")
+        if not isinstance(sig, str) or not hmac.compare_digest(sig, _signature(payload.get("contest_id"), checksum, secret)):
+            errs.append("signature_invalid")
     counts = payload.get("counts", {})
     if counts.get("books") != len(data["books"]) or counts.get("pages") != len(data["pages"]):
         errs.append("count_mismatch")
     if expected_contest_id is not None and payload.get("contest_id") != expected_contest_id:
         errs.append("different_contest")
+    if any(not isinstance(b, dict) for b in data["books"]):
+        return errs + ["bad_book_row"]
     book_ids = {b.get("_id") for b in data["books"]}
     for p in data["pages"]:
+        prob = _page_row_problem(p)
+        if prob:
+            errs.append(prob)
+            break
         if p.get("book_id") not in book_ids:
             errs.append("page_with_unknown_book")
             break
@@ -145,14 +208,27 @@ def validate_backup(payload, expected_contest_id=None) -> list:
     return errs
 
 
-def save_json_file(payload: dict, prefix: str) -> str:
+def save_json_file(payload: dict, prefix: str, keep: int = JSON_BACKUPS_KEEP) -> str:
+    """Writes a private JSON file; keeps only the newest `keep` files with this prefix
+    (keep=None keeps all, e.g. for deleted contests)."""
     name = f"{prefix}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.json"
     path = os.path.join(backup_dir(), name)
     tmp = path + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
+    with _private_open(tmp, "w", encoding="utf-8") as f:
         json.dump(payload, f, ensure_ascii=False)
     os.replace(tmp, path)
+    if keep:
+        olds = sorted(glob.glob(os.path.join(backup_dir(), glob.escape(prefix) + "-*.json")))
+        for old in olds[:-keep]:
+            try:
+                os.remove(old)
+            except OSError:
+                pass
     return path
+
+
+# Never taken from a backup: who approved/owns the contest, which wiki it runs on and its URL.
+RESTORE_PROTECTED_FIELDS = {"slug", "approval_status", "approved_by", "created_by", "wiki_domain"}
 
 
 def restore_contest(db, contest, payload, models, username: str) -> dict:
@@ -160,8 +236,7 @@ def restore_contest(db, contest, payload, models, username: str) -> dict:
     Replace a contest's books/pages with the backup content in ONE transaction.
     Caller must have validated the payload. A safety JSON of the current state is written first.
     """
-    Contest, IndexBook, ContestPage, AuditLog, Hub = (
-        models["Contest"], models["IndexBook"], models["ContestPage"], models["AuditLog"], models["Hub"])
+    IndexBook, ContestPage, AuditLog = models["IndexBook"], models["ContestPage"], models["AuditLog"]
 
     safety = export_contest(contest, ContestPage, AuditLog)
     safety_path = save_json_file(safety, f"pre-restore-contest{contest.id}")
@@ -174,16 +249,15 @@ def restore_contest(db, contest, payload, models, username: str) -> dict:
         db.session.flush()
 
         for f in CONTEST_FIELDS:
-            if f == "slug":
-                continue  # keep current slug (avoids collisions); old links keep working
+            if f in RESTORE_PROTECTED_FIELDS:
+                continue
             if f in c:
                 setattr(contest, f, c[f])
         for f in ("start_time", "end_time", "last_synced_at"):
             if c.get(f):
                 setattr(contest, f, _parse_dt(c[f]))
-        if c.get("hub_slug"):
-            hub = Hub.query.filter_by(slug=c["hub_slug"]).first()
-            contest.hub_id = hub.id if hub else contest.hub_id
+        # hub membership is never changed by a restore (a file could otherwise attach the
+        # contest to someone else's central contest)
 
         id_map = {}
         for bd in data["books"]:
@@ -268,32 +342,118 @@ def _integrity_ok(path: str) -> bool:
         return False
 
 
-def snapshot_database(engine, reason: str = "auto") -> dict:
-    """Online, consistent copy of the SQLite DB into the backup folder; verified and pruned."""
-    src = sqlite_path_from_engine(engine)
-    if not src or not os.path.exists(src):
-        return {"ok": False, "error": "not_sqlite"}
-    if not _integrity_ok(src):
-        return {"ok": False, "error": "source_integrity_failed"}
-    name = f"db-{reason}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.sqlite"
-    dest = os.path.join(backup_dir(), name)
-    tmp = dest + ".tmp"
-    s = sqlite3.connect(src, timeout=30)
-    d = sqlite3.connect(tmp)
-    with d:
-        s.backup(d)
-    d.close(); s.close()
-    if not _integrity_ok(tmp):
-        os.remove(tmp)
-        return {"ok": False, "error": "snapshot_integrity_failed"}
-    os.replace(tmp, dest)
-    snaps = sorted(glob.glob(os.path.join(backup_dir(), "db-*.sqlite")))
+def _prune_snapshots():
+    snaps = sorted(glob.glob(os.path.join(backup_dir(), "db-*.sqlite")) +
+                   glob.glob(os.path.join(backup_dir(), "db-*.json.gz")), key=os.path.getmtime)
     for old in snaps[:-SNAPSHOT_KEEP]:
         try:
             os.remove(old)
         except OSError:
             pass
+
+
+def _sqlite_snapshot(src: str, reason: str) -> dict:
+    if not os.path.exists(src):
+        return {"ok": False, "error": "not_found"}
+    if not _integrity_ok(src):
+        return {"ok": False, "error": "source_integrity_failed"}
+    name = f"db-{reason}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.sqlite"
+    dest = os.path.join(backup_dir(), name)
+    tmp = dest + ".tmp"
+    _private_open(tmp, "w").close()
+    s = sqlite3.connect(src, timeout=30)
+    d = sqlite3.connect(tmp)
+    with d:
+        s.backup(d)
+    for t in SNAPSHOT_SKIP_TABLES:   # no OAuth credentials in backup copies
+        try:
+            d.execute(f"DELETE FROM {t}")
+        except sqlite3.Error:
+            pass
+    d.commit()
+    d.execute("VACUUM")
+    d.close(); s.close()
+    if not _integrity_ok(tmp):
+        os.remove(tmp)
+        return {"ok": False, "error": "snapshot_integrity_failed"}
+    os.replace(tmp, dest)
+    _prune_snapshots()
     return {"ok": True, "file": name}
+
+
+def _json_default(v):
+    if isinstance(v, (datetime, date)):
+        return v.isoformat()
+    if isinstance(v, Decimal):
+        return int(v) if v == int(v) else float(v)
+    if isinstance(v, bytes):
+        return v.decode("utf-8", "replace")
+    raise TypeError(f"cannot serialise {type(v)}")
+
+
+def iter_table_rows(conn, table, chunk: int = 5000):
+    pk = list(table.primary_key.columns)
+    q = table.select()
+    if pk:
+        q = q.order_by(*pk)
+    offset = 0
+    while True:
+        rows = conn.execute(q.limit(chunk).offset(offset)).mappings().all()
+        if not rows:
+            break
+        for r in rows:
+            yield dict(r)
+        offset += len(rows)
+
+
+def dump_database_json(engine, metadata, path: str) -> dict:
+    """Portable logical dump (works for MariaDB/ToolsDB and SQLite): one gzip'd JSON document
+    {"format": "proofsource-db-dump", "tables": {name: [rows...]}}, written atomically."""
+    counts = {}
+    tmp = path + ".tmp"
+    with _private_open(tmp, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb") as gz:
+        w = io.TextIOWrapper(gz, encoding="utf-8")
+        w.write('{"format":"proofsource-db-dump","version":1,"dialect":%s,"created_at":%s,"tables":{' % (
+            json.dumps(engine.dialect.name), json.dumps(_dt(datetime.utcnow()))))
+        first_table = True
+        with engine.connect() as conn:
+            for table in metadata.sorted_tables:
+                if table.name in SNAPSHOT_SKIP_TABLES:
+                    continue
+                w.write(("" if first_table else ",") + json.dumps(table.name) + ":[")
+                first_table = False
+                n = 0
+                for row in iter_table_rows(conn, table):
+                    w.write(("," if n else "") + json.dumps(row, ensure_ascii=False, default=_json_default))
+                    n += 1
+                w.write("]")
+                counts[table.name] = n
+        w.write("}}")
+        w.flush()
+        w.detach()
+    os.replace(tmp, path)
+    return counts
+
+
+def snapshot_database(engine, reason: str = "auto") -> dict:
+    """Consistent copy of the whole database into the backup folder; verified and pruned."""
+    reason = "".join(ch for ch in reason if ch.isalnum() or ch in "-_")[:40] or "snap"
+    src = sqlite_path_from_engine(engine)
+    if src:
+        return _sqlite_snapshot(src, reason)
+    from models import db as _db   # late import: backup_engine stays usable without the app
+    name = f"db-{reason}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.json.gz"
+    dest = os.path.join(backup_dir(), name)
+    try:
+        counts = dump_database_json(engine, _db.metadata, dest)
+    except Exception as e:
+        try:
+            os.remove(dest + ".tmp")
+        except OSError:
+            pass
+        return {"ok": False, "error": f"dump_failed: {type(e).__name__}"}
+    _prune_snapshots()
+    return {"ok": True, "file": name, "counts": counts}
 
 
 _last_check = [0.0]
@@ -307,7 +467,8 @@ def maybe_auto_snapshot(engine) -> None:
     _last_check[0] = now
     try:
         d = backup_dir()
-        snaps = sorted(glob.glob(os.path.join(d, "db-*.sqlite")))
+        snaps = sorted(glob.glob(os.path.join(d, "db-*.sqlite")) + glob.glob(os.path.join(d, "db-*.json.gz")),
+                       key=os.path.getmtime)
         if snaps and now - os.path.getmtime(snaps[-1]) < SNAPSHOT_INTERVAL_HOURS * 3600:
             return
         lock = os.path.join(d, ".snapshot.lock")
@@ -327,7 +488,8 @@ def maybe_auto_snapshot(engine) -> None:
 
 def list_snapshots() -> list:
     out = []
-    for p in sorted(glob.glob(os.path.join(backup_dir(), "db-*.sqlite")), reverse=True):
+    paths = glob.glob(os.path.join(backup_dir(), "db-*.sqlite")) + glob.glob(os.path.join(backup_dir(), "db-*.json.gz"))
+    for p in sorted(paths, key=os.path.getmtime, reverse=True):
         out.append({"file": os.path.basename(p), "size": os.path.getsize(p),
                     "time": datetime.utcfromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%dT%H:%M:%SZ")})
     return out
