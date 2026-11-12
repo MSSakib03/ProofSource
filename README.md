@@ -60,7 +60,7 @@ ProofSource finds every page that is proofread on Wikisource during a contest, l
 | 📚 **Flexible books** | Per-book points, excluded pages (`1-5, 12`) and per-book time windows. |
 | 💾 **Backups** | Full JSON backup and restore, CSV exports, automatic snapshots and reminders. |
 | 📝 **Activity log** | Every admin action is recorded and cannot be edited. |
-| 🌙 **Comfortable UI** | ProofSource's Wikisource-blue theme with Wikimedia (Codex) style components, English and Bangla, dark mode, mobile friendly, keyboard shortcuts. |
+| 🌙 **Comfortable UI** | ProofSource's Wikisource-blue theme with Wikimedia (Codex) style components, English and Bangla (Hind Siliguri / Tiro Bangla fonts), dark mode, mobile friendly, keyboard shortcuts. |
 | 🔒 **Private & safe** | No third-party CDNs or trackers; OAuth tokens encrypted at rest; CSRF, CSP and signed backups. |
 
 ---

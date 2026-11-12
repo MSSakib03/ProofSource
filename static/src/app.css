@@ -8,6 +8,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------- Bangla fonts (self-hosted, see static/fonts/README.md)
+ * unicode-range: files load only when Bangla text is on screen; Latin keeps the system font.
+ * Digits come from Noto Sans Bengali because Hind Siliguri's ১ is drawn at letter height.
+ * size-adjust: Bangla glyphs are scaled 5% up so small UI text stays readable next to Latin. */
+@font-face { font-family: 'PS Bangla'; font-style: normal; font-weight: 400; font-display: swap; size-adjust: 105%;
+  src: url('../fonts/hind-siliguri-bengali-400.woff2') format('woff2'); unicode-range: U+0951-0952, U+0964-0965, U+0980-09E5, U+09F0-09FE, U+200C-200D, U+25CC; }
+@font-face { font-family: 'PS Bangla'; font-style: normal; font-weight: 500; font-display: swap; size-adjust: 105%;
+  src: url('../fonts/hind-siliguri-bengali-500.woff2') format('woff2'); unicode-range: U+0951-0952, U+0964-0965, U+0980-09E5, U+09F0-09FE, U+200C-200D, U+25CC; }
+@font-face { font-family: 'PS Bangla'; font-style: normal; font-weight: 600; font-display: swap; size-adjust: 105%;
+  src: url('../fonts/hind-siliguri-bengali-600.woff2') format('woff2'); unicode-range: U+0951-0952, U+0964-0965, U+0980-09E5, U+09F0-09FE, U+200C-200D, U+25CC; }
+@font-face { font-family: 'PS Bangla'; font-style: normal; font-weight: 700; font-display: swap; size-adjust: 105%;
+  src: url('../fonts/hind-siliguri-bengali-700.woff2') format('woff2'); unicode-range: U+0951-0952, U+0964-0965, U+0980-09E5, U+09F0-09FE, U+200C-200D, U+25CC; }
+@font-face { font-family: 'PS Bangla'; font-style: normal; font-weight: 400; font-display: swap; size-adjust: 105%;
+  src: url('../fonts/noto-sans-bengali-digits-400.woff2') format('woff2'); unicode-range: U+09E6-09EF; }
+@font-face { font-family: 'PS Bangla'; font-style: normal; font-weight: 500; font-display: swap; size-adjust: 105%;
+  src: url('../fonts/noto-sans-bengali-digits-500.woff2') format('woff2'); unicode-range: U+09E6-09EF; }
+@font-face { font-family: 'PS Bangla'; font-style: normal; font-weight: 600; font-display: swap; size-adjust: 105%;
+  src: url('../fonts/noto-sans-bengali-digits-600.woff2') format('woff2'); unicode-range: U+09E6-09EF; }
+@font-face { font-family: 'PS Bangla'; font-style: normal; font-weight: 700; font-display: swap; size-adjust: 105%;
+  src: url('../fonts/noto-sans-bengali-digits-700.woff2') format('woff2'); unicode-range: U+09E6-09EF; }
+@font-face { font-family: 'PS Bangla Serif'; font-style: normal; font-weight: 400; font-display: swap;
+  src: url('../fonts/tiro-bangla-bengali-400.woff2') format('woff2'); unicode-range: U+0951-0952, U+0964-0965, U+0980-09E5, U+09F0-09FE, U+200C-200D, U+25CC, U+09E6-09EF; }
+
 /* ---------------------------------------------------------------- tokens
  * Colours: ProofSource's original theme (Wikisource logo blues on Tailwind slate).
  * Shapes, sizes and states: Wikimedia Codex. */

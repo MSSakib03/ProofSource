@@ -717,15 +717,15 @@
                     {{ r.username }}
                   </button>
                 </td>
-                <td class="py-3 px-4 text-right tabular-nums text-xs">{{ r.submitted }}</td>
-                <td class="py-3 px-4 text-right tabular-nums text-xs text-emerald-600 dark:text-emerald-400 font-semibold">{{ r.accepted }}</td>
+                <td class="py-3 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
+                <td class="py-3 px-4 text-right tabular-nums text-xs text-emerald-600 dark:text-emerald-400 font-semibold">{{ fmtNum(r.accepted) }}</td>
                 <template v-if="active.contest.review_enabled">
-                  <td class="py-3 px-4 text-right tabular-nums text-xs text-amber-600 dark:text-amber-400">{{ r.pending }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-xs text-orange-600 dark:text-orange-400">{{ r.needs_fix }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-xs text-rose-600 dark:text-rose-400">{{ r.rejected }}</td>
+                  <td class="py-3 px-4 text-right tabular-nums text-xs text-amber-600 dark:text-amber-400">{{ fmtNum(r.pending) }}</td>
+                  <td class="py-3 px-4 text-right tabular-nums text-xs text-orange-600 dark:text-orange-400">{{ fmtNum(r.needs_fix) }}</td>
+                  <td class="py-3 px-4 text-right tabular-nums text-xs text-rose-600 dark:text-rose-400">{{ fmtNum(r.rejected) }}</td>
                 </template>
-                <td v-if="hasReverted" class="py-3 px-4 text-right tabular-nums text-xs text-slate-500">{{ r.reverted || 0 }}</td>
-                <td class="py-3 px-4 text-right tabular-nums font-bold">{{ r.points }}</td>
+                <td v-if="hasReverted" class="py-3 px-4 text-right tabular-nums text-xs text-slate-500">{{ fmtNum(r.reverted || 0) }}</td>
+                <td class="py-3 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
               </tr>
             </tbody>
           </table>
@@ -913,10 +913,10 @@
                       {{ j.username }}
                     </a>
                   </td>
-                  <td class="py-3 px-4 text-right tabular-nums font-bold">{{ j.reviewed }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-emerald-600 dark:text-emerald-400">{{ j.accepted }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-amber-600 dark:text-amber-400">{{ j.needs_fix }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-rose-600 dark:text-rose-400">{{ j.rejected }}</td>
+                  <td class="py-3 px-4 text-right tabular-nums font-bold">{{ fmtNum(j.reviewed) }}</td>
+                  <td class="py-3 px-4 text-right tabular-nums text-emerald-600 dark:text-emerald-400">{{ fmtNum(j.accepted) }}</td>
+                  <td class="py-3 px-4 text-right tabular-nums text-amber-600 dark:text-amber-400">{{ fmtNum(j.needs_fix) }}</td>
+                  <td class="py-3 px-4 text-right tabular-nums text-rose-600 dark:text-rose-400">{{ fmtNum(j.rejected) }}</td>
                 </tr>
               </tbody>
             </table>
