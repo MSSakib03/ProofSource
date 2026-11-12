@@ -28,3 +28,6 @@ _local/
 Thumbs.db
 .vscode/
 .idea/
+
+# Node (CSS build tooling only)
+node_modules/

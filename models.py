@@ -4,6 +4,11 @@ from sqlalchemy import event, inspect, text
 
 db = SQLAlchemy()
 
+# MariaDB/ToolsDB: always utf8mb4 (Bangla and every other script) with a binary collation, so
+# text comparisons behave exactly like SQLite. The default *_ci collations are case- AND
+# accent-insensitive: "José" and "Jose" would be merged into one leaderboard entry.
+MYSQL_TABLE_ARGS = {"mysql_charset": "utf8mb4", "mysql_collate": "utf8mb4_bin", "mysql_engine": "InnoDB"}
+
 
 class Hub(db.Model):
     """
@@ -12,6 +17,7 @@ class Hub(db.Model):
     (Table keeps the old name 'hubs' for backward compatibility.)
     """
     __tablename__ = 'hubs'
+    __table_args__ = MYSQL_TABLE_ARGS
     id = db.Column(db.Integer, primary_key=True)
     slug = db.Column(db.String(100), nullable=False, unique=True, index=True)
     title = db.Column(db.String(255), nullable=False)
@@ -30,6 +36,8 @@ class Hub(db.Model):
     custom_points_policy = db.Column(db.String(10), default='project')   # yes | no | project
     bonus_policy = db.Column(db.String(10), default='project')           # yes | no | project
     review_policy = db.Column(db.String(10), default='project')          # yes (required) | no | project
+    # --- v8 ---
+    submission_policy = db.Column(db.String(10), default='project')      # auto | enroll | manual | project
     delete_requested_by = db.Column(db.String(100), nullable=True)
     delete_requested_at = db.Column(db.DateTime, nullable=True)
     delete_reason = db.Column(db.Text, default="")
@@ -39,6 +47,7 @@ class Hub(db.Model):
 
 class Contest(db.Model):
     __tablename__ = 'contests'
+    __table_args__ = MYSQL_TABLE_ARGS
     id = db.Column(db.Integer, primary_key=True)
     slug = db.Column(db.String(100), nullable=False, unique=True, index=True)
     title = db.Column(db.String(255), nullable=False)
@@ -74,9 +83,15 @@ class Contest(db.Model):
     delete_requested_by = db.Column(db.String(100), nullable=True)
     delete_requested_at = db.Column(db.DateTime, nullable=True)
     delete_reason = db.Column(db.Text, default="")
+    # --- v8: how eligible pages enter the contest ---
+    #   auto   = every eligible page is listed automatically (original behaviour)
+    #   enroll = semi-automatic: only pages of participants who enrolled are listed automatically
+    #   manual = participants pick and submit their eligible pages themselves
+    submission_mode = db.Column(db.String(10), default='auto')
 
     books = db.relationship('IndexBook', backref='contest', cascade="all, delete-orphan", lazy=True)
     pages = db.relationship('ContestPage', backref='contest', cascade="all, delete-orphan", lazy=True)
+    enrollments = db.relationship('Enrollment', backref='contest', cascade="all, delete-orphan", lazy=True)
 
     @property
     def lang_code(self):
@@ -92,6 +107,7 @@ class Contest(db.Model):
 
 class IndexBook(db.Model):
     __tablename__ = 'index_books'
+    __table_args__ = MYSQL_TABLE_ARGS
     id = db.Column(db.Integer, primary_key=True)
     contest_id = db.Column(db.Integer, db.ForeignKey('contests.id', ondelete='CASCADE'), nullable=False, index=True)
     title = db.Column(db.String(255), nullable=False)
@@ -117,6 +133,7 @@ class ContestPage(db.Model):
         db.Index('ix_cp_contest_status', 'contest_id', 'review_status'),
         db.Index('ix_cp_book_page', 'book_id', 'page_number'),
         db.Index('ix_cp_contest_proofreader', 'contest_id', 'proofreader'),
+        MYSQL_TABLE_ARGS,
     )
     id = db.Column(db.Integer, primary_key=True)
     contest_id = db.Column(db.Integer, db.ForeignKey('contests.id', ondelete='CASCADE'), nullable=False, index=True)
@@ -126,7 +143,7 @@ class ContestPage(db.Model):
     wiki_level = db.Column(db.Integer, default=1)
     proofreader = db.Column(db.String(100), nullable=True, index=True)
     validator = db.Column(db.String(100), nullable=True, index=True)
-    proofread_rev_id = db.Column(db.Integer, nullable=True)
+    proofread_rev_id = db.Column(db.BigInteger, nullable=True)
     proofread_time = db.Column(db.DateTime, nullable=True)
     review_status = db.Column(db.String(30), default='unproofread', index=True)
     reviewed_by = db.Column(db.String(100), nullable=True)
@@ -139,9 +156,13 @@ class ContestPage(db.Model):
     reserved_by_user = db.Column(db.String(100), nullable=True)
     user_lock_expires = db.Column(db.DateTime, nullable=True)
     # --- v6: incremental sync ---
-    last_rev_id = db.Column(db.Integer, nullable=True)
+    last_rev_id = db.Column(db.BigInteger, nullable=True)
     # --- v7: equal review distribution ---
     assigned_to = db.Column(db.String(100), nullable=True, index=True)
+    # --- v8: a listed page that stopped qualifying is kept as 'reverted' (never deleted) ---
+    reverted_from = db.Column(db.String(30), nullable=True)     # status it had before
+    revert_reason = db.Column(db.String(30), nullable=True)     # not_proofread | ineligible | excluded
+    reverted_at = db.Column(db.DateTime, nullable=True)
 
     def counts_as_accepted(self, contest):
         if self.review_status == 'accepted':
@@ -158,6 +179,7 @@ class ContestPage(db.Model):
 class AuditLog(db.Model):
     """Append-only action history. Rows can never be updated or deleted through the ORM."""
     __tablename__ = 'audit_logs'
+    __table_args__ = MYSQL_TABLE_ARGS
     id = db.Column(db.Integer, primary_key=True)
     contest_id = db.Column(db.Integer, nullable=True, index=True)   # no FK: log survives contest deletion
     username = db.Column(db.String(100), nullable=False, default="")
@@ -182,15 +204,40 @@ def _audit_no_delete(mapper, connection, target):
 class SlugAlias(db.Model):
     """Old slugs keep working after a contest's slug is changed (they redirect to the new one)."""
     __tablename__ = 'slug_aliases'
+    __table_args__ = MYSQL_TABLE_ARGS
     id = db.Column(db.Integer, primary_key=True)
     old_slug = db.Column(db.String(100), nullable=False, unique=True, index=True)
     contest_id = db.Column(db.Integer, db.ForeignKey('contests.id', ondelete='CASCADE'), nullable=False, index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+class Enrollment(db.Model):
+    """Semi-automatic submission: participants who registered for a contest."""
+    __tablename__ = 'enrollments'
+    __table_args__ = (
+        db.UniqueConstraint('contest_id', 'username', name='uq_enrollment_user'),
+        MYSQL_TABLE_ARGS,
+    )
+    id = db.Column(db.Integer, primary_key=True)
+    contest_id = db.Column(db.Integer, db.ForeignKey('contests.id', ondelete='CASCADE'), nullable=False, index=True)
+    username = db.Column(db.String(100), nullable=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+class ToolAdmin(db.Model):
+    """Tool administrators added from the UI (in addition to PROOFSOURCE_SUPER_ADMINS)."""
+    __tablename__ = 'tool_admins'
+    __table_args__ = MYSQL_TABLE_ARGS
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(100), nullable=False, unique=True)
+    added_by = db.Column(db.String(100), nullable=False, default="")
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+
 class OAuthLogin(db.Model):
     """OAuth 2.0 tokens are stored server-side (they are too long for a cookie)."""
     __tablename__ = 'oauth_logins'
+    __table_args__ = MYSQL_TABLE_ARGS
     id = db.Column(db.String(64), primary_key=True)
     username = db.Column(db.String(255), nullable=False, index=True)
     access_token = db.Column(db.Text, nullable=False)

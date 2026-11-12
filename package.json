@@ -1,0 +1,12 @@
+{
+  "name": "proofsource-ui",
+  "private": true,
+  "description": "Build tooling for ProofSource's stylesheet. Only needed when templates/index.html or static/src/app.css change; the built static/css/app.css is committed, so Toolforge deploys need no Node.js.",
+  "scripts": {
+    "build:css": "tailwindcss -c tailwind.config.js -i static/src/app.css -o static/css/app.css --minify",
+    "watch:css": "tailwindcss -c tailwind.config.js -i static/src/app.css -o static/css/app.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "3.4.17"
+  }
+}
