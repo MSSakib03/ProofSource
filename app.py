@@ -85,6 +85,8 @@ OAUTH2_BASE = os.environ.get("OAUTH2_BASE", "https://meta.wikimedia.org/w/rest.p
 OAUTH2_CLIENT_ID = os.environ.get("OAUTH2_CLIENT_ID", "").strip()
 OAUTH2_CLIENT_SECRET = os.environ.get("OAUTH2_CLIENT_SECRET", "").strip()
 OAUTH2_REDIRECT_URI = os.environ.get("OAUTH2_REDIRECT_URI", "https://proofsource.toolforge.org/auth/callback").strip()
+# PKCE is on by default; set OAUTH2_USE_PKCE=0 only if the Wikimedia consumer ever rejects it.
+OAUTH2_USE_PKCE = os.environ.get("OAUTH2_USE_PKCE", "1").strip() != "0"
 
 PUBLIC_HOSTS = frozenset(h for h in [urlsplit(OAUTH2_REDIRECT_URI).netloc.lower()] if h)
 
@@ -862,6 +864,15 @@ def add_security_headers(resp):
     return security.apply_security_headers(resp, https=app.config["SESSION_COOKIE_SECURE"])
 
 
+@app.errorhandler(500)
+def handle_server_error(e):
+    """Unexpected errors: the traceback is in the server log; the API answers with JSON the UI can show."""
+    if request.path.startswith("/api/"):
+        return err("server_error", 500)
+    return _plain("Something went wrong on the ProofSource server. Please try again; if it keeps "
+                  "happening, tell the tool maintainers (details are in the server log).", 500)
+
+
 @app.errorhandler(ValueError)
 def handle_value_error(e):
     """Bad user input (non-numeric numbers, invalid domain...) is a 400, never a 500 with a trace."""
@@ -870,6 +881,8 @@ def handle_value_error(e):
 
 
 def db_config_warnings():
+    if not security.crypto_available():
+        log.error(security.CRYPTO_MISSING_MSG)
     url = app.config["SQLALCHEMY_DATABASE_URI"]
     if db_config.is_sqlite(url):
         if os.environ.get("TOOL_TOOLSDB_USER") or os.path.exists(os.path.expanduser("~/replica.my.cnf")):
@@ -986,17 +999,19 @@ def oauth_login():
         return _plain("OAuth 2.0 client ID / secret not configured on server "
                       "(set OAUTH2_CLIENT_ID and OAUTH2_CLIENT_SECRET).", 500)
     state = secrets.token_urlsafe(24)
-    verifier, challenge = _pkce_pair()
     session["oauth_state"] = state
-    session["oauth_pkce"] = verifier
     params = {
         "response_type": "code",
         "client_id": OAUTH2_CLIENT_ID,
         "redirect_uri": OAUTH2_REDIRECT_URI,
         "state": state,
-        "code_challenge": challenge,
-        "code_challenge_method": "S256",
     }
+    if OAUTH2_USE_PKCE:
+        verifier, challenge = _pkce_pair()
+        session["oauth_pkce"] = verifier
+        params.update(code_challenge=challenge, code_challenge_method="S256")
+    else:
+        session.pop("oauth_pkce", None)
     return redirect(OAUTH2_BASE + "/authorize?" + urlencode(params))
 
 @app.route("/oauth-callback")
@@ -1011,7 +1026,7 @@ def oauth_callback():
     verifier = session.pop("oauth_pkce", None)
     if not code:
         return redirect(url_for("index"))
-    if not expected or not secrets.compare_digest(state, expected):
+    if not expected or not secrets.compare_digest(state.encode("utf-8"), str(expected).encode("utf-8")):
         return _plain("OAuth state mismatch (session expired?). Please go back and click Login again.", 400)
     try:
         req = {"grant_type": "authorization_code", "code": code, "redirect_uri": OAUTH2_REDIRECT_URI}
@@ -1023,19 +1038,26 @@ def oauth_callback():
         log.exception("OAuth callback failed")
         return _plain("Login failed while talking to Wikimedia. Please go back and try again.", 400)
 
-    old = get_login_record()
-    if old:
-        db.session.delete(old)
-    purge_expired_logins()
-    rec = OAuthLogin(
-        id=secrets.token_hex(32),
-        username=username,
-        access_token=_enc(js["access_token"]),
-        refresh_token=_enc(js.get("refresh_token")),
-        expires_at=_expiry_from(js)
-    )
-    db.session.add(rec)
-    db.session.commit()
+    try:
+        old = get_login_record()
+        if old:
+            db.session.delete(old)
+        purge_expired_logins()
+        rec = OAuthLogin(
+            id=secrets.token_hex(32),
+            username=username,
+            access_token=_enc(js["access_token"]),
+            refresh_token=_enc(js.get("refresh_token")),
+            expires_at=_expiry_from(js)
+        )
+        db.session.add(rec)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        log.exception("Could not store the login of %s", username)
+        return _plain("Wikimedia confirmed your account, but ProofSource could not save the login. "
+                      "Please try again in a minute; if it keeps happening, tell the tool maintainers "
+                      "(details are in the server log).", 500)
     session.clear()            # new session (prevents fixation); a fresh CSRF token is issued lazily
     session.permanent = True
     session["login_id"] = rec.id
