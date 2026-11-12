@@ -13,6 +13,8 @@ Security helpers for ProofSource.
 import base64
 import hashlib
 import hmac
+import importlib.util
+import logging
 import secrets
 import threading
 import time
@@ -108,10 +110,33 @@ def apply_security_headers(resp, https: bool = True):
 # ---------------------------------------------------------------- token encryption at rest
 
 _ENC_PREFIX = "enc1:"
+_log = logging.getLogger("proofsource")
+_warned_no_crypto = [False]
+CRYPTO_MISSING_MSG = ("The 'cryptography' package is not installed, so OAuth tokens are stored WITHOUT "
+                      "encryption. Run `pip install -r requirements.txt` in the tool's virtualenv and restart.")
+
+
+def crypto_available() -> bool:
+    try:
+        return importlib.util.find_spec("cryptography.fernet") is not None
+    except (ImportError, ValueError):
+        return False
+
+
+def _warn_no_crypto():
+    if not _warned_no_crypto[0]:
+        _warned_no_crypto[0] = True
+        _log.error(CRYPTO_MISSING_MSG)
 
 
 def _fernet(secret_key: str):
-    from cryptography.fernet import Fernet
+    """Fernet instance, or None when `cryptography` is missing (an update deployed without
+    reinstalling requirements must never break login)."""
+    try:
+        from cryptography.fernet import Fernet
+    except ImportError:
+        _warn_no_crypto()
+        return None
     raw = hashlib.sha256(("proofsource-token-encryption:" + secret_key).encode("utf-8")).digest()
     return Fernet(base64.urlsafe_b64encode(raw))
 
@@ -119,17 +144,24 @@ def _fernet(secret_key: str):
 def encrypt_secret(value, secret_key: str):
     if value is None or value == "":
         return value
-    return _ENC_PREFIX + _fernet(secret_key).encrypt(value.encode("utf-8")).decode("ascii")
+    f = _fernet(secret_key)
+    if f is None:
+        return value   # degraded mode: same as before encryption existed; logged loudly
+    return _ENC_PREFIX + f.encrypt(value.encode("utf-8")).decode("ascii")
 
 
 def decrypt_secret(value, secret_key: str):
     """Decrypts a stored token. Legacy plaintext rows are returned unchanged.
-    Returns None when the value cannot be decrypted (e.g. the secret key was rotated)."""
+    Returns None when the value cannot be decrypted (secret key rotated, or `cryptography`
+    missing): the user is then simply asked to log in again."""
     if not value or not value.startswith(_ENC_PREFIX):
         return value
+    f = _fernet(secret_key)
+    if f is None:
+        return None
     from cryptography.fernet import InvalidToken
     try:
-        return _fernet(secret_key).decrypt(value[len(_ENC_PREFIX):].encode("ascii")).decode("utf-8")
+        return f.decrypt(value[len(_ENC_PREFIX):].encode("ascii")).decode("utf-8")
     except (InvalidToken, ValueError):
         return None
 

@@ -209,6 +209,72 @@ class IdentityTests(Base):
             self.assertEqual(A.get_oauth_creds(), {"access_token": "SECRET-AT"})
 
 
+class LoginResilienceTests(Base):
+    """Login must keep working after a deploy that forgot `pip install -r requirements.txt`,
+    and must never end on a bare 'Internal Server Error' page."""
+
+    class R:
+        def __init__(s, js): s.status_code = 200; s._js = js; s.text = ""
+        def json(s): return s._js
+
+    def _login_flow(self, client=None):
+        from urllib.parse import urlparse, parse_qs
+        c = client or self.c
+        state = parse_qs(urlparse(c.get("/login").headers["Location"]).query)["state"][0]
+        with mock.patch.object(A.requests, "post", lambda *a, **k: self.R({"access_token": "AT", "refresh_token": "RT", "expires_in": 14400})), \
+             mock.patch.object(A.requests, "get", lambda *a, **k: self.R({"username": "Some User"})):
+            return c.get(f"/auth/callback?code=x&state={state}")
+
+    def test_login_works_without_cryptography_installed(self):
+        import sys
+        saved = {k: sys.modules.get(k) for k in ("cryptography", "cryptography.fernet")}
+        sys.modules["cryptography"] = None
+        sys.modules["cryptography.fernet"] = None
+        try:
+            self.assertFalse(A.security.crypto_available())
+            r = self._login_flow()
+            self.assertEqual(r.status_code, 302)
+            self.assertEqual(self.c.get("/api/session").json["current_user"], "Some User")
+            with A.app.test_request_context():
+                # an encrypted token from before cannot be read: the user is simply asked to log in again
+                self.assertIsNone(A.security.decrypt_secret("enc1:abc", "k"))
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    sys.modules.pop(k, None)
+                else:
+                    sys.modules[k] = v
+
+    def test_storage_failure_gives_a_readable_message(self):
+        with mock.patch.object(A, "purge_expired_logins", side_effect=RuntimeError("db down")):
+            r = self._login_flow()
+        self.assertEqual(r.status_code, 500)
+        self.assertEqual(r.mimetype, "text/plain")
+        self.assertIn(b"could not save the login", r.data)
+
+    def test_unexpected_api_error_is_json(self):
+        with mock.patch.object(A, "compute_contest_leaderboard", side_effect=RuntimeError("boom")):
+            cid = self.make_contest()
+            A.app.config["PROPAGATE_EXCEPTIONS"] = False
+            try:
+                r = self.c.get(f"/api/contests/{cid}")
+            finally:
+                A.app.config["PROPAGATE_EXCEPTIONS"] = None
+        self.assertEqual(r.status_code, 500)
+        self.assertEqual(r.json["error_code"], "server_error")
+
+    def test_pkce_can_be_switched_off(self):
+        with mock.patch.object(A, "OAUTH2_USE_PKCE", False):
+            loc = self.c.get("/login").headers["Location"]
+            self.assertNotIn("code_challenge", loc)
+            self.assertEqual(self._login_flow().status_code, 302)
+
+    def test_non_ascii_state_is_rejected_cleanly(self):
+        self.c.get("/login")
+        r = self.c.get("/auth/callback?code=x&state=%E0%A6%95")
+        self.assertEqual(r.status_code, 400)
+
+
 class AbuseTests(Base):
     def test_redos_page_is_parsed_in_linear_time(self):
         evil = '<noinclude><pagequality level="3" user="x" />' + "</noinclude><noinclude>" * 50000 + "x"

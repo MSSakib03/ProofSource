@@ -103,6 +103,7 @@ Set with `toolforge envvars create NAME VALUE`. Secrets are never stored in code
 | `OAUTH2_CLIENT_SECRET` | OAuth 2.0 client secret | — required |
 | `OAUTH2_REDIRECT_URI` | Must equal the consumer's registered callback | `https://proofsource.toolforge.org/auth/callback` |
 | `OAUTH2_BASE` | OAuth endpoint base | `https://meta.wikimedia.org/w/rest.php/oauth2` |
+| `OAUTH2_USE_PKCE` | `0` turns PKCE off (only if the consumer ever rejects it) | `1` |
 | `SECRET_KEY` | Flask session signing key; also derives the OAuth-token encryption key and the backup signing key | auto-generated and stored in `~/.proofsource_secret_key` (mode 0600) |
 | `TOOLSDB_DATABASE` | **Production:** ToolsDB database, e.g. `proofsource` → `<user>__proofsource`. Credentials come from `TOOL_TOOLSDB_USER`/`TOOL_TOOLSDB_PASSWORD` (Toolforge envvars) or `~/replica.my.cnf` | — |
 | `TOOLSDB_HOST` | ToolsDB host | `tools.db.svc.wikimedia.cloud` |
@@ -337,4 +338,11 @@ Users log in once more afterwards (OAuth logins are deliberately not copied). Ro
 ```bash
 cd ~/www/python/src && git pull && source ~/www/python/venv/bin/activate && pip install -r requirements.txt && toolforge webservice restart
 ```
-The database migrates itself automatically on startup.
+The database migrates itself automatically on startup. **Always run the `pip install` step**: new versions may need new packages (this one adds `cryptography`).
+
+### Troubleshooting
+
+- **See the real error:** `toolforge webservice logs` (add `-f` to follow) shows the traceback behind any error page.
+- **Login fails or the log says `The 'cryptography' package is not installed`:** the update was deployed without reinstalling the requirements. Run `source ~/www/python/venv/bin/activate && pip install -r ~/www/python/src/requirements.txt` inside `webservice python3.11 shell`, then `toolforge webservice restart`. Until then login still works, but tokens are stored unencrypted.
+- **Login ends with "Login failed while talking to Wikimedia":** check `OAUTH2_CLIENT_ID`, `OAUTH2_CLIENT_SECRET` and that `OAUTH2_REDIRECT_URI` exactly matches the consumer's callback URL. As a last resort set `OAUTH2_USE_PKCE=0`.
+- **"OAuth state mismatch":** the session cookie was lost between leaving and returning (another browser/tab, or `SECRET_KEY` changed between workers — set it with `toolforge envvars create SECRET_KEY …`).
