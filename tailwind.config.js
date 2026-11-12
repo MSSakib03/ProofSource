@@ -26,9 +26,11 @@ module.exports = {
         xl: '0 12px 32px 0 rgba(0,0,0,.18)'
       },
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Inter', 'Lato', '"Noto Sans"',
+        // 'PS Bangla' / 'PS Bangla Serif' only cover Bengali script (unicode-range), so they come first:
+        // otherwise a system font with its own Bengali glyphs would win. See static/fonts/README.md.
+        sans: ['"PS Bangla"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', 'Inter', 'Lato', '"Noto Sans"',
                '"Noto Sans Bengali"', '"Nirmala UI"', 'Vrinda', 'Helvetica', 'Arial', 'sans-serif'],
-        serif: ['"Linux Libertine"', '"Georgia"', '"Times"', '"Source Serif Pro"', '"Noto Serif Bengali"',
+        serif: ['"PS Bangla Serif"', '"Linux Libertine"', '"Georgia"', '"Times"', '"Source Serif Pro"', '"Noto Serif Bengali"',
                 '"Noto Serif"', 'serif'],
         mono: ['Menlo', 'Consolas', '"Liberation Mono"', '"Courier New"', 'monospace']
       }
