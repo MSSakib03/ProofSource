@@ -152,10 +152,23 @@
 
   /* stats */
   .ps-stat { position: relative; background: var(--ps-surface); border: 1px solid var(--ps-border-muted); border-radius: 4px;
-             padding: .75rem 1rem .8rem; box-shadow: var(--ps-shadow); overflow: hidden; }
+             padding: .6rem .9rem .65rem; box-shadow: var(--ps-shadow); overflow: hidden; }
   .ps-stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--ps-stat-accent, var(--ps-border-subtle)); }
   .ps-stat-l { font-size: .75rem; font-weight: 600; color: var(--ps-text-subtle); }
-  .ps-stat-v { font-family: theme('fontFamily.serif'); font-size: 1.75rem; line-height: 1.15; margin-top: .15rem; font-variant-numeric: tabular-nums lining-nums; }
+  .ps-stat-v { font-family: theme('fontFamily.serif'); font-size: 1.6rem; line-height: 1.15; margin-top: .1rem; font-variant-numeric: tabular-nums lining-nums; }
+  /* Phones: the stat cards become one compact panel, three numbers per row (Fountain-style strip). */
+  @media (max-width: 639px) {
+    .ps-stats { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; gap: 0 !important; overflow: hidden;
+                background: var(--ps-surface); border: 1px solid var(--ps-border-muted); border-radius: 4px; box-shadow: var(--ps-shadow); }
+    .ps-stats > .ps-stat { grid-column: auto !important; border: 0; border-radius: 0; box-shadow: none; margin-bottom: -1px;
+                           padding: .45rem .6rem .5rem; border-right: 1px solid var(--ps-border-muted); border-bottom: 1px solid var(--ps-border-muted); }
+    .ps-stats > .ps-stat:nth-child(3n) { border-right: 0; }
+    .ps-stats > .ps-stat:last-child:nth-child(3n+2) { grid-column: span 2 !important; border-right: 0; }
+    .ps-stats > .ps-stat:last-child:nth-child(3n+1) { grid-column: span 3 !important; border-right: 0; }
+    .ps-stats > .ps-stat::before { inset: 0 0 auto 0; width: auto; height: 2px; }
+    .ps-stats .ps-stat-l { font-size: .6875rem; line-height: 1.25; overflow-wrap: anywhere; }
+    .ps-stats .ps-stat-v { font-size: 1.3rem; line-height: 1.2; margin-top: 0; }
+  }
   .ps-stat.is-progressive { --ps-stat-accent: var(--ps-progressive); }
   .ps-stat.is-success { --ps-stat-accent: var(--q-validated); }
   .ps-stat.is-warning { --ps-stat-accent: var(--q-proofread); }
