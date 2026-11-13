@@ -101,19 +101,19 @@
 
   <div class="ps-progress" :style="{ width: loadingBar + '%', opacity: loadingBar > 0 && loadingBar < 100 ? 1 : 0 }"></div>
 
-  <main id="ps-main" class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-4 pb-6 sm:pt-6 sm:pb-8 min-w-0">
+  <main id="ps-main" class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 pb-6 sm:pt-[18px] sm:pb-8 min-w-0">
 
     <div v-if="view === 'home'" class="space-y-5 ps-view">
       <section class="ps-hero">
         <div class="ps-hero-lines hidden md:block" aria-hidden="true"></div>
         <div class="ps-hero-margin hidden md:block" aria-hidden="true"></div>
-        <div class="relative grid md:grid-cols-[1.35fr_1fr] gap-5 sm:gap-6 p-4 sm:p-7">
-          <div class="space-y-4 min-w-0">
-            <div class="ps-eyebrow flex items-center gap-2">
+        <div class="relative grid md:grid-cols-[1.4fr_1fr] gap-5 md:gap-10 p-4 sm:p-6 lg:px-8">
+          <div class="space-y-3.5 min-w-0">
+            <div class="ps-eyebrow flex items-center gap-2 !text-ws-cerulean dark:!text-ws-nature">
               <svg class="w-4 h-4 text-ws-cerulean dark:text-ws-nature" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 5.5Q7 4 11.5 6v13Q7 17 2 18.5z"/><path d="M22 5.5Q17 4 12.5 6v13q4.5-2 9.5-.5z"/></svg>
               <span>{{ t('heroEyebrow') }}</span>
             </div>
-            <h1 class="ps-serif text-3xl sm:text-[2.6rem] leading-[1.12] text-slate-900 dark:text-slate-50">{{ t('heroTitle') }}</h1>
+            <h1 class="ps-serif text-[1.9rem] sm:text-[2.45rem] leading-[1.12] text-slate-900 dark:text-slate-50">{{ t('heroTitle') }}</h1>
             <p class="text-[15px] leading-relaxed text-slate-600 dark:text-slate-400 max-w-xl">{{ t('heroSubtitle') }}</p>
             <div class="flex flex-wrap gap-2 pt-1">
               <button v-if="loggedIn" @click="openCreateContest" class="ps-btn ps-btn-primary">
@@ -129,18 +129,11 @@
               <a href="https://github.com/MSSakib03/ProofSource#readme" target="_blank" rel="noopener" class="ps-btn ps-btn-quiet no-underline">{{ t('howItWorks') }} ↗</a>
             </div>
           </div>
-          <dl class="grid grid-cols-3 md:grid-cols-1 gap-2 sm:gap-3 self-center">
-            <div class="ps-sunken px-3 sm:px-4 py-2.5 flex md:items-center md:justify-between flex-col md:flex-row gap-0.5">
-              <dt class="text-xs font-semibold text-slate-600 dark:text-slate-400">{{ t('activeContests') }}</dt>
-              <dd class="ps-serif text-2xl sm:text-3xl tabular-nums">{{ fmtNum(countByStatus('running')) }}</dd>
-            </div>
-            <div class="ps-sunken px-3 sm:px-4 py-2.5 flex md:items-center md:justify-between flex-col md:flex-row gap-0.5">
-              <dt class="text-xs font-semibold text-slate-600 dark:text-slate-400">{{ t('pagesProofreadAll') }}</dt>
-              <dd class="ps-serif text-2xl sm:text-3xl tabular-nums">{{ fmtNum(homeTotals.pages) }}</dd>
-            </div>
-            <div class="ps-sunken px-3 sm:px-4 py-2.5 flex md:items-center md:justify-between flex-col md:flex-row gap-0.5">
-              <dt class="text-xs font-semibold text-slate-600 dark:text-slate-400">{{ t('wikisourcesWord') }}</dt>
-              <dd class="ps-serif text-2xl sm:text-3xl tabular-nums">{{ fmtNum(homeTotals.projects) }}</dd>
+          <dl class="grid grid-cols-3 md:grid-cols-1 gap-2 sm:gap-2.5 self-center">
+            <div v-for="st in [['activeContests', countByStatus('running'), 'is-success'], ['pagesProofreadAll', homeTotals.pages, 'is-warning'], ['wikisourcesWord', homeTotals.projects, 'is-progressive']]" :key="st[0]"
+                 class="ps-stat flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:!py-3 md:!px-4" :class="st[2]">
+              <dt class="ps-stat-l">{{ t(st[0]) }}</dt>
+              <dd class="ps-stat-v !mt-0 md:!text-[1.85rem]">{{ fmtNum(st[1]) }}</dd>
             </div>
           </dl>
         </div>
@@ -192,15 +185,15 @@
                 <svg class="w-4 h-4 transition-transform duration-200" :class="isExpanded(row.central) ? 'rotate-90' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polyline points="9 6 15 12 9 18"></polyline></svg>
               </button>
               <a :href="'/central/' + row.central.slug" @click.prevent="openCentral(row.central.slug)" @mouseenter="prefetchCentral(row.central.slug)"
-                 class="flex-1 min-w-0 py-3.5 pr-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-inherit no-underline hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
+                 class="group flex-1 min-w-0 py-3 pr-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-inherit no-underline hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 flex-wrap">
                     <span class="ps-chip !text-[10px] !font-bold uppercase tracking-wider !py-0 text-ws-cerulean dark:text-ws-nature">{{ t('centralShort') }}</span>
-                    <span class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 break-words">{{ row.central.title }}</span>
+                    <span class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.central.title }}</span>
                   </div>
                   <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">{{ fmtNum(row.central.project_count) }} {{ t('projectsWord') }} · {{ formatDateShort(row.central.start_iso) }} – {{ formatDateShort(row.central.end_iso) }} (UTC)</div>
                 </div>
-                <span class="self-start sm:self-center ps-chip" :class="statusClass(row.central.status)"><span class="ps-dot" :class="statusDot(row.central.status)"></span>{{ t(row.central.status) }}</span>
+                <span class="self-start sm:self-center sm:min-w-[7rem] flex sm:justify-end"><span class="ps-chip" :class="statusClass(row.central.status)"><span class="ps-dot" :class="statusDot(row.central.status)"></span>{{ t(row.central.status) }}</span></span>
               </a>
             </div>
             <transition name="ps-tree">
@@ -222,22 +215,29 @@
 
           <!-- independent contest -->
           <a v-else :href="'/contest/' + row.contest.lang_code + '/' + row.contest.slug" @click.prevent="openContest(row.contest.id)" @mouseenter="prefetchContest(row.contest.id)"
-             class="ps-row ps-spine no-underline pl-5 pr-4 py-3.5" :class="'is-' + row.contest.status">
+             class="ps-row ps-spine group no-underline pl-5 pr-4 py-3" :class="'is-' + row.contest.status">
             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5">
               <div class="min-w-0 flex-1">
-                <div class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 break-words">{{ row.contest.title }}</div>
+                <div class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.contest.title }}</div>
                 <div class="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                   <span class="font-semibold text-ws-cerulean dark:text-ws-nature">{{ projectLabel(row.contest.wiki_domain) }}</span>
                   <span>{{ formatDateShort(row.contest.start_iso) }} – {{ formatDateShort(row.contest.end_iso) }} (UTC)</span>
                   <span class="tabular-nums">{{ t('books') }}: {{ fmtNum(row.contest.book_count) }}</span>
+                  <span class="tabular-nums sm:hidden">{{ t('proofread') }}: {{ fmtNum(row.contest.listed_pages) }}</span>
                 </div>
               </div>
               <div class="flex items-center gap-4 shrink-0">
-                <div v-if="row.contest.listed_pages" class="hidden sm:block w-36" :title="t('accepted') + ': ' + fmtNum(row.contest.accepted_pages) + ' / ' + fmtNum(row.contest.listed_pages)">
-                  <div class="flex justify-between text-[11px] text-slate-600 dark:text-slate-400 tabular-nums mb-1"><span>{{ t('proofread') }}</span><span>{{ fmtNum(row.contest.listed_pages) }}</span></div>
-                  <div class="ps-qbar"><span class="ps-qbar-validated" :style="{ width: pct(row.contest.accepted_pages, row.contest.listed_pages) + '%' }"></span><span class="ps-qbar-proofread" :style="{ width: (100 - pct(row.contest.accepted_pages, row.contest.listed_pages)) + '%' }"></span></div>
+                <div class="hidden sm:block w-40" :title="t('accepted') + ': ' + fmtNum(row.contest.accepted_pages) + ' · ' + t('proofread') + ': ' + fmtNum(row.contest.listed_pages) + (row.contest.total_pages ? ' / ' + fmtNum(row.contest.total_pages) : '')">
+                  <div class="flex justify-between gap-2 text-[11px] text-slate-600 dark:text-slate-400 tabular-nums mb-1">
+                    <span>{{ t('proofread') }}</span>
+                    <span><b class="font-semibold text-slate-800 dark:text-slate-200">{{ fmtNum(row.contest.listed_pages) }}</b><template v-if="row.contest.total_pages"> / {{ fmtNum(row.contest.total_pages) }}</template></span>
+                  </div>
+                  <div class="ps-qbar !h-1.5">
+                    <span class="ps-qbar-validated" :style="{ width: pct(row.contest.accepted_pages, row.contest.total_pages || row.contest.listed_pages) + '%' }"></span>
+                    <span class="ps-qbar-proofread" :style="{ width: pct(Math.max(0, row.contest.listed_pages - row.contest.accepted_pages), row.contest.total_pages || row.contest.listed_pages) + '%' }"></span>
+                  </div>
                 </div>
-                <span class="ps-chip" :class="statusClass(row.contest.status)"><span class="ps-dot" :class="statusDot(row.contest.status)"></span>{{ t(row.contest.status) }}</span>
+                <span class="sm:min-w-[7rem] flex sm:justify-end"><span class="ps-chip" :class="statusClass(row.contest.status)"><span class="ps-dot" :class="statusDot(row.contest.status)"></span>{{ t(row.contest.status) }}</span></span>
               </div>
             </div>
           </a>
@@ -281,6 +281,12 @@
           <div class="sm:col-span-2">
             <label class="ps-label">{{ t('description') }}</label>
             <textarea v-model="form.description" rows="2" class="ps-input"></textarea>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="ps-label">{{ t('contestPageLink') }}</label>
+            <input v-model="form.link" type="url" inputmode="url" placeholder="https://bn.wikisource.org/wiki/..." class="ps-input" />
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ t('contestPageLinkHelp') }}</p>
           </div>
 
           <div>
@@ -546,25 +552,28 @@
                 <span v-if="!active.contest.review_enabled" class="ps-chip">{{ t('withoutReview') }}</span>
                 <span v-if="active.contest.submission_mode !== 'auto'" class="ps-chip" :title="t('mode_' + active.contest.submission_mode + '_desc')">{{ t('mode_' + active.contest.submission_mode) }}</span>
               </div>
-              <h1 class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-slate-900 dark:text-slate-50 break-words">{{ active.contest.title }}</h1>
+              <h1 class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
+                <a v-if="safeUrl(active.contest.link)" :href="safeUrl(active.contest.link)" target="_blank" rel="noopener" class="ps-title-link">{{ active.contest.title }}</a>
+                <template v-else>{{ active.contest.title }}</template>
+              </h1>
               <p v-if="active.contest.description" @click="descOpen = !descOpen" :class="descOpen ? '' : 'line-clamp-2'"
                  class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl cursor-pointer">{{ active.contest.description }}</p>
             </div>
-            <div class="flex flex-wrap items-center gap-1.5 shrink-0">
+            <div class="flex flex-wrap items-center gap-1.5 shrink-0 max-md:w-full">
               <template v-if="active.contest.submission_mode === 'enroll'">
-                <span v-if="active.contest.is_enrolled" class="ps-btn !cursor-default !text-emerald-700 dark:!text-emerald-400 !border-emerald-500/60" :title="t('enrolledHint')">
+                <span v-if="active.contest.is_enrolled" class="ps-btn max-md:order-first max-md:basis-full !cursor-default !text-emerald-700 dark:!text-emerald-400 !border-emerald-500/60" :title="t('enrolledHint')">
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>{{ t('enrolled') }}
                 </span>
-                <button v-else-if="active.contest.can_enroll" @click="enrollContest" :disabled="busy" class="ps-btn ps-btn-primary" :title="t('mode_enroll_desc')">
+                <button v-else-if="active.contest.can_enroll" @click="enrollContest" :disabled="busy" class="ps-btn ps-btn-primary max-md:order-first max-md:basis-full" :title="t('mode_enroll_desc')">
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2"/><path d="M18 14v6M15 17h6"/></svg>
                   <span>{{ t('enroll') }}</span>
                 </button>
               </template>
-              <button v-if="active.contest.submission_mode === 'manual' && active.contest.can_submit" @click="openSubmitDialog" class="ps-btn ps-btn-primary" :title="t('mode_manual_desc')">
+              <button v-if="active.contest.submission_mode === 'manual' && active.contest.can_submit" @click="openSubmitDialog" class="ps-btn ps-btn-primary max-md:order-first max-md:basis-full" :title="t('mode_manual_desc')">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
                 <span>{{ t('submitPages') }} <span v-if="loggedIn && active.contest.my_eligible_count" class="font-normal tabular-nums">({{ fmtNum(active.contest.my_eligible_count) }})</span></span>
               </button>
-              <button v-if="loggedIn" @click="openUserPages(currentUser)" class="ps-btn">
+              <button v-if="loggedIn" @click="openUserPages(currentUser)" class="ps-btn max-md:flex-1">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                 <span>{{ t('myPages') }} <span class="font-normal tabular-nums">({{ fmtNum(active.contest.my_pages_count) }})</span></span>
               </button>
@@ -574,7 +583,7 @@
               <button v-if="active.contest.is_admin" @click="openEditConfig" class="ps-btn ps-btn-icon" :title="t('configure')" :aria-label="t('configure')">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
               </button>
-              <button v-if="active.contest.is_jury && active.contest.review_enabled" @click="openJuryWorkspace(null)" class="ps-btn ps-btn-primary">
+              <button v-if="active.contest.is_jury && active.contest.review_enabled" @click="openJuryWorkspace(null)" class="ps-btn ps-btn-primary max-md:order-first max-md:basis-full">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z"></path><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><polyline points="9 14 11 16 15 12"></polyline></svg>
                 <span>{{ t('juryPanel') }} <span class="font-normal tabular-nums">({{ fmtNum(active.stats.pending_pages) }})</span></span>
               </button>
@@ -625,13 +634,13 @@
 
       <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.participants) }}</div></div>
+        <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
         <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ active.contest.validation_visible ? t('proofreadListed') : t('proofread') }}</div><div class="ps-stat-v text-ws-cerulean dark:text-ws-nature">{{ fmtNum(active.stats.listed_pages) }}</div></div>
         <template v-if="active.contest.review_enabled">
           <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('reviewed') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(active.stats.reviewed_pages) }}</div></div>
           <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v text-amber-600 dark:text-amber-400">{{ fmtNum(active.stats.pending_pages) }}</div></div>
         </template>
         <div v-else class="ps-stat"><div class="ps-stat-l">{{ t('totalBookPages') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_book_pages) }}</div></div>
-        <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
         <button v-if="active.stats.reverted_pages" @click="contestSubTab = 'reverted'" class="ps-stat text-left hover:!border-slate-400" :title="t('revertedHelp')"><div class="ps-stat-l">{{ t('revertedPages') }}</div><div class="ps-stat-v text-slate-500">{{ fmtNum(active.stats.reverted_pages) }}</div></button>
       </div>
 
@@ -696,17 +705,17 @@
           <table class="w-full min-w-[580px] text-left border-collapse text-sm">
             <thead>
               <tr class="border-b border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
-                <th class="py-3 px-4 font-bold w-14">#</th>
-                <th class="py-3.5 px-4 font-medium">{{ t('user') }}</th>
-                <th class="py-3.5 px-4 font-medium text-right">{{ t('proofread') }}</th>
-                <th class="py-3.5 px-4 font-medium text-right">{{ t('accepted') }}</th>
+                <th class="py-3 px-4 font-semibold w-14">#</th>
+                <th class="py-3 px-4 font-semibold">{{ t('user') }}</th>
+                <th class="py-3 px-4 font-semibold text-right">{{ t('proofread') }}</th>
+                <th class="py-3 px-4 font-semibold text-right">{{ t('accepted') }}</th>
                 <template v-if="active.contest.review_enabled">
-                  <th class="py-3.5 px-4 font-medium text-right">{{ t('pending') }}</th>
-                  <th class="py-3.5 px-4 font-medium text-right">{{ t('needsFix') }}</th>
-                  <th class="py-3.5 px-4 font-medium text-right">{{ t('rejected') }}</th>
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('pending') }}</th>
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('needsFix') }}</th>
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('rejected') }}</th>
                 </template>
-                <th v-if="hasReverted" class="py-3.5 px-4 font-medium text-right" :title="t('revertedHelp')">{{ t('reverted') }}</th>
-                <th class="py-3.5 px-4 font-medium text-right">{{ t('points') }}</th>
+                <th v-if="hasReverted" class="py-3 px-4 font-semibold text-right" :title="t('revertedHelp')">{{ t('reverted') }}</th>
+                <th class="py-3 px-4 font-semibold text-right">{{ t('points') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -714,21 +723,21 @@
                 <td colspan="8" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td>
               </tr>
               <tr v-for="(r, idx) in active.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                <td class="py-3 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(idx)">{{ fmtNum(idx + 1) }}</span></td>
-                <td class="py-3 px-4">
+                <td class="py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(idx)">{{ fmtNum(idx + 1) }}</span></td>
+                <td class="py-2.5 px-4">
                   <button @click="openUserPages(r.username)" class="font-semibold text-ws-cerulean dark:text-ws-nature hover:underline text-left">
                     {{ r.username }}
                   </button>
                 </td>
-                <td class="py-3 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
-                <td class="py-3 px-4 text-right tabular-nums text-xs text-emerald-600 dark:text-emerald-400 font-semibold">{{ fmtNum(r.accepted) }}</td>
+                <td class="py-2.5 px-4 text-right tabular-nums text-[13px]">{{ fmtNum(r.submitted) }}</td>
+                <td class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
                 <template v-if="active.contest.review_enabled">
-                  <td class="py-3 px-4 text-right tabular-nums text-xs text-amber-600 dark:text-amber-400">{{ fmtNum(r.pending) }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-xs text-orange-600 dark:text-orange-400">{{ fmtNum(r.needs_fix) }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-xs text-rose-600 dark:text-rose-400">{{ fmtNum(r.rejected) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.pending ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(r.pending) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.needs_fix ? 'text-orange-600 dark:text-orange-400' : 'ps-zero'">{{ fmtNum(r.needs_fix) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(r.rejected) }}</td>
                 </template>
-                <td v-if="hasReverted" class="py-3 px-4 text-right tabular-nums text-xs text-slate-500">{{ fmtNum(r.reverted || 0) }}</td>
-                <td class="py-3 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
+                <td v-if="hasReverted" class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.reverted ? 'text-slate-600 dark:text-slate-300' : 'ps-zero'">{{ fmtNum(r.reverted || 0) }}</td>
+                <td class="py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
               </tr>
             </tbody>
           </table>
@@ -895,18 +904,18 @@
         </div>
 
         <div v-if="active.contest.review_enabled" class="ps-card overflow-hidden">
-          <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 font-semibold text-xs uppercase tracking-wider text-slate-500">
+          <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 font-bold text-sm text-slate-800 dark:text-slate-200">
             {{ t('juryStatistics') }}
           </div>
           <div class="overflow-x-auto w-full">
             <table class="w-full min-w-[500px] text-left border-collapse text-sm">
               <thead>
-                <tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-500 uppercase">
-                  <th class="py-3 px-4 font-medium">{{ t('juryMember') }}</th>
-                  <th class="py-3 px-4 font-medium text-right">{{ t('totalReviewed') }}</th>
-                  <th class="py-3 px-4 font-medium text-right">{{ t('accepted') }}</th>
-                  <th class="py-3 px-4 font-medium text-right">{{ t('needsFix') }}</th>
-                  <th class="py-3 px-4 font-medium text-right">{{ t('rejected') }}</th>
+                <tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
+                  <th class="py-3 px-4 font-semibold">{{ t('juryMember') }}</th>
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('totalReviewed') }}</th>
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('accepted') }}</th>
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('needsFix') }}</th>
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('rejected') }}</th>
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -916,10 +925,10 @@
                       {{ j.username }}
                     </a>
                   </td>
-                  <td class="py-3 px-4 text-right tabular-nums font-bold">{{ fmtNum(j.reviewed) }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-emerald-600 dark:text-emerald-400">{{ fmtNum(j.accepted) }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-amber-600 dark:text-amber-400">{{ fmtNum(j.needs_fix) }}</td>
-                  <td class="py-3 px-4 text-right tabular-nums text-rose-600 dark:text-rose-400">{{ fmtNum(j.rejected) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(j.reviewed) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums" :class="j.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(j.accepted) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums" :class="j.needs_fix ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(j.needs_fix) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums" :class="j.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(j.rejected) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -988,11 +997,14 @@
 
       <section class="ps-card overflow-hidden">
         <div class="h-1 bg-gradient-to-r from-ws-dark via-ws-cerulean to-ws-nature"></div>
-        <div class="p-4 sm:p-5 space-y-3">
+        <div class="px-3.5 py-3 sm:px-5 sm:py-4 space-y-3">
           <div class="flex flex-col md:flex-row md:items-start justify-between gap-3">
             <div class="min-w-0 space-y-1.5">
               <div class="ps-eyebrow !text-ws-cerulean dark:!text-ws-nature">{{ t('centralContest') }}</div>
-              <h1 class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-slate-900 dark:text-slate-50 break-words">{{ central.central.title }}</h1>
+              <h1 class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
+                <a v-if="safeUrl(central.central.link)" :href="safeUrl(central.central.link)" target="_blank" rel="noopener" class="ps-title-link">{{ central.central.title }}</a>
+                <template v-else>{{ central.central.title }}</template>
+              </h1>
               <p v-if="central.central.description" class="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl line-clamp-2">{{ central.central.description }}</p>
             </div>
             <div class="flex items-center gap-2 shrink-0">
@@ -1002,15 +1014,15 @@
               </button>
             </div>
           </div>
-          <div class="pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-3 text-xs">
-            <div class="flex flex-wrap items-center gap-2.5">
-              <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-medium">
-                <svg class="w-3.5 h-3.5 text-ws-cerulean dark:text-ws-nature" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+          <div class="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-2 text-xs">
+            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+              <span class="ps-chip !font-semibold !text-slate-700 dark:!text-slate-300 !rounded">
+                <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <template v-if="central.central.start_iso">{{ formatDateReadable(central.central.start_iso) }} – {{ formatDateReadable(central.central.end_iso) }} (UTC)</template>
                 <template v-else>{{ t('datesNotSet') }}</template>
               </span>
-              <span v-if="countdownFor(central.central.start_iso, central.central.end_iso)" class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-ws-dark/10 dark:bg-ws-nature/15 text-ws-dark dark:text-ws-nature font-semibold">
-                <span class="w-2 h-2 rounded-full" :class="central.central.status === 'running' ? 'bg-emerald-500 animate-pulse' : central.central.status === 'upcoming' ? 'bg-amber-500' : 'bg-slate-400'"></span>{{ countdownFor(central.central.start_iso, central.central.end_iso) }}
+              <span v-if="countdownFor(central.central.start_iso, central.central.end_iso)" class="ps-chip !font-bold !rounded !text-slate-900 dark:!text-slate-100">
+                <span class="ps-dot" :class="central.central.status === 'running' ? 'bg-emerald-500 animate-pulse' : central.central.status === 'upcoming' ? 'bg-amber-500' : 'bg-slate-400'"></span>{{ countdownFor(central.central.start_iso, central.central.end_iso) }}
               </span>
             </div>
             <div class="flex items-center gap-1.5 flex-wrap lg:justify-end">
@@ -1025,8 +1037,12 @@
       <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('projectsWordCap') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.projects) }}</div></div>
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.participants) }}</div></div>
-        <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.listed) }}</div></div>
-        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(central.stats.accepted) }}</div></div>
+        <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.books) }}</div></div>
+        <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v text-ws-cerulean dark:text-ws-nature">{{ fmtNum(central.stats.listed) }}</div></div>
+        <template v-if="central.stats.review_enabled">
+          <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('reviewed') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(central.stats.reviewed) }}</div></div>
+          <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v text-amber-600 dark:text-amber-400">{{ fmtNum(central.stats.pending) }}</div></div>
+        </template>
       </div>
 
       <div class="ps-tabs" role="tablist">
@@ -1051,7 +1067,7 @@
               <td class="py-2.5 px-4 font-semibold">{{ r.username }}</td>
               <td class="py-2.5 px-4 text-[11px] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="mr-2 whitespace-nowrap">{{ projectShort(dom) }}: {{ fmtNum(pts) }}</span></td>
               <td class="py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
-              <td class="py-2.5 px-4 text-right tabular-nums text-xs text-emerald-600 dark:text-emerald-400">{{ fmtNum(r.accepted) }}</td>
+              <td class="py-2.5 px-4 text-right tabular-nums text-xs" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
               <td class="py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
             </tr>
           </tbody>
@@ -1562,7 +1578,7 @@
     <div class="max-w-7xl mx-auto px-3 sm:px-6 py-6 grid gap-4 sm:grid-cols-[1fr_auto] items-start text-xs leading-relaxed">
       <div class="space-y-1">
         <div class="flex flex-wrap items-baseline gap-x-2">
-          <span class="ps-wordmark !text-base">ProofSource</span>
+          <span class="ps-wordmark !text-base !font-bold">ProofSource</span>
           <span class="text-slate-400 dark:text-slate-600" aria-hidden="true">·</span>
           <span>{{ t('createdByPrefix') }} <a href="https://meta.wikimedia.org/wiki/User:MS_Sakib" target="_blank" rel="noopener author" class="font-semibold">MS Sakib</a></span>
         </div>
@@ -1690,7 +1706,7 @@ const I18N = {
     newCentral: 'New Central Contest', editCentral: 'Central Contest Configuration', centralContest: 'Central Contest', centralShort: 'Central',
     centralFormHint: 'Set the shared rules here. Each project admin then adds books and everything else on their own project page.',
     centralPendingTitle: 'This central contest is awaiting approval', centralPendingDesc: 'The tool admin or a Wikisource administrator of one of the projects must approve it.',
-    centralAdmins: 'Central contest admins (comma-separated)', centralRules: 'Rules for all projects', eventPage: 'Event page', eventPageLink: 'Event page link (optional)',
+    centralAdmins: 'Central contest admins (comma-separated)', centralRules: 'Rules for all projects', eventPage: 'Event page', eventPageLink: 'Event page link (optional)', contestPageLink: 'Contest page link (optional)', contestPageLinkHelp: 'If given, the contest name links to this page.',
     policyCustomPoints: 'Custom points per book', policyBonus: 'Bonus points', policyReview: 'Jury review',
     pol_yes: 'Allowed', pol_no: 'Not allowed', pol_project: 'Project decides',
     includedProjects: 'Included projects', addProject: 'Add project', selectProject: '— Select project —', projectAdminsPh: 'Project admins (comma-separated)',
@@ -1829,7 +1845,7 @@ const I18N = {
     err_wiki_edit_failed: 'Saved in tool, but the wiki edit failed', err_exception: 'Unexpected error',
     err_invalid_backup: 'Invalid backup', err_restore_failed: 'Restore failed (nothing was changed)', err_page_locked: 'Another reviewer is on this page',
     err_csrf_failed: 'Your session changed — please reload the page and try again', err_rate_limited: 'Too many requests — please wait a minute and try again',
-    err_invalid_link: 'The event page link must start with https://', bk_signature_invalid: 'not a backup made by this server (only the tool admin can restore it)',
+    err_invalid_link: 'The link must start with https://', bk_signature_invalid: 'not a backup made by this server (only the tool admin can restore it)',
     bk_bad_page_row: 'a page record is damaged', bk_bad_book_row: 'a book record is damaged', bk_not_json_object: 'not a backup file',
     skipToContent: 'Skip to content', tagline: 'Wikisource contests', switchLanguage: 'Switch language', close: 'Close',
     heroEyebrow: 'Proofreading contests · every Wikisource',
@@ -1878,7 +1894,7 @@ const I18N = {
     newCentral: 'নতুন কেন্দ্রীয় প্রতিযোগিতা', editCentral: 'কেন্দ্রীয় প্রতিযোগিতার কনফিগারেশন', centralContest: 'কেন্দ্রীয় প্রতিযোগিতা', centralShort: 'কেন্দ্রীয়',
     centralFormHint: 'এখানে সব প্রকল্পের জন্য সাধারণ নিয়ম ঠিক করুন। এরপর প্রতিটি প্রকল্পের অ্যাডমিন নিজের পাতায় গিয়ে বই যোগসহ বাকি সব কনফিগার করবেন।',
     centralPendingTitle: 'এই কেন্দ্রীয় প্রতিযোগিতাটি অনুমোদনের অপেক্ষায়', centralPendingDesc: 'টুল অ্যাডমিন অথবা অন্তর্ভুক্ত যেকোনো উইকিসংকলনের প্রশাসক অনুমোদন দিলে চালু হবে।',
-    centralAdmins: 'কেন্দ্রীয় প্রতিযোগিতার অ্যাডমিন (কমা দিয়ে)', centralRules: 'সব প্রকল্পের নিয়ম', eventPage: 'ইভেন্ট পাতা', eventPageLink: 'ইভেন্ট পাতার লিংক (ঐচ্ছিক)',
+    centralAdmins: 'কেন্দ্রীয় প্রতিযোগিতার অ্যাডমিন (কমা দিয়ে)', centralRules: 'সব প্রকল্পের নিয়ম', eventPage: 'ইভেন্ট পাতা', eventPageLink: 'ইভেন্ট পাতার লিংক (ঐচ্ছিক)', contestPageLink: 'প্রতিযোগিতার পাতার লিংক (ঐচ্ছিক)', contestPageLinkHelp: 'দিলে প্রতিযোগিতার নামটি এই পাতার লিংক হবে।',
     policyCustomPoints: 'বইভিত্তিক কাস্টম পয়েন্ট', policyBonus: 'বোনাস পয়েন্ট', policyReview: 'জুরি পর্যালোচনা',
     pol_yes: 'অনুমোদিত', pol_no: 'অনুমোদিত নয়', pol_project: 'প্রকল্প ঠিক করবে',
     includedProjects: 'অন্তর্ভুক্ত প্রকল্প', addProject: 'প্রকল্প যোগ করুন', selectProject: '— প্রকল্প নির্বাচন করুন —', projectAdminsPh: 'প্রকল্পের অ্যাডমিন (কমা দিয়ে)',
@@ -1921,7 +1937,7 @@ const I18N = {
     approveContest: 'অনুমোদন ও চালু করুন', myPages: 'আমার পাতাসমূহ', syncWithWiki: 'উইকি সিঙ্ক করুন', syncing: 'সিঙ্ক হচ্ছে...',
     lastSynced: 'সর্বশেষ সিঙ্ক', configure: 'কনফিগারেশন', juryPanel: 'পর্যালোচনা করুন',
     totalBookPages: 'বইয়ের মোট পাতা', proofreadListed: 'মুদ্রণ সংশোধিত ও বৈধকৃত', accepted: 'গৃহীত', reviewed: 'পর্যালোচিত',
-    pendingReview: 'অপেক্ষমাণ পর্যালোচনা', pending: 'অপেক্ষমাণ', needsFix: 'সংশোধন প্রয়োজন', myNeedsFixTitle: 'আপনার যে পাতাগুলোতে সংশোধন প্রয়োজন',
+    pendingReview: 'অপেক্ষমাণ', pending: 'অপেক্ষমাণ', needsFix: 'সংশোধন প্রয়োজন', myNeedsFixTitle: 'আপনার যে পাতাগুলোতে সংশোধন প্রয়োজন',
     rejected: 'বাতিল', dailyActivityChart: 'দৈনিক মুদ্রণ সংশোধন পরিসংখ্যান', leaderboard: 'লিডারবোর্ড',
     indexBooks: 'নির্ঘণ্ট বইসমূহ', resultsAndStats: 'ফলাফল ও পরিসংখ্যান', anyBook: 'যেকোনো বই', proofreadAnyPage: 'যেকোনো পাতা প্রুফরিড করুন',
     pts: 'পয়েন্ট', progress: 'অগ্রগতি', user: 'অংশগ্রহণকারী', points: 'পয়েন্ট',
@@ -2007,7 +2023,7 @@ const I18N = {
     err_invalid_backup: 'ব্যাকআপ সঠিক নয়', err_restore_failed: 'পুনরুদ্ধার ব্যর্থ (কিছুই বদলানো হয়নি)', err_page_locked: 'আরেকজন পর্যালোচক এই পাতায় কাজ করছেন'
 ,
     err_csrf_failed: 'সেশন বদলে গেছে — পাতাটি আবার লোড করে চেষ্টা করুন', err_rate_limited: 'খুব বেশি অনুরোধ — এক মিনিট পরে আবার চেষ্টা করুন',
-    err_invalid_link: 'ইভেন্ট পাতার লিংক https:// দিয়ে শুরু হতে হবে', bk_signature_invalid: 'এই সার্ভারে তৈরি ব্যাকআপ নয় (শুধু টুল অ্যাডমিন এটি পুনরুদ্ধার করতে পারেন)',
+    err_invalid_link: 'লিংকটি https:// দিয়ে শুরু হতে হবে', bk_signature_invalid: 'এই সার্ভারে তৈরি ব্যাকআপ নয় (শুধু টুল অ্যাডমিন এটি পুনরুদ্ধার করতে পারেন)',
     bk_bad_page_row: 'একটি পাতার তথ্য ক্ষতিগ্রস্ত', bk_bad_book_row: 'একটি বইয়ের তথ্য ক্ষতিগ্রস্ত', bk_not_json_object: 'এটি ব্যাকআপ ফাইল নয়',
     skipToContent: 'মূল বিষয়বস্তুতে যান', tagline: 'উইকিসংকলন প্রতিযোগিতা', switchLanguage: 'ভাষা বদলান', close: 'বন্ধ করুন',
     heroEyebrow: 'মুদ্রণ সংশোধন প্রতিযোগিতা · সব উইকিসংকলনে',
@@ -2513,7 +2529,7 @@ createApp({
         proofread_points: 3, validate_points: 0, max_bonus_points: 0, jury_mode: 'accept_reject', jury_gets_points: false,
         reject_action: 'hold_batch', admins: this.currentUser || '', juries: this.currentUser || '', excluded_users: '', books: '',
         review_enabled: true, bulk_review_enabled: false, review_assignment: 'open', allow_custom_points: true, announcement_en: '', announcement_bn: '',
-        submission_mode: 'auto'
+        submission_mode: 'auto', link: ''
       };
     },
     openCreateContest() {
@@ -2592,7 +2608,7 @@ createApp({
         review_enabled: c.review_enabled, bulk_review_enabled: c.bulk_review_enabled,
         review_assignment: c.review_assignment || 'open', allow_custom_points: c.allow_custom_points,
         announcement_en: c.announcement_en || '', announcement_bn: c.announcement_bn || '',
-        submission_mode: c.submission_mode || 'auto'
+        submission_mode: c.submission_mode || 'auto', link: c.link || ''
       };
       this.active.books.forEach(b => { b.start_local = this.isoToLocalInput(b.start_iso); b.end_local = this.isoToLocalInput(b.end_iso); });
       this.restore = { checked: false, problems: [], counts: null, exported_at: null, text: '' };

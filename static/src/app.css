@@ -153,7 +153,7 @@
   /* stats */
   .ps-stat { position: relative; background: var(--ps-surface); border: 1px solid var(--ps-border-muted); border-radius: 4px;
              padding: .6rem .9rem .65rem; box-shadow: var(--ps-shadow); overflow: hidden; }
-  .ps-stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--ps-stat-accent, var(--ps-border-subtle)); }
+  .ps-stat::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--ps-stat-accent, var(--ps-border)); }
   .ps-stat-l { font-size: .75rem; font-weight: 600; color: var(--ps-text-subtle); }
   .ps-stat-v { font-family: theme('fontFamily.serif'); font-size: 1.6rem; line-height: 1.15; margin-top: .1rem; font-variant-numeric: tabular-nums lining-nums; }
   /* Stat strip: the same cards on every screen. md+: one row, equal widths. Below md: at most three
@@ -206,6 +206,8 @@
   /* header & footer */
   .ps-wordmark { font-family: theme('fontFamily.serif'); font-size: 1.35rem; line-height: 1; color: var(--ps-text); letter-spacing: -.01em; }
   @media (max-width: 479px) { header .ps-wordmark { font-size: 1.05rem; } header .ps-logo { width: 28px; height: 20px; } }
+  .ps-title-link { color: inherit; text-decoration: none; }
+  .ps-title-link:hover { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .15em; }
   .ps-nav-link { position: relative; padding: 1.05rem .15rem; font-size: .875rem; font-weight: 600; color: rgba(255, 255, 255, .8); }
   .ps-nav-link:hover { color: #fff; }
   .ps-nav-link.is-active { color: #fff; }
@@ -234,6 +236,7 @@
   .ps-spine.is-ended { --ps-spine: var(--ps-border); }
 
   /* tables */
+  .ps-zero { color: var(--ps-text-placeholder); }
   .ps-table thead th { font-size: .75rem; font-weight: 700; color: var(--ps-text-subtle); text-transform: none; letter-spacing: 0; }
 
   /* wikitext preview (rendered by MediaWiki, sanitised again by DOMPurify) */

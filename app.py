@@ -1111,7 +1111,13 @@ def api_list_contests():
             d["listed"] += n
         if st == 'accepted':
             d["accepted"] += n
-    book_counts = dict(db.session.query(IndexBook.contest_id, func.count(IndexBook.id)).group_by(IndexBook.contest_id).all())
+    book_counts, page_totals = {}, {}
+    for b_cid, b_total, b_excl, b_active in db.session.query(IndexBook.contest_id, IndexBook.total_pages,
+                                                             IndexBook.excluded_pages, IndexBook.is_active).all():
+        book_counts[b_cid] = book_counts.get(b_cid, 0) + 1
+        if b_active and b_total:
+            excl = len([p for p in parse_excluded_pages_spec(b_excl) if 1 <= p <= b_total])
+            page_totals[b_cid] = page_totals.get(b_cid, 0) + max(0, b_total - excl)
 
     result = []
     for c in contests:
@@ -1129,7 +1135,9 @@ def api_list_contests():
             "start_iso": iso(c.start_time), "end_iso": iso(c.end_time),
             "status": contest_status(c, now), "approval_status": c.approval_status,
             "created_by": c.created_by, "book_count": book_counts.get(c.id, 0),
-            "listed_pages": cnt["listed"], "accepted_pages": cnt["accepted"],
+            "listed_pages": cnt["listed"],
+            "accepted_pages": cnt["accepted"] if c.is_review_enabled else cnt["listed"],
+            "total_pages": page_totals.get(c.id, 0),
             "is_admin": is_adm, "is_jury": is_reviewer(c, current_user), "can_approve": can_approve,
             "review_enabled": c.is_review_enabled,
             "hub_slug": c.hub.slug if c.hub else None,
@@ -1210,6 +1218,9 @@ def api_create_contest():
     if data.get("jury_mode", JURY_MODES[0]) not in JURY_MODES or \
             data.get("reject_action", REJECT_ACTIONS[0]) not in REJECT_ACTIONS:
         return err("invalid_value")
+    link = str(data.get("link") or "").strip()
+    if link and not security.safe_http_url(link):
+        return err("invalid_link")
     limited = rate_limit("create", 10, 3600, current_user)
     if limited:
         return limited
@@ -1238,6 +1249,7 @@ def api_create_contest():
         bulk_review_enabled=bool(data.get("bulk_review_enabled", False)),
         announcement_en=clip(data.get("announcement_en"), LEN_TEXT),
         announcement_bn=clip(data.get("announcement_bn"), LEN_TEXT),
+        link=link,
         review_assignment="equal" if data.get("review_assignment") == "equal" else "open",
         submission_mode=data.get("submission_mode") if data.get("submission_mode") in SUBMISSION_MODES else "auto",
         allow_custom_points=bool(data.get("allow_custom_points", True)),
@@ -1348,6 +1360,7 @@ def contest_payload(c: Contest, current_user):
             "excluded_users": c.excluded_users or "",
             "review_enabled": c.is_review_enabled, "bulk_review_enabled": bool(c.bulk_review_enabled),
             "announcement_en": c.announcement_en or "", "announcement_bn": c.announcement_bn or "",
+            "link": security.safe_http_url(c.link or ""),
             "hub_slug": c.hub.slug if c.hub else "", "hub_title": c.hub.title if c.hub else "",
             "locked_fields": locked_fields(c),
             "delete_request": delete_request_info(c),
@@ -1479,6 +1492,14 @@ def api_update_contest_config(cid):
             db.session.add(SlugAlias(old_slug=c.slug, contest_id=c.id))
         changes["slug"] = (c.slug, new_slug)
         c.slug = new_slug
+
+    if "link" in data and data["link"] is not None:
+        link = str(data["link"]).strip()
+        if link and not security.safe_http_url(link):
+            return err("invalid_link")   # blocks javascript:/data: links (stored XSS)
+        if link != (c.link or ""):
+            changes["link"] = (c.link, link)
+            c.link = link
 
     old_default_pts = c.proofread_points
     for f in CONFIG_FIELDS_TEXT:
@@ -2798,7 +2819,8 @@ def api_get_central(slug):
     user = get_current_user()
     now = datetime.utcnow()
     combined, projects, daily = {}, [], {}
-    totals = {"listed": 0, "accepted": 0, "books": 0}
+    totals = {"listed": 0, "accepted": 0, "books": 0, "pending": 0, "reviewed": 0}
+    any_review = False
     for c in sorted(h.contests, key=lambda x: x.wiki_domain):
         board = compute_contest_leaderboard(c)
         bstats = book_stats_map(c.id)
@@ -2810,6 +2832,11 @@ def api_get_central(slug):
         totals["listed"] += listed
         totals["accepted"] += accepted
         totals["books"] += books
+        if c.is_review_enabled:
+            any_review = True
+            pending = sum(v["pending"] for v in bstats.values())
+            totals["pending"] += pending
+            totals["reviewed"] += max(0, listed - pending)
         projects.append({"contest_id": c.id, "slug": c.slug, "lang_code": c.lang_code, "wiki_domain": c.wiki_domain,
                          "title": c.title, "admins_list": split_users(c.admins), "books": books, "listed": listed,
                          "accepted": accepted, "reverted": reverted, "participants": len(board),
@@ -2849,6 +2876,7 @@ def api_get_central(slug):
         "stats": {"participants": len(board), "listed": totals["listed"], "accepted": totals["accepted"],
                   "reverted": totals.get("reverted", 0),
                   "books": totals["books"], "projects": len(projects),
+                  "pending": totals["pending"], "reviewed": totals["reviewed"], "review_enabled": any_review,
                   "daily": sorted(daily.values(), key=lambda x: x["date"])[-30:]},
     })
 

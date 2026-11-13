@@ -63,7 +63,7 @@ CONTEST_FIELDS = [
     "slug", "title", "description", "wiki_domain", "proofread_points", "validate_points",
     "max_bonus_points", "jury_mode", "jury_gets_points", "reject_action", "created_by", "admins",
     "juries", "excluded_users", "approval_status", "approved_by", "review_enabled",
-    "bulk_review_enabled", "announcement_en", "announcement_bn", "submission_mode",
+    "bulk_review_enabled", "announcement_en", "announcement_bn", "submission_mode", "link",
 ]
 CONTEST_DT_FIELDS = ["start_time", "end_time", "last_synced_at", "created_at", "last_backup_at"]
 

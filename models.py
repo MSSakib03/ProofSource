@@ -88,6 +88,7 @@ class Contest(db.Model):
     #   enroll = semi-automatic: only pages of participants who enrolled are listed automatically
     #   manual = participants pick and submit their eligible pages themselves
     submission_mode = db.Column(db.String(10), default='auto')
+    link = db.Column(db.String(500), default="")   # optional contest page on the wiki (title links to it)
 
     books = db.relationship('IndexBook', backref='contest', cascade="all, delete-orphan", lazy=True)
     pages = db.relationship('ContestPage', backref='contest', cascade="all, delete-orphan", lazy=True)
