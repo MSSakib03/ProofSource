@@ -158,6 +158,20 @@ class OAuthTests(Base):
         self.assertEqual(self.c.get("/auth/callback?code=x&state=bad").status_code, 400)
 
 
+class ContestLinkTests(Base):
+    def test_contest_page_link_is_validated_and_returned(self):
+        cid = self.make_contest(link="https://bn.wikisource.org/wiki/WS:Contest")
+        self.assertEqual(self.c.get(f"/api/contests/{cid}").json["contest"]["link"], "https://bn.wikisource.org/wiki/WS:Contest")
+        r = self.c.post(f"/api/contests/{cid}/config", json={"link": "javascript:alert(1)"})
+        self.assertEqual(r.json.get("error_code"), "invalid_link")
+        self.assertTrue(self.c.post(f"/api/contests/{cid}/config", json={"link": ""}).json["success"])
+        self.assertEqual(self.c.get(f"/api/contests/{cid}").json["contest"]["link"], "")
+
+    def test_new_contest_defaults_to_accept_in_tool_only(self):
+        cid = self.make_contest()
+        self.assertEqual(self.c.get(f"/api/contests/{cid}").json["contest"]["jury_mode"], "accept_reject")
+
+
 class SyncTests(Base):
     def test_sync_scores_and_incremental(self):
         cid = self.make_contest(entries={1: ("Alice", 3, 11), 2: ("Bob", 3, 12), 3: ("Alice", 1, 13)})
