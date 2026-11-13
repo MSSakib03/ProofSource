@@ -2819,7 +2819,8 @@ def api_get_central(slug):
     user = get_current_user()
     now = datetime.utcnow()
     combined, projects, daily = {}, [], {}
-    totals = {"listed": 0, "accepted": 0, "books": 0}
+    totals = {"listed": 0, "accepted": 0, "books": 0, "pending": 0, "reviewed": 0}
+    any_review = False
     for c in sorted(h.contests, key=lambda x: x.wiki_domain):
         board = compute_contest_leaderboard(c)
         bstats = book_stats_map(c.id)
@@ -2831,6 +2832,11 @@ def api_get_central(slug):
         totals["listed"] += listed
         totals["accepted"] += accepted
         totals["books"] += books
+        if c.is_review_enabled:
+            any_review = True
+            pending = sum(v["pending"] for v in bstats.values())
+            totals["pending"] += pending
+            totals["reviewed"] += max(0, listed - pending)
         projects.append({"contest_id": c.id, "slug": c.slug, "lang_code": c.lang_code, "wiki_domain": c.wiki_domain,
                          "title": c.title, "admins_list": split_users(c.admins), "books": books, "listed": listed,
                          "accepted": accepted, "reverted": reverted, "participants": len(board),
@@ -2870,6 +2876,7 @@ def api_get_central(slug):
         "stats": {"participants": len(board), "listed": totals["listed"], "accepted": totals["accepted"],
                   "reverted": totals.get("reverted", 0),
                   "books": totals["books"], "projects": len(projects),
+                  "pending": totals["pending"], "reviewed": totals["reviewed"], "review_enabled": any_review,
                   "daily": sorted(daily.values(), key=lambda x: x["date"])[-30:]},
     })
 

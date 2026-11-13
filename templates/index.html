@@ -634,13 +634,13 @@
 
       <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.participants) }}</div></div>
+        <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
         <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ active.contest.validation_visible ? t('proofreadListed') : t('proofread') }}</div><div class="ps-stat-v text-ws-cerulean dark:text-ws-nature">{{ fmtNum(active.stats.listed_pages) }}</div></div>
         <template v-if="active.contest.review_enabled">
           <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('reviewed') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(active.stats.reviewed_pages) }}</div></div>
           <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v text-amber-600 dark:text-amber-400">{{ fmtNum(active.stats.pending_pages) }}</div></div>
         </template>
         <div v-else class="ps-stat"><div class="ps-stat-l">{{ t('totalBookPages') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_book_pages) }}</div></div>
-        <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
         <button v-if="active.stats.reverted_pages" @click="contestSubTab = 'reverted'" class="ps-stat text-left hover:!border-slate-400" :title="t('revertedHelp')"><div class="ps-stat-l">{{ t('revertedPages') }}</div><div class="ps-stat-v text-slate-500">{{ fmtNum(active.stats.reverted_pages) }}</div></button>
       </div>
 
@@ -1037,8 +1037,12 @@
       <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('projectsWordCap') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.projects) }}</div></div>
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.participants) }}</div></div>
-        <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.listed) }}</div></div>
-        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(central.stats.accepted) }}</div></div>
+        <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.books) }}</div></div>
+        <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v text-ws-cerulean dark:text-ws-nature">{{ fmtNum(central.stats.listed) }}</div></div>
+        <template v-if="central.stats.review_enabled">
+          <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('reviewed') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(central.stats.reviewed) }}</div></div>
+          <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v text-amber-600 dark:text-amber-400">{{ fmtNum(central.stats.pending) }}</div></div>
+        </template>
       </div>
 
       <div class="ps-tabs" role="tablist">
@@ -1933,7 +1937,7 @@ const I18N = {
     approveContest: 'অনুমোদন ও চালু করুন', myPages: 'আমার পাতাসমূহ', syncWithWiki: 'উইকি সিঙ্ক করুন', syncing: 'সিঙ্ক হচ্ছে...',
     lastSynced: 'সর্বশেষ সিঙ্ক', configure: 'কনফিগারেশন', juryPanel: 'পর্যালোচনা করুন',
     totalBookPages: 'বইয়ের মোট পাতা', proofreadListed: 'মুদ্রণ সংশোধিত ও বৈধকৃত', accepted: 'গৃহীত', reviewed: 'পর্যালোচিত',
-    pendingReview: 'অপেক্ষমাণ পর্যালোচনা', pending: 'অপেক্ষমাণ', needsFix: 'সংশোধন প্রয়োজন', myNeedsFixTitle: 'আপনার যে পাতাগুলোতে সংশোধন প্রয়োজন',
+    pendingReview: 'অপেক্ষমাণ', pending: 'অপেক্ষমাণ', needsFix: 'সংশোধন প্রয়োজন', myNeedsFixTitle: 'আপনার যে পাতাগুলোতে সংশোধন প্রয়োজন',
     rejected: 'বাতিল', dailyActivityChart: 'দৈনিক মুদ্রণ সংশোধন পরিসংখ্যান', leaderboard: 'লিডারবোর্ড',
     indexBooks: 'নির্ঘণ্ট বইসমূহ', resultsAndStats: 'ফলাফল ও পরিসংখ্যান', anyBook: 'যেকোনো বই', proofreadAnyPage: 'যেকোনো পাতা প্রুফরিড করুন',
     pts: 'পয়েন্ট', progress: 'অগ্রগতি', user: 'অংশগ্রহণকারী', points: 'পয়েন্ট',
