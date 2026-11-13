@@ -231,7 +231,7 @@ def err(code: str, status: int = 400, **extra):
 
 # Column limits (MariaDB rejects over-long values in strict mode; SQLite silently accepted them).
 LEN_TITLE, LEN_SLUG, LEN_USERS, LEN_TEXT, LEN_NOTE = 255, 100, 10000, 20000, 500
-JURY_MODES = ("in_app_validate", "accept_reject")
+JURY_MODES = ("accept_reject", "in_app_validate")
 REJECT_ACTIONS = ("hold_batch", "instant_revert")
 
 
@@ -1226,7 +1226,7 @@ def api_create_contest():
         proofread_points=to_int(data.get("proofread_points"), 3, 0, 10000),
         validate_points=to_int(data.get("validate_points"), 0, 0, 10000),
         max_bonus_points=to_int(data.get("max_bonus_points"), 0, 0, 10000),
-        jury_mode=data.get("jury_mode", "in_app_validate"),
+        jury_mode=data.get("jury_mode", "accept_reject"),
         jury_gets_points=bool(data.get("jury_gets_points", False)),
         reject_action=data.get("reject_action", "hold_batch"),
         created_by=current_user, admins=admins_raw,
@@ -1377,7 +1377,8 @@ def contest_payload(c: Contest, current_user):
             "total_books": len([b for b in c.books if b.is_active]),
             "total_book_pages": total_book_pages,
             "listed_pages": totals["listed"], "accepted_pages": totals["accepted"],
-            "pending_pages": totals["pending"], "rejected_hold_count": rejected_hold_count,
+            "pending_pages": totals["pending"],
+            "reviewed_pages": max(0, totals["listed"] - totals["pending"]), "rejected_hold_count": rejected_hold_count,
             "participants": len(leaderboard), "reverted_pages": totals["reverted"],
         },
         "reverted": reverted,

@@ -31,7 +31,7 @@
   <a href="#ps-main" class="sr-only focus:not-sr-only focus:absolute focus:z-[80] focus:top-2 focus:left-2 ps-btn ps-btn-primary">{{ t('skipToContent') }}</a>
 
   <header class="bg-gradient-to-r from-ws-dark via-ws-chambray to-ws-cerulean dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 text-white border-b border-white/10 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
-    <div class="max-w-7xl mx-auto px-3 sm:px-6 h-14 flex items-center justify-between gap-2">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 h-[50px] sm:h-[52px] flex items-center justify-between gap-2">
       <div class="flex items-center gap-4 sm:gap-7 min-w-0 self-stretch">
         <a href="/" @click.prevent="goHome" class="flex items-center gap-2.5 shrink-0 no-underline !text-white" aria-label="ProofSource">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="4 12 58 40" class="ps-logo shrink-0" aria-hidden="true">
@@ -53,7 +53,7 @@
   <path d="M47.2 44.7l2.8 2.8 5.1-5.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
           <span class="flex flex-col leading-none min-w-0 max-[380px]:hidden">
-            <span class="ps-wordmark !text-white"><b>Proof</b>Source</span>
+            <span class="ps-wordmark !text-white">ProofSource</span>
             <span class="hidden sm:block text-[10px] tracking-[.14em] uppercase text-white/70 mt-1">{{ t('tagline') }}</span>
           </span>
         </a>
@@ -78,7 +78,7 @@
 
         <a v-if="!loggedIn" href="/login" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-white !text-ws-dark hover:bg-slate-100 shadow-sm transition whitespace-nowrap no-underline">
           <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
-          <span>{{ t('loginWikimedia') }}</span>
+          <span class="sm:hidden">{{ t('loginShort') }}</span><span class="hidden sm:inline">{{ t('loginWikimedia') }}</span>
         </a>
 
         <div v-else class="ps-hbtn !pr-1 !cursor-default max-w-[180px] sm:max-w-none">
@@ -101,7 +101,7 @@
 
   <div class="ps-progress" :style="{ width: loadingBar + '%', opacity: loadingBar > 0 && loadingBar < 100 ? 1 : 0 }"></div>
 
-  <main id="ps-main" class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-3 pb-6 sm:pt-4 sm:pb-8 min-w-0">
+  <main id="ps-main" class="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 pt-4 pb-6 sm:pt-6 sm:pb-8 min-w-0">
 
     <div v-if="view === 'home'" class="space-y-5 ps-view">
       <section class="ps-hero">
@@ -186,8 +186,8 @@
       <div v-else class="space-y-2.5">
         <template v-for="row in homeRows" :key="row.key">
           <!-- central contest: a folder with its projects -->
-          <div v-if="row.type === 'central'" class="ps-row ps-spine overflow-hidden" :class="'is-' + row.central.status">
-            <div class="flex items-stretch">
+          <div v-if="row.type === 'central'" class="ps-row overflow-hidden">
+            <div class="ps-spine ps-spine-inner flex items-stretch" :class="'is-' + row.central.status">
               <button @click="toggleTree(row.central.slug)" class="pl-3.5 pr-2 flex items-center text-slate-500 hover:text-ws-cerulean dark:hover:text-ws-nature shrink-0" :aria-expanded="isExpanded(row.central)" :title="isExpanded(row.central) ? t('collapse') : t('expand')">
                 <svg class="w-4 h-4 transition-transform duration-200" :class="isExpanded(row.central) ? 'rotate-90' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><polyline points="9 6 15 12 9 18"></polyline></svg>
               </button>
@@ -623,13 +623,15 @@
         </div>
       </section>
 
-      <div class="ps-stats grid grid-cols-2 gap-2.5" :class="active.stats.reverted_pages ? 'sm:grid-cols-3 lg:grid-cols-6' : 'sm:grid-cols-5'">
+      <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.participants) }}</div></div>
         <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ active.contest.validation_visible ? t('proofreadListed') : t('proofread') }}</div><div class="ps-stat-v text-ws-cerulean dark:text-ws-nature">{{ fmtNum(active.stats.listed_pages) }}</div></div>
-        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(active.stats.accepted_pages) }}</div></div>
-        <div v-if="active.contest.review_enabled" class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v text-amber-600 dark:text-amber-400">{{ fmtNum(active.stats.pending_pages) }}</div></div>
+        <template v-if="active.contest.review_enabled">
+          <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('reviewed') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(active.stats.reviewed_pages) }}</div></div>
+          <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v text-amber-600 dark:text-amber-400">{{ fmtNum(active.stats.pending_pages) }}</div></div>
+        </template>
         <div v-else class="ps-stat"><div class="ps-stat-l">{{ t('totalBookPages') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_book_pages) }}</div></div>
-        <div class="ps-stat is-problem" :class="active.stats.reverted_pages ? '' : 'col-span-2 sm:col-span-1'"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
+        <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
         <button v-if="active.stats.reverted_pages" @click="contestSubTab = 'reverted'" class="ps-stat text-left hover:!border-slate-400" :title="t('revertedHelp')"><div class="ps-stat-l">{{ t('revertedPages') }}</div><div class="ps-stat-v text-slate-500">{{ fmtNum(active.stats.reverted_pages) }}</div></button>
       </div>
 
@@ -1020,7 +1022,7 @@
         </div>
       </section>
 
-      <div class="ps-stats grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('projectsWordCap') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.projects) }}</div></div>
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.participants) }}</div></div>
         <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v">{{ fmtNum(central.stats.listed) }}</div></div>
@@ -1219,7 +1221,7 @@
           <div class="text-[10px] text-slate-500">/ {{ fmtNum(upages.summary.participants) }}</div>
         </div>
       </div>
-      <div class="ps-stats grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+      <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.proofread) }}</div></div>
         <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(upages.summary.accepted) }}</div></div>
         <template v-if="upages.review_enabled">
@@ -1560,7 +1562,7 @@
     <div class="max-w-7xl mx-auto px-3 sm:px-6 py-6 grid gap-4 sm:grid-cols-[1fr_auto] items-start text-xs leading-relaxed">
       <div class="space-y-1">
         <div class="flex flex-wrap items-baseline gap-x-2">
-          <span class="ps-wordmark !text-base"><b>Proof</b>Source</span>
+          <span class="ps-wordmark !text-base">ProofSource</span>
           <span class="text-slate-400 dark:text-slate-600" aria-hidden="true">·</span>
           <span>{{ t('createdByPrefix') }} <a href="https://meta.wikimedia.org/wiki/User:MS_Sakib" target="_blank" rel="noopener author" class="font-semibold">MS Sakib</a></span>
         </div>
@@ -1707,7 +1709,7 @@ const I18N = {
     proofreadOnly: 'Proofread', err_projects_required: 'Add at least one project', err_invalid_project: 'Invalid Wikisource project',
     err_project_has_data: 'This project already has contest pages and cannot be removed', err_not_assigned_to_you: 'This page is assigned to another reviewer',
     err_invalid_value: 'Invalid value', centralSaved: 'Central contest saved', light: 'Light', dark: 'Dark',
-    loginWikimedia: 'MediaWiki Login', logout: 'Logout',
+    loginWikimedia: 'MediaWiki Login', loginShort: 'Login', logout: 'Logout',
     running: 'Active', upcoming: 'Upcoming', ended: 'Ended', pending_approval: 'Pending Approval', rejected_status: 'Rejected', rejected_c: 'Rejected',
     all: 'All', createContest: 'Create Contest', editContestConfig: 'Contest Configuration',
     noContests: 'No contests found in this category.', contestName: 'Contest Name', project: 'Wikisource Project',
@@ -1731,7 +1733,7 @@ const I18N = {
     pendingApprovalBannerDesc: 'Tool Admin (MS Sakib) or a local Wikisource Administrator must approve this contest to activate it.',
     approveContest: 'Approve & Activate', myPages: 'My Pages', syncWithWiki: 'Sync Now', syncing: 'Syncing...',
     lastSynced: 'Last synced', configure: 'Configuration', juryPanel: 'Review',
-    totalBookPages: 'Eligible Pages', proofreadListed: 'Proofread / Validated', accepted: 'Accepted',
+    totalBookPages: 'Eligible Pages', proofreadListed: 'Proofread / Validated', accepted: 'Accepted', reviewed: 'Reviewed',
     pendingReview: 'Pending Review', pending: 'Pending', needsFix: 'Needs Fix', myNeedsFixTitle: 'Pages Requiring Your Revision',
     rejected: 'Rejected', dailyActivityChart: 'Daily Proofreading Activity', leaderboard: 'Leaderboard',
     indexBooks: 'Index Books', resultsAndStats: 'Results & Statistics', anyBook: 'Any Book', proofreadAnyPage: 'Proofread Any Page',
@@ -1895,7 +1897,7 @@ const I18N = {
     proofreadOnly: 'মুদ্রণ সংশোধিত', err_projects_required: 'অন্তত একটি প্রকল্প যোগ করুন', err_invalid_project: 'উইকিসংকলন প্রকল্পটি সঠিক নয়',
     err_project_has_data: 'এই প্রকল্পে ইতিমধ্যে পাতা জমা পড়েছে, তাই বাদ দেওয়া যাবে না', err_not_assigned_to_you: 'এই পাতাটি অন্য পর্যালোচককে বরাদ্দ করা',
     err_invalid_value: 'মান সঠিক নয়', centralSaved: 'কেন্দ্রীয় প্রতিযোগিতা সংরক্ষিত হয়েছে', light: 'লাইট', dark: 'ডার্ক',
-    loginWikimedia: 'মিডিয়াউইকি লগইন', logout: 'লগআউট',
+    loginWikimedia: 'মিডিয়াউইকি লগইন', loginShort: 'লগইন', logout: 'লগআউট',
     running: 'চলমান', upcoming: 'আসন্ন', ended: 'সমাপ্ত', pending_approval: 'অনুমোদনের অপেক্ষায়', rejected_status: 'প্রত্যাখ্যাত',
     all: 'সব', createContest: 'নতুন প্রতিযোগিতা কনফিগার করুন', editContestConfig: 'প্রতিযোগিতা কনফিগারেশন',
     noContests: 'এই তালিকায় কোনো প্রতিযোগিতা নেই।', contestName: 'প্রতিযোগিতার নাম', project: 'উইকিসংকলন প্রকল্প',
@@ -1918,7 +1920,7 @@ const I18N = {
     pendingApprovalBannerDesc: 'টুল অ্যাডমিন (MS Sakib) অথবা সংশ্লিষ্ট উইকিসংকলনের প্রশাসক অনুমোদন করলেই প্রতিযোগিতাটি চালু হবে।',
     approveContest: 'অনুমোদন ও চালু করুন', myPages: 'আমার পাতাসমূহ', syncWithWiki: 'উইকি সিঙ্ক করুন', syncing: 'সিঙ্ক হচ্ছে...',
     lastSynced: 'সর্বশেষ সিঙ্ক', configure: 'কনফিগারেশন', juryPanel: 'পর্যালোচনা করুন',
-    totalBookPages: 'বইয়ের মোট পাতা', proofreadListed: 'মুদ্রণ সংশোধিত ও বৈধকৃত', accepted: 'গৃহীত',
+    totalBookPages: 'বইয়ের মোট পাতা', proofreadListed: 'মুদ্রণ সংশোধিত ও বৈধকৃত', accepted: 'গৃহীত', reviewed: 'পর্যালোচিত',
     pendingReview: 'অপেক্ষমাণ পর্যালোচনা', pending: 'অপেক্ষমাণ', needsFix: 'সংশোধন প্রয়োজন', myNeedsFixTitle: 'আপনার যে পাতাগুলোতে সংশোধন প্রয়োজন',
     rejected: 'বাতিল', dailyActivityChart: 'দৈনিক মুদ্রণ সংশোধন পরিসংখ্যান', leaderboard: 'লিডারবোর্ড',
     indexBooks: 'নির্ঘণ্ট বইসমূহ', resultsAndStats: 'ফলাফল ও পরিসংখ্যান', anyBook: 'যেকোনো বই', proofreadAnyPage: 'যেকোনো পাতা প্রুফরিড করুন',
@@ -2508,7 +2510,7 @@ createApp({
       return {
         slug: '', title: '', description: '', wiki_domain: 'bn.wikisource.org',
         start_time: now.toISOString().slice(0, 16), end_time: next.toISOString().slice(0, 16),
-        proofread_points: 3, validate_points: 0, max_bonus_points: 0, jury_mode: 'in_app_validate', jury_gets_points: false,
+        proofread_points: 3, validate_points: 0, max_bonus_points: 0, jury_mode: 'accept_reject', jury_gets_points: false,
         reject_action: 'hold_batch', admins: this.currentUser || '', juries: this.currentUser || '', excluded_users: '', books: '',
         review_enabled: true, bulk_review_enabled: false, review_assignment: 'open', allow_custom_points: true, announcement_en: '', announcement_bn: '',
         submission_mode: 'auto'

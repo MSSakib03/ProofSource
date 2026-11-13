@@ -58,7 +58,7 @@ class Contest(db.Model):
     proofread_points = db.Column(db.Integer, default=3)
     validate_points = db.Column(db.Integer, default=1)
     max_bonus_points = db.Column(db.Integer, default=0)
-    jury_mode = db.Column(db.String(30), default='in_app_validate')
+    jury_mode = db.Column(db.String(30), default='accept_reject')
     jury_gets_points = db.Column(db.Boolean, default=False)
     reject_action = db.Column(db.String(30), default='hold_batch')
     created_by = db.Column(db.String(100), nullable=False, default="")
