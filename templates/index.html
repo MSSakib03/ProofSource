@@ -559,17 +559,17 @@
               <p v-if="active.contest.description" @click="descOpen = !descOpen" :class="descOpen ? '' : 'line-clamp-2'"
                  class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl cursor-pointer">{{ active.contest.description }}</p>
             </div>
-            <div class="flex flex-wrap items-center gap-1.5 shrink-0 max-md:w-full">
+            <div class="flex flex-wrap items-center gap-1.5 max-md:gap-y-0 shrink-0 max-md:w-full">
               <template v-if="active.contest.submission_mode === 'enroll'">
-                <span v-if="active.contest.is_enrolled" class="ps-btn max-md:order-first max-md:basis-full !cursor-default !text-emerald-700 dark:!text-emerald-400 !border-emerald-500/60" :title="t('enrolledHint')">
+                <span v-if="active.contest.is_enrolled" class="ps-btn max-md:order-first max-md:flex-1 !cursor-default !text-emerald-700 dark:!text-emerald-400 !border-emerald-500/60" :title="t('enrolledHint')">
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>{{ t('enrolled') }}
                 </span>
-                <button v-else-if="active.contest.can_enroll" @click="enrollContest" :disabled="busy" class="ps-btn ps-btn-primary max-md:order-first max-md:basis-full" :title="t('mode_enroll_desc')">
+                <button v-else-if="active.contest.can_enroll" @click="enrollContest" :disabled="busy" class="ps-btn ps-btn-primary max-md:order-first max-md:flex-1" :title="t('mode_enroll_desc')">
                   <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2"/><path d="M18 14v6M15 17h6"/></svg>
                   <span>{{ t('enroll') }}</span>
                 </button>
               </template>
-              <button v-if="active.contest.submission_mode === 'manual' && active.contest.can_submit" @click="openSubmitDialog" class="ps-btn ps-btn-primary max-md:order-first max-md:basis-full" :title="t('mode_manual_desc')">
+              <button v-if="active.contest.submission_mode === 'manual' && active.contest.can_submit" @click="openSubmitDialog" class="ps-btn ps-btn-primary max-md:order-first max-md:flex-1" :title="t('mode_manual_desc')">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
                 <span>{{ t('submitPages') }} <span v-if="loggedIn && active.contest.my_eligible_count" class="font-normal tabular-nums">({{ fmtNum(active.contest.my_eligible_count) }})</span></span>
               </button>
@@ -583,10 +583,13 @@
               <button v-if="active.contest.is_admin" @click="openEditConfig" class="ps-btn ps-btn-icon" :title="t('configure')" :aria-label="t('configure')">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
               </button>
-              <button v-if="active.contest.is_jury && active.contest.review_enabled" @click="openJuryWorkspace(null)" class="ps-btn ps-btn-primary max-md:order-first max-md:basis-full">
+              <button v-if="active.contest.is_jury && active.contest.review_enabled" @click="openJuryWorkspace(null)" class="ps-btn ps-btn-primary max-md:order-first max-md:flex-1">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z"></path><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><polyline points="9 14 11 16 15 12"></polyline></svg>
                 <span>{{ t('juryPanel') }} <span class="font-normal tabular-nums">({{ fmtNum(active.stats.pending_pages) }})</span></span>
               </button>
+              <!-- phones: primary actions share the first row, the rest go below -->
+              <span v-if="(active.contest.submission_mode === 'enroll' && (active.contest.is_enrolled || active.contest.can_enroll)) || (active.contest.submission_mode === 'manual' && active.contest.can_submit) || (active.contest.is_jury && active.contest.review_enabled)"
+                    class="hidden max-md:block max-md:order-first basis-full h-1.5" aria-hidden="true"></span>
             </div>
           </div>
 
