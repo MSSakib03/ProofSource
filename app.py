@@ -1185,18 +1185,6 @@ def add_books_from_multiline(contest: Contest, raw_books: str):
     return added
 
 
-def _apply_hub(contest: Contest, hub_slug: str):
-    hub_slug = (hub_slug or "").strip().lower()
-    if not hub_slug:
-        contest.hub_id = None
-        return None
-    hub = Hub.query.filter_by(slug=hub_slug).first()
-    if not hub:
-        raise ValueError("hub_not_found")
-    contest.hub_id = hub.id
-    return hub
-
-
 @app.route("/api/contests", methods=["POST"])
 def api_create_contest():
     current_user = get_current_user()
