@@ -101,6 +101,9 @@
   .ps-card { background: var(--ps-surface); border: 1px solid var(--ps-border-muted); border-radius: 4px; box-shadow: var(--ps-shadow); }
   .ps-sunken { background: var(--ps-surface-2); border: 1px solid var(--ps-border-muted); border-radius: 4px; }
   .ps-serif { font-family: theme('fontFamily.serif'); font-weight: 400; letter-spacing: -.005em; }
+  /* Contest titles: the Bangla serif has no bold cut and the browser's synthetic bold is too heavy,
+   * so thicken the regular weight a touch with a thin stroke instead (scales with the font size). */
+  .ps-title-strong { font-weight: 400; font-synthesis: none; -webkit-text-stroke: .028em currentColor; }
   .ps-h-rule { border-bottom: 1px solid var(--ps-border); padding-bottom: .25rem; } /* wiki-style h2 rule */
   .ps-eyebrow { font-size: .6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ps-text-subtle); }
 
