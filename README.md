@@ -83,7 +83,7 @@ On the home page, contests are grouped into **Active, Upcoming, Ended and Pendin
 1. Open the contest from the home page, or use the direct link from the organizers (for example `/contest/bn/wcnov26`).
 2. The **Index Books** tab lists the books in the contest, their points per page and any book-specific time window.
 3. Click **Proofread Any Page** (you need to be logged in) to open a random unproofread page on Wikisource. You can pick a book first. The page is reserved for you for 20 minutes.
-4. Proofread it on Wikisource as usual and save it as **Proofread**. The tool picks it up automatically. Press the sync button (↻) to refresh immediately.
+4. Proofread it on Wikisource as usual and save it as **Proofread**. The tool picks it up automatically. Press **Sync** (↻) to refresh immediately.
 
 ### How your pages enter the contest
 The organizers choose one of three submission modes; the contest page shows which one is used.
@@ -283,7 +283,7 @@ Tool admins can approve any contest, delete contests when their admins ask for i
 <details>
 <summary><b>My proofread page is not on the leaderboard. Why?</b></summary>
 
-Press sync (↻) first. Then check:
+Press **Sync** (↻) first. Then check:
 - Is the page in one of the contest books?
 - Was it proofread for the first time inside the contest or book window?
 - Did you work on the text yourself?

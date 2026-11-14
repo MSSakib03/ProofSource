@@ -273,6 +273,8 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 - **i18n**: the `I18N = { en: {...}, bn: {...} }` table. No hard-coded UI text; English is the fallback. To add a language, copy `en`.
 - Theme: **light by default**, whatever the browser or OS prefers; dark mode only when the visitor chooses it (`ws_theme` in localStorage, applied before first paint). Dark mode uses the same tokens as light mode (`static/src/app.css`), and the template's `dark:slate-*` utilities are mapped onto them.
 - Saving a contest configuration (create or edit) first opens a compact summary to confirm.
+- Buttons: the main action is solid blue (`.ps-btn-primary`); every other `.ps-btn` uses the Codex *normal progressive* look (pale blue fill, blue outline and text). The sync button carries a "Sync" label except on phones narrower than 380 px. The header logo sits in a thin rounded outline (`.ps-logo-tile`).
+- Icons for the home-page totals (desktop only) are taken from the Wikimedia Codex icon set (`@wikimedia/codex-icons`, MIT): `cdxIconLive`, `cdxIconArticleCheck`, `cdxIconLogoWikisource`, inlined as SVG.
 - The reviewer chips on the contest page are measured (`fitJuries`): as many as fit on one line beside the dates on wide screens, two lines on phones, then "+N".
 - Dates are always UTC, with Bangla digits and month names in Bangla.
 - Keyboard shortcuts use `event.code` (Alt+A accept, Alt+F needs fix, Alt+R reject, Alt+N next), so they work with Bangla/Avro layouts and never fire inside text fields.
