@@ -5,19 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0" />
   <title>ProofSource — Wikisource proofreading contests</title>
   <meta name="description" content="Proofreading contests for every Wikisource: automatic tracking, reviews and live leaderboards." />
-  <meta name="color-scheme" content="light dark" />
-  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-  <meta name="theme-color" content="#101418" media="(prefers-color-scheme: dark)" />
+  <meta name="color-scheme" content="light" />
+  <meta name="theme-color" content="#ffffff" id="ps-theme-color" />
   <meta name="referrer" content="strict-origin-when-cross-origin" />
   <link rel="icon" type="image/svg+xml" href="/static/favicon.svg" />
   <!-- Every asset is served by the tool itself: no third-party CDN ever sees a visitor. -->
   <link rel="stylesheet" href="{{ asset_url('css/app.css') }}" />
   <script nonce="{{ csp_nonce() }}">
     window.PS_INITIAL = {{ initial|tojson }};
-    (function () {   /* apply the saved theme before first paint (no flash) */
+    (function () {   /* light by default whatever the browser/OS prefers; dark only when chosen (applied before first paint) */
       try {
-        var t = localStorage.getItem('ws_theme');
-        if (t === 'dark' || (!t && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches)) document.documentElement.classList.add('dark');
+        if (localStorage.getItem('ws_theme') === 'dark') {
+          document.documentElement.classList.add('dark');
+          document.getElementById('ps-theme-color').setAttribute('content', '#111b2e');
+        }
       } catch (e) {}
     })();
   </script>
@@ -478,7 +479,7 @@
         </div>
 
         <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-          <button @click="view === 'create' ? submitNewContest() : submitUpdateConfig()" :disabled="busy"
+          <button @click="openConfigPreview" :disabled="busy"
                   class="ps-btn ps-btn-primary">
             {{ busy ? t('saving') : t('saveConfiguration') }}
           </button>
@@ -595,7 +596,7 @@
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                 <span>{{ t('myPages') }} <span class="font-normal tabular-nums">({{ fmtNum(active.contest.my_pages_count) }})</span></span>
               </button>
-              <button @click="syncContestNow" :disabled="busy || syncing" class="ps-btn ps-btn-icon" :title="(busy || syncing) ? t('syncing') : t('syncWithWiki')" :aria-label="t('syncWithWiki')">
+              <button @click="syncContestNow" :disabled="busy || syncing" class="ps-btn ps-btn-icon" :class="loggedIn ? '' : 'max-md:order-first'" :title="(busy || syncing) ? t('syncing') : t('syncWithWiki')" :aria-label="t('syncWithWiki')">
                 <svg class="w-4 h-4" :class="{'animate-spin': busy || syncing}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
               </button>
               <button v-if="active.contest.is_admin" @click="openEditConfig" class="ps-btn ps-btn-icon" :title="t('configure')" :aria-label="t('configure')">
@@ -605,8 +606,8 @@
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 2h6a1 1 0 0 1 1 1v2H8V3a1 1 0 0 1 1-1z"></path><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><polyline points="9 14 11 16 15 12"></polyline></svg>
                 <span>{{ t('juryPanel') }} <span class="font-normal tabular-nums">({{ fmtNum(active.stats.pending_pages) }})</span></span>
               </button>
-              <!-- phones: primary actions share the first row, the rest go below -->
-              <span v-if="(active.contest.submission_mode === 'enroll' && (active.contest.is_enrolled || active.contest.can_enroll)) || (active.contest.submission_mode === 'manual' && active.contest.can_submit) || (active.contest.is_jury && active.contest.review_enabled)"
+              <!-- phones: primary actions share the first row, the rest go below (logged out: sync stays beside the primary action) -->
+              <span v-if="loggedIn && ((active.contest.submission_mode === 'enroll' && (active.contest.is_enrolled || active.contest.can_enroll)) || (active.contest.submission_mode === 'manual' && active.contest.can_submit) || (active.contest.is_jury && active.contest.review_enabled))"
                     class="hidden max-md:block max-md:order-first basis-full h-1.5" aria-hidden="true"></span>
             </div>
           </div>
@@ -627,8 +628,8 @@
             </div>
           </div>
 
-          <div class="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-2 text-xs">
-            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          <div class="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-2 lg:gap-4 text-xs">
+            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 lg:shrink-0">
               <span class="ps-chip !font-semibold !text-slate-700 dark:!text-slate-300 !rounded max-sm:!text-[11px] max-sm:!px-1.5 max-sm:!gap-1">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <span class="sm:hidden">{{ formatDateShort(active.contest.start_iso) }} – {{ formatDateShort(active.contest.end_iso) }}</span>
@@ -638,15 +639,16 @@
                 <span class="ps-dot" :class="countdownState === 'running' ? 'bg-emerald-500 animate-pulse' : countdownState === 'upcoming' ? 'bg-ws-cerulean' : 'bg-slate-400'"></span>{{ countdownText }}
               </span>
             </div>
-            <div v-if="active.contest.review_enabled && active.contest.juries_list.length" class="flex items-center gap-1.5 flex-wrap lg:justify-end lg:max-w-[55%]">
+            <!-- reviewers: as many as fit on one line beside the dates (desktop) or on two lines (phones), then "+N" -->
+            <div v-if="active.contest.review_enabled && active.contest.juries_list.length" ref="juryBox" class="flex items-center gap-1.5 flex-wrap lg:flex-1 lg:min-w-0 lg:justify-end">
               <span class="text-slate-600 dark:text-slate-400 font-semibold mr-0.5">{{ t('juryLabel') }}:</span>
-              <a v-for="j in (showAllJuries ? active.contest.juries_list : active.contest.juries_list.slice(0, 4))" :key="j"
+              <a v-for="j in (showAllJuries || juryMeasuring ? active.contest.juries_list : active.contest.juries_list.slice(0, juryFit))" :key="j" data-jury-chip
                  :href="'https://' + active.contest.wiki_domain + '/wiki/User_talk:' + encodeURIComponent(j)" target="_blank" rel="noopener" :title="t('openTalkPage') + ': ' + j"
                  class="ps-chip no-underline hover:!border-ws-cerulean hover:!text-ws-cerulean dark:hover:!text-ws-nature">
                 <svg class="w-3 h-3 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>{{ j }}
               </a>
-              <button v-if="active.contest.juries_list.length > 4" @click="showAllJuries = !showAllJuries" class="ps-chip !border-dashed hover:!border-ws-cerulean">
-                {{ showAllJuries ? t('showLess') : '+' + fmtNum(active.contest.juries_list.length - 4) }}
+              <button v-if="juryMeasuring || showAllJuries || active.contest.juries_list.length > juryFit" ref="juryMore" @click="showAllJuries = !showAllJuries" class="ps-chip !border-dashed hover:!border-ws-cerulean">
+                {{ showAllJuries ? t('showLess') : '+' + fmtNum(juryMeasuring ? active.contest.juries_list.length : active.contest.juries_list.length - juryFit) }}
               </button>
             </div>
           </div>
@@ -1262,7 +1264,8 @@
         <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(upages.summary.accepted) }}</div></div>
         <template v-if="upages.review_enabled">
           <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pending') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.pending) }}</div></div>
-          <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('needsFix') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.needs_fix) }}</div></div>
+          <div v-if="upages.summary.needs_fix" class="ps-stat is-problem"><div class="ps-stat-l">{{ t('needsFix') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.needs_fix) }}</div></div>
+          <div v-if="upages.summary.rejected" class="ps-stat is-danger"><div class="ps-stat-l">{{ t('rejected') }}</div><div class="ps-stat-v text-rose-600 dark:text-rose-400">{{ fmtNum(upages.summary.rejected) }}</div></div>
         </template>
         <div v-if="upages.show_validation" class="ps-stat"><div class="ps-stat-l">{{ t('validated') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.validated) }}</div></div>
         <div class="ps-stat"><div class="ps-stat-l">{{ t('points') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.points) }}</div></div>
@@ -1593,15 +1596,15 @@
 
   </main>
 
-  <footer class="ps-footer mt-6">
+  <footer class="ps-footer mt-5">
     <div class="h-[3px] bg-gradient-to-r from-ws-dark via-ws-cerulean to-ws-nature" aria-hidden="true"></div>
-    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-3.5 grid gap-2 sm:gap-4 sm:grid-cols-[1fr_auto] items-center text-xs leading-relaxed">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-2.5 grid gap-1.5 sm:gap-4 sm:grid-cols-[1fr_auto] items-center text-xs leading-normal">
       <div class="flex flex-wrap items-baseline gap-x-2">
         <span class="ps-wordmark !text-base !font-bold">ProofSource</span>
         <span class="text-slate-400 dark:text-slate-600" aria-hidden="true">·</span>
         <span>{{ t('createdByPrefix') }} <a href="https://meta.wikimedia.org/wiki/User:MS_Sakib" target="_blank" rel="noopener author" class="font-semibold">MS Sakib</a></span>
       </div>
-      <nav class="flex flex-wrap gap-x-4 gap-y-1.5 sm:justify-end" :aria-label="t('footerLinks')">
+      <nav class="flex flex-wrap gap-x-4 gap-y-1 sm:justify-end" :aria-label="t('footerLinks')">
         <a href="https://github.com/MSSakib03/ProofSource" target="_blank" rel="noopener">{{ t('sourceCode') }}</a>
         <a href="https://github.com/MSSakib03/ProofSource/issues" target="_blank" rel="noopener">{{ t('reportIssue') }}</a>
         <a href="https://toolforge.org/" target="_blank" rel="noopener">{{ t('hostedOnToolforge') }}</a>
@@ -1609,6 +1612,58 @@
       </nav>
     </div>
   </footer>
+
+  <!-- contest configuration: compact summary to confirm before saving -->
+  <div v-if="cfgPreview.open" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="ps-cfgpv-title" @keydown.esc="cfgPreview.open = false" @click.self="cfgPreview.open = false">
+    <div class="ps-card max-w-lg w-full max-h-[88vh] flex flex-col shadow-xl overflow-hidden">
+      <div class="h-1 bg-gradient-to-r from-ws-dark via-ws-cerulean to-ws-nature shrink-0"></div>
+      <div class="px-4 sm:px-5 pt-3.5 pb-3 border-b border-slate-200 dark:border-slate-800 shrink-0">
+        <div class="ps-eyebrow">{{ t('pv_title') }}</div>
+        <h3 id="ps-cfgpv-title" class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 break-words">{{ form.title }}</h3>
+        <div class="flex flex-wrap gap-1.5 mt-1.5">
+          <span class="ps-chip !text-ws-cerulean dark:!text-ws-nature">{{ projectLabel(form.wiki_domain) }}</span>
+          <span class="ps-chip">{{ form.review_enabled ? t('withReview') : t('withoutReview') }}</span>
+          <span class="ps-chip">{{ t('mode_' + form.submission_mode) }}</span>
+        </div>
+      </div>
+      <div class="px-4 sm:px-5 py-3 overflow-y-auto text-xs space-y-3">
+        <dl class="ps-pv">
+          <dt>{{ t('pv_link') }}</dt><dd class="font-mono break-all">/contest/{{ formLangPreview }}/{{ form.slug || ('‹' + t('pv_random') + '›') }}</dd>
+          <dt>{{ t('pv_period') }}</dt><dd class="tabular-nums">{{ pvDate(form.start_time) }} – {{ pvDate(form.end_time) }}</dd>
+          <dt>{{ t('points') }}</dt><dd>{{ t('pv_pointsVal').replace('{p}', fmtNum(form.proofread_points)).replace('{v}', fmtNum(form.validate_points)).replace('{b}', fmtNum(form.max_bonus_points)) }}</dd>
+          <template v-if="form.description"><dt>{{ t('description') }}</dt><dd class="line-clamp-2 break-words">{{ form.description }}</dd></template>
+          <template v-if="form.link"><dt>{{ t('pv_page') }}</dt><dd class="break-all">{{ form.link }}</dd></template>
+        </dl>
+        <dl class="ps-pv border-t border-slate-200 dark:border-slate-800 pt-3">
+          <dt>{{ t('pv_admins') }}</dt>
+          <dd><span v-if="!pvList(form.admins).length" class="ps-zero">—</span><span v-for="u in pvList(form.admins)" :key="'a' + u" class="ps-chip !py-0 mr-1 mb-1">{{ u }}</span></dd>
+          <template v-if="form.review_enabled"><dt>{{ t('juryLabel') }}</dt>
+          <dd><span v-if="!pvList(form.juries).length" class="ps-zero">—</span><span v-for="u in pvList(form.juries)" :key="'j' + u" class="ps-chip !py-0 mr-1 mb-1">{{ u }}</span></dd></template>
+          <template v-if="pvList(form.excluded_users).length"><dt>{{ t('pv_excluded') }}</dt>
+          <dd><span v-for="u in pvList(form.excluded_users)" :key="'x' + u" class="ps-chip !py-0 mr-1 mb-1">{{ u }}</span></dd></template>
+        </dl>
+        <dl v-if="form.review_enabled" class="ps-pv border-t border-slate-200 dark:border-slate-800 pt-3">
+          <dt>{{ t('reviewDistribution') }}</dt><dd>{{ form.review_assignment === 'equal' ? t('distEqual') : t('distOpen') }}</dd>
+          <dt>{{ t('juryReviewMode') }}</dt><dd>{{ form.jury_mode === 'in_app_validate' ? t('pv_inApp') : t('pv_acceptOnly') }}<span v-if="form.jury_gets_points" class="text-slate-500"> · {{ t('pv_juryPoints') }}</span></dd>
+          <dt>{{ t('pv_rejected') }}</dt><dd>{{ form.reject_action === 'instant_revert' ? t('pv_instant') : t('pv_hold') }}</dd>
+          <template v-if="form.bulk_review_enabled"><dt>{{ t('pv_bulk') }}</dt><dd>✓</dd></template>
+        </dl>
+        <dl class="ps-pv border-t border-slate-200 dark:border-slate-800 pt-3">
+          <dt>{{ t('pv_notice') }}</dt><dd>EN {{ form.announcement_en ? '✓' : '—' }} · বাংলা {{ form.announcement_bn ? '✓' : '—' }}</dd>
+          <dt>{{ view === 'create' ? t('books') : t('pv_newBooks') }}</dt>
+          <dd><span v-if="!pvLines(form.books).length" class="ps-zero">—</span>
+            <template v-else><b class="tabular-nums">{{ fmtNum(pvLines(form.books).length) }}</b>
+              <span class="block font-mono text-[11px] text-slate-600 dark:text-slate-400 break-all">{{ pvLines(form.books).slice(0, 3).join(', ') }}<template v-if="pvLines(form.books).length > 3"> +{{ fmtNum(pvLines(form.books).length - 3) }}</template></span></template></dd>
+        </dl>
+      </div>
+      <div class="px-4 sm:px-5 py-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2 shrink-0 bg-slate-50 dark:bg-slate-900/60">
+        <button @click="cfgPreview.open = false" class="ps-btn ps-btn-quiet">{{ t('pv_back') }}</button>
+        <button @click="confirmConfigSave" :disabled="busy" class="ps-btn ps-btn-primary">
+          <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>{{ t('pv_confirm') }}
+        </button>
+      </div>
+    </div>
+  </div>
 
   <div v-if="confirmBox.open" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" @keydown.esc="confirmBox.open = false" role="dialog" aria-modal="true">
     <div class="ps-card max-w-md w-full p-5 space-y-4 shadow-xl">
@@ -1866,6 +1921,12 @@ const I18N = {
     loginToTakePart: 'Log in with your Wikimedia account', howItWorks: 'How it works',
     activeContests: 'Active contests', pagesProofreadAll: 'Pages proofread', wikisourcesWord: 'Wikisources',
     ofPages: 'of {n} pages proofread', remaining: 'Remaining',
+    pv_title: 'Review before saving', pv_link: 'Link', pv_random: 'random', pv_period: 'Period (UTC)',
+    pv_pointsVal: 'Proofread {p} · Validate {v} · Bonus up to {b}', pv_page: 'Contest page', pv_admins: 'Admins',
+    pv_excluded: 'Excluded', pv_inApp: 'Validate on Wikisource from the tool', pv_acceptOnly: 'Accept / reject in the tool only',
+    pv_juryPoints: 'reviewers earn validation points', pv_rejected: 'Rejected pages', pv_instant: 'Revert on Wikisource at once',
+    pv_hold: 'Revert in one batch after the contest', pv_bulk: 'Bulk review', pv_notice: 'Announcement', pv_newBooks: 'New index pages',
+    pv_back: 'Back to editing', pv_confirm: 'Confirm & save',
     footerLinks: 'About this tool', sourceCode: 'Source code', reportIssue: 'Report an issue',
     hostedOnToolforge: 'Hosted on Wikimedia Toolforge', termsOfUse: 'Terms of use',
     createdByPrefix: 'Created by',
@@ -1906,7 +1967,7 @@ const I18N = {
     centralFormHint: 'এখানে সব প্রকল্পের জন্য সাধারণ নিয়ম ঠিক করুন। এরপর প্রতিটি প্রকল্পের অ্যাডমিন নিজের পাতায় গিয়ে বই যোগসহ বাকি সব কনফিগার করবেন।',
     centralPendingTitle: 'এই কেন্দ্রীয় প্রতিযোগিতাটি অনুমোদনের অপেক্ষায়', centralPendingDesc: 'টুল অ্যাডমিন অথবা অন্তর্ভুক্ত যেকোনো উইকিসংকলনের প্রশাসক অনুমোদন দিলে চালু হবে।',
     centralAdmins: 'কেন্দ্রীয় প্রতিযোগিতার অ্যাডমিন (কমা দিয়ে)', centralRules: 'সব প্রকল্পের নিয়ম', eventPage: 'ইভেন্ট পাতা', eventPageLink: 'ইভেন্ট পাতার লিংক (ঐচ্ছিক)', contestPageLink: 'প্রতিযোগিতার পাতার লিংক (ঐচ্ছিক)', contestPageLinkHelp: 'দিলে প্রতিযোগিতার নামটি এই পাতার লিংক হবে।',
-    policyCustomPoints: 'বইভিত্তিক কাস্টম পয়েন্ট', policyBonus: 'বোনাস পয়েন্ট', policyReview: 'জুরি পর্যালোচনা',
+    policyCustomPoints: 'বইভিত্তিক কাস্টম পয়েন্ট', policyBonus: 'বোনাস পয়েন্ট', policyReview: 'পর্যালোচনা',
     pol_yes: 'অনুমোদিত', pol_no: 'অনুমোদিত নয়', pol_project: 'প্রকল্প ঠিক করবে',
     includedProjects: 'অন্তর্ভুক্ত প্রকল্প', addProject: 'প্রকল্প যোগ করুন', selectProject: '— প্রকল্প নির্বাচন করুন —', projectAdminsPh: 'প্রকল্পের অ্যাডমিন (কমা দিয়ে)',
     projectsWord: 'টি প্রকল্প', projectsWordCap: 'প্রকল্প', noProjectsYet: 'এখনো কোনো প্রকল্প নেই।', youAreAdmin: 'আপনি অ্যাডমিন',
@@ -1933,7 +1994,7 @@ const I18N = {
     customSlugPlaceholder: 'যেমন: wcnov26 (খালি রাখলে র‍্যান্ডম)', startTime: 'শুরুর সময়', endTime: 'শেষের সময়',
     proofreadPoints: 'ডিফল্ট মুদ্রণ সংশোধন পয়েন্ট', validatePoints: 'বৈধকরণ পয়েন্ট (০ অনুমোদিত)',
     maxBonusPoints: 'সর্বোচ্চ বোনাস পয়েন্ট (ডিফল্ট ০)', admins: 'প্রতিযোগিতার অ্যাডমিন (কমা দিয়ে)',
-    juries: 'পর্যালোচক / জুরি তালিকা (কমা দিয়ে)', juryLabel: 'জুরি বৃন্দ', openTalkPage: 'উইকিসংকলন আলাপ পাতায় যান',
+    juries: 'পর্যালোচক তালিকা (কমা দিয়ে)', juryLabel: 'পর্যালোচক', openTalkPage: 'উইকিসংকলন আলাপ পাতায় যান',
     excludedUsersLabel: 'তালিকা বহির্ভূত ব্যবহারকারী (বট অ্যাকাউন্ট স্বয়ংক্রিয়ভাবে বাদ থাকবে)', excludedUsersPlaceholder: 'UserA, UserB',
     juryReviewMode: 'পর্যালোচনা মোড', modeAcceptOnly: 'শুধু টুলে গ্রহণ/বাতিল হবে (উইকিসংকলনে স্ট্যাটাস বদলাবে না)',
     modeInAppValidate: 'টুল থেকেই সরাসরি উইকিসংকলনে বৈধকরণ হবে', juryGetsPoints: 'পর্যালোচক বৈধকরণ করলে তার জন্য পয়েন্ট পাবেন',
@@ -2039,6 +2100,12 @@ const I18N = {
     loginToTakePart: 'উইকিমিডিয়া অ্যাকাউন্টে লগইন করুন', howItWorks: 'কীভাবে কাজ করে',
     activeContests: 'চলমান প্রতিযোগিতা', pagesProofreadAll: 'সংশোধিত পাতা', wikisourcesWord: 'উইকিসংকলন',
     ofPages: '/ {n} পাতা সংশোধিত', remaining: 'বাকি',
+    pv_title: 'সংরক্ষণের আগে দেখে নিন', pv_link: 'লিংক', pv_random: 'র‍্যান্ডম', pv_period: 'সময়কাল (UTC)',
+    pv_pointsVal: 'মুদ্রণ সংশোধন {p} · বৈধকরণ {v} · বোনাস সর্বোচ্চ {b}', pv_page: 'প্রতিযোগিতার পাতা', pv_admins: 'প্রশাসক',
+    pv_excluded: 'তালিকা বহির্ভূত', pv_inApp: 'টুল থেকে উইকিসংকলনে বৈধকরণ', pv_acceptOnly: 'শুধু টুলে গ্রহণ / বাতিল',
+    pv_juryPoints: 'পর্যালোচক বৈধকরণ পয়েন্ট পাবেন', pv_rejected: 'বাতিল পাতা', pv_instant: 'সঙ্গে সঙ্গে উইকিতে ফেরানো হবে',
+    pv_hold: 'প্রতিযোগিতা শেষে একসাথে ফেরানো হবে', pv_bulk: 'বাল্ক পর্যালোচনা', pv_notice: 'নোটিশ', pv_newBooks: 'নতুন নির্ঘণ্ট পাতা',
+    pv_back: 'সম্পাদনায় ফিরুন', pv_confirm: 'নিশ্চিত করে সংরক্ষণ',
     footerLinks: 'এই টুল সম্পর্কে', sourceCode: 'সোর্স কোড', reportIssue: 'সমস্যা জানান',
     hostedOnToolforge: 'উইকিমিডিয়া টুলফোর্জে চালিত', termsOfUse: 'ব্যবহারের শর্তাবলি',
     createdByPrefix: 'তৈরি করেছেন',
@@ -2108,7 +2175,7 @@ createApp({
       view: 'home', homeFilter: 'running', busy: false, syncing: false,
       notice: '', noticeType: 'info', noticeTimer: null,
       loggedIn: false, currentUser: null, wikiProjects: WIKI_PROJECTS, userMenuCompact: false, userMenuOpen: false,
-      contests: [], centrals: [], deleteRequests: [], showAllJuries: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
+      contests: [], centrals: [], deleteRequests: [], showAllJuries: false, cfgPreview: { open: false }, juryFit: 99, juryMeasuring: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
       expanded: {}, central: null, centralTab: 'leaderboard', cform: {}, upages: null, loadingBar: 0,
       juryStats: null, juryScope: null, selectMode: false, selectedIds: [], lastSelIdx: null, prefetchedAt: {},
       active: null, nowTick: Date.now(),
@@ -2200,13 +2267,15 @@ createApp({
     }
   },
   watch: {
-    view() { window.scrollTo(0, 0); this.selectMode = false; this.selectedIds = []; },
+    view(v) { window.scrollTo(0, 0); this.selectMode = false; this.selectedIds = []; if (v === 'contest') this.fitJuries(); },
     homeProject(v) {
       if (!v) { this.homeProjectPinned = false; safeDrop('ps_home_project'); }
       else if (this.homeProjectPinned) safeStore('ps_home_project', v);
     },
     currentUser() { this.fitUserMenu(); },
-    lang() { this.fitUserMenu(); }
+    lang() { this.fitUserMenu(); this.fitJuries(); },
+    'active.contest.juries_list'() { this.fitJuries(); },
+    countdownText() { this.fitJuries(); }
   },
   mounted() {
     const boot = document.getElementById('ps-boot');
@@ -2221,9 +2290,9 @@ createApp({
     window.addEventListener('keydown', this.handleKeyShortcuts);
     window.addEventListener('popstate', this.handleRoutePop);
     let fitTimer = null;
-    window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(this.fitUserMenu, 120); });
+    window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { this.fitUserMenu(); this.fitJuries(); }, 120); });
     document.addEventListener('click', () => { this.userMenuOpen = false; });
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(this.fitUserMenu);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.fitUserMenu(); this.fitJuries(); });
   },
   methods: {
     /* The name and Logout sit side by side while they fit; when a long name would crowd the
@@ -2238,6 +2307,32 @@ createApp({
       let crowded = row.scrollWidth > row.clientWidth + 1 || box.scrollWidth > box.clientWidth + 1;
       if (!crowded && mark && mark.offsetParent) crowded = mark.getBoundingClientRect().right + 8 > box.getBoundingClientRect().left;
       this.userMenuCompact = crowded;
+    },
+    // How many reviewer chips fit: one line beside the dates on wide screens, two lines on phones.
+    // Everything is rendered once (with the "+N" chip at its widest) and measured, then the line
+    // packing is simulated so the visible chips plus "+N" never need an extra line.
+    async fitJuries() {
+      if (this.juryMeasuring) return;
+      this.juryMeasuring = true;
+      await this.$nextTick();
+      const box = this.$refs.juryBox;
+      if (!box || !box.offsetParent) { this.juryMeasuring = false; return; }
+      const W = box.clientWidth, cs = getComputedStyle(box);
+      const gap = parseFloat(cs.columnGap) || 0;
+      const label = box.firstElementChild, more = this.$refs.juryMore;
+      const outer = (el) => { const m = getComputedStyle(el); return el.getBoundingClientRect().width + (parseFloat(m.marginLeft) || 0) + (parseFloat(m.marginRight) || 0); };
+      const chips = [...box.querySelectorAll('[data-jury-chip]')].map(outer);
+      const lw = label ? outer(label) : 0, mw = more ? outer(more) : 0;
+      const maxLines = window.innerWidth >= 1024 ? 1 : 2;
+      const lines = (ws) => { let n = 1, x = 0; for (const w of ws) { if (x === 0) x = w; else if (x + gap + w <= W + 0.5) x += gap + w; else { n++; x = w; } } return n; };
+      let fit = chips.length;
+      if (lines([lw, ...chips]) > maxLines) {
+        fit = 0;
+        for (let k = chips.length - 1; k >= 1; k--) if (lines([lw, ...chips.slice(0, k), mw]) <= maxLines) { fit = k; break; }
+        fit = Math.max(1, fit);
+      }
+      this.juryFit = fit;
+      this.juryMeasuring = false;
     },
     t(key) { return (I18N[this.lang] && I18N[this.lang][key]) || I18N.en[key] || key; },
     fmtNum(n) {
@@ -2419,7 +2514,10 @@ createApp({
     },
     toggleLang() { this.lang = this.lang === 'en' ? 'bn' : 'en'; safeStore('ws_lang', this.lang); document.documentElement.lang = this.lang; },
     toggleTheme() { this.darkMode = !this.darkMode; safeStore('ws_theme', this.darkMode ? 'dark' : 'light'); this.applyTheme(); },
-    applyTheme() { document.documentElement.classList.toggle('dark', this.darkMode); },
+    applyTheme() {
+      document.documentElement.classList.toggle('dark', this.darkMode);
+      const m = document.getElementById('ps-theme-color'); if (m) m.setAttribute('content', this.darkMode ? '#111b2e' : '#ffffff');
+    },
     countByStatus(st, project) {
       return this.contests.filter(c => (st === 'all' || c.status === st) && (!project || c.wiki_domain === project)).length;
     },
@@ -2582,6 +2680,17 @@ createApp({
       this.form = this.blankForm(); this.view = 'create';
     },
     formPayload() { return Object.assign({}, this.form); },
+    pvList(v) { return String(v || '').split(',').map(x => x.trim()).filter(Boolean); },
+    pvLines(v) { return String(v || '').split('\n').map(x => x.trim()).filter(Boolean); },
+    pvDate(v) { return v ? this.digits(String(v).replace('T', ' ')) : '—'; },
+    openConfigPreview() {
+      if (!this.form.title) { this.notify(this.t('err_title_required'), 'error'); return; }
+      this.cfgPreview.open = true;
+    },
+    confirmConfigSave() {
+      this.cfgPreview.open = false;
+      if (this.view === 'create') this.submitNewContest(); else this.submitUpdateConfig();
+    },
     async submitNewContest() {
       if (!this.form.title) { this.notify(this.t('err_title_required'), 'error'); return; }
       this.busy = true;
