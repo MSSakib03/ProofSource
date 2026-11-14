@@ -10,7 +10,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-236798)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-006699)
 ![Vue](https://img.shields.io/badge/Vue-3-4D8AC0)
-![Tests](https://img.shields.io/badge/tests-81%20passing-2e7d32)
+![Tests](https://img.shields.io/badge/tests-89%20passing-2e7d32)
 
 </div>
 
@@ -128,7 +128,7 @@ Set with `toolforge envvars create NAME VALUE`. Secrets are never stored in code
 4. Tokens are stored **server-side** in `oauth_logins` (they are too long for a cookie), **encrypted** (Fernet, key derived from `SECRET_KEY`); the cookie only holds a random `login_id`. Login records expire server-side after 30 days and are never copied into snapshots.
 5. Access tokens are refreshed automatically with the refresh token when expired.
 6. The authorization request uses **PKCE** (S256) in addition to the `state` check.
-6. Wiki edits use `Authorization: Bearer <token>` against each wiki's `api.php`.
+7. Wiki edits use `Authorization: Bearer <token>` against each wiki's `api.php`.
 
 Toolforge requirement: `~/www/python/uwsgi.ini` with `buffer-size = 65535`; otherwise uWSGI drops the long callback request ("upstream connect error … connection termination").
 
@@ -227,7 +227,7 @@ Every permission is checked in the backend; the UI only hides buttons. Tool admi
 - **Wiki allowlist:** a contest's wiki must match `^([a-z0-9-]+\.)?wikisource\.org$`, checked on create, on config change and again in `wiki_engine.get_api_url()` before any request. No request (and no OAuth token) ever goes anywhere else. Moving a contest to another wiki sends it back to *pending approval* unless the user is an admin there.
 - **CSRF:** every non-GET request needs the session's token in `X-CSRF-Token` (the page gets it in `window.PS_INITIAL`, refreshed by `/api/session` and `/logout`); cross-site requests (`Sec-Fetch-Site`/`Origin`) are refused.
 - **Headers:** CSP with a per-request nonce (`script-src 'self' 'nonce-…' 'unsafe-eval'` — the eval is needed by Vue's in-browser template compiler), `frame-ancestors 'none'`, `X-Frame-Options`, `nosniff`, HSTS, `no-store` for the API.
-- **No third-party assets:** Vue and DOMPurify are served from `static/vendor`, the CSS is built locally, and fonts are the system fonts — no visitor data reaches a CDN.
+- **No third-party assets:** Vue and DOMPurify are served from `static/vendor`, the CSS is built locally, and fonts are the system fonts plus self-hosted Bangla fonts (`static/fonts/`) — no visitor data reaches a CDN.
 - **Output:** wiki-rendered HTML is sanitised again with DOMPurify; announcement markup is escaped before the few wiki-link conversions; links shown from user input must be `http(s)`.
 - **Backups:** signed with HMAC-SHA256 (server secret); only signed files of the same contest can be restored by contest admins (the tool admin may restore legacy/unsigned files). Approval, creator, wiki and slug are never taken from a backup.
 - **Abuse limits:** forced syncs, page reservations (login required), previews, restores, backups and contest creation are rate-limited per user; numeric/enum inputs are validated (400, never 500); text fields are length-capped.
@@ -271,6 +271,9 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 
 - Single Vue 3 app (no JavaScript build step; Vue and DOMPurify are vendored in `static/vendor`). Views: `home` (status tabs, search, language/project filter, central contests as a collapsible tree), `contest`, `edit_config` / `create`, `jury` (review panel), `userpages`, `central`, `central_form`.
 - **i18n**: the `I18N = { en: {...}, bn: {...} }` table. No hard-coded UI text; English is the fallback. To add a language, copy `en`.
+- Theme: **light by default**, whatever the browser or OS prefers; dark mode only when the visitor chooses it (`ws_theme` in localStorage, applied before first paint). Dark mode uses the same tokens as light mode (`static/src/app.css`), and the template's `dark:slate-*` utilities are mapped onto them.
+- Saving a contest configuration (create or edit) first opens a compact summary to confirm.
+- The reviewer chips on the contest page are measured (`fitJuries`): as many as fit on one line beside the dates on wide screens, two lines on phones, then "+N".
 - Dates are always UTC, with Bangla digits and month names in Bangla.
 - Keyboard shortcuts use `event.code` (Alt+A accept, Alt+F needs fix, Alt+R reject, Alt+N next), so they work with Bangla/Avro layouts and never fire inside text fields.
 - Cached contest/central data (localStorage) is shown instantly, then refreshed; links prefetch on hover; there is a top progress bar and fade transitions.
@@ -282,10 +285,10 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 
 ## 8. Testing
 
-- `python3 -m unittest discover -s tests` (67 tests, network fully mocked): OAuth flow, counting rules, sync safety, review rules, equal distribution, bulk review, central contests, my-pages visibility, backup/restore/tamper, audit append-only, migration of an old database, deletion workflow, and `tests/test_security.py` (CSRF, headers/CSP, wiki allowlist, XSS, signed backups, exact tool-admin match, login expiry, token encryption + PKCE, ReDoS, rate limits, review locks).
+- `python3 -m unittest discover -s tests` (89 tests, network fully mocked): OAuth flow, counting rules, sync safety, review rules, equal distribution, bulk review, central contests, my-pages visibility, backup/restore/tamper, audit append-only, migration of an old database, deletion workflow, and `tests/test_security.py` (CSRF, headers/CSP, wiki allowlist, XSS, signed backups, exact tool-admin match, login expiry, token encryption + PKCE, ReDoS, rate limits, review locks).
 - The same suite runs against MariaDB: `PROOFSOURCE_TEST_DATABASE_URL='mysql+pymysql://user:pw@localhost/db?charset=utf8mb4' python3 -m unittest discover -s tests`.
 - Load test (local, SQLite): 1k / 10k / 50k / 100k pages; 4 concurrent reviewers; restore of 50k pages ≈ 4 s.
-- Browser tests were run with Playwright + Chrome (CDN assets served locally): direct links, i18n, shortcuts, bulk selection, mobile (375 px) without horizontal overflow.
+- Browser tests were run with Playwright + Chromium: direct links, i18n, shortcuts, bulk selection, mobile (375 px) without horizontal overflow.
 
 ---
 

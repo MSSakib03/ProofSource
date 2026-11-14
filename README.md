@@ -60,7 +60,7 @@ ProofSource finds every page that is proofread on Wikisource during a contest, l
 | 📚 **Flexible books** | Per-book points, excluded pages (`1-5, 12`) and per-book time windows. |
 | 💾 **Backups** | Full JSON backup and restore, CSV exports, automatic snapshots and reminders. |
 | 📝 **Activity log** | Every admin action is recorded and cannot be edited. |
-| 🌙 **Comfortable UI** | ProofSource's Wikisource-blue theme with Wikimedia (Codex) style components, English and Bangla (Hind Siliguri / Tiro Bangla fonts), dark mode, mobile friendly, keyboard shortcuts. |
+| 🌙 **Comfortable UI** | ProofSource's Wikisource-blue theme with Wikimedia (Codex) style components, English and Bangla (Hind Siliguri / Tiro Bangla fonts), light theme with an optional dark mode, mobile friendly, keyboard shortcuts. |
 | 🔒 **Private & safe** | No third-party CDNs or trackers; OAuth tokens encrypted at rest; CSRF, CSP and signed backups. |
 
 ---
@@ -69,7 +69,7 @@ ProofSource finds every page that is proofread on Wikisource during a contest, l
 
 1. Open **https://proofsource.toolforge.org**.
 2. Click **MediaWiki Login** (top right) and press **Allow** on Meta-Wiki. The tool never sees your password.
-3. Use the **বাংলা / EN** button to switch the language (English is the default) and **Dark / Light** for the theme.
+3. Use the **বাংলা / EN** button to switch the language (English is the default) and **Dark / Light** for the theme. The tool always opens in the light theme until you choose dark; your choice is remembered.
 
 All dates and times are shown in **UTC**.
 
@@ -96,7 +96,7 @@ The organizers choose one of three submission modes; the contest page shows whic
 
 ### My Pages
 **My Pages** opens your own page (`…/me`) with:
-- your rank, proofread, accepted, pending, needs-fix counts and total points
+- your rank, proofread, accepted and pending counts and total points; *Needs fix* and *Rejected* appear when you have such pages
 - a breakdown by book
 - every page with its status and the reviewer's note
 
@@ -188,6 +188,8 @@ Click **Create Contest** on the home page and fill in:
 | Rejected pages | Revert in one batch after the contest, or immediately. |
 | Announcements | English and Bangla. |
 | Index pages | One per line, e.g. `Index:Book.djvu` or `নির্ঘণ্ট:বই.pdf`. |
+
+Press **Save Configuration**: a short summary of the settings appears. Check it and press **Confirm & save** (or go back to editing). The same summary appears when you save changes later.
 
 If you are an administrator of that Wikisource, the contest is active immediately. Otherwise it waits until a local administrator or the tool admin approves it.
 

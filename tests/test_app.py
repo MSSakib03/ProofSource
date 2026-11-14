@@ -39,7 +39,7 @@ wiki_engine.requests.post = _no_network
 
 import app as A  # noqa: E402
 import backup_engine  # noqa: E402
-from models import db, Contest, IndexBook, ContestPage, AuditLog, OAuthLogin, SlugAlias, Hub  # noqa: E402
+from models import db, Contest, IndexBook, ContestPage, AuditLog, OAuthLogin, Hub  # noqa: E402,F401 (Hub is re-exported to test_security)
 
 A.app.config["SESSION_COOKIE_SECURE"] = False
 A.app.config["FORCED_SYNC_MIN_SECONDS"] = 0   # tests sync back to back
