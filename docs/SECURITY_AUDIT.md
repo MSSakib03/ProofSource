@@ -24,7 +24,7 @@ logged-in user; **High** = stored XSS or privilege escalation by a contest admin
 | 9 | Medium | Tool-admin check was case-insensitive (`ms sakib`) | exact canonical-username match, configurable |
 | 10 | Medium | Anonymous users could force syncs and reserve pages without limit (DoS) | login required, per-user rate limits, minimum sync interval |
 | 11 | Medium | No security headers (clickjacking of the review panel, no CSP) | CSP with nonce, frame-ancestors, nosniff, HSTS, no-store |
-| 12 | Medium | Third-party CDNs (Tailwind, cdnjs, Google Fonts) leaked every visitor's IP | all assets self-hosted; system fonts |
+| 12 | Medium | Third-party CDNs (Tailwind, cdnjs, Google Fonts) leaked every visitor's IP | all assets self-hosted (system fonts for Latin text, self-hosted Bangla fonts) |
 | 13 | Low | Wiki-rendered HTML injected with `v-html` unsanitised | DOMPurify with a positioning-stripping hook |
 | 14 | Low | A reviewer could take over or decide a page locked by another reviewer | lock respected in `next-page` and `submit` (409) |
 | 15 | Low | Login records never expired server-side | 30-day server-side expiry + purge |

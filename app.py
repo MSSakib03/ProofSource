@@ -231,7 +231,7 @@ def err(code: str, status: int = 400, **extra):
 
 
 # Column limits (MariaDB rejects over-long values in strict mode; SQLite silently accepted them).
-LEN_TITLE, LEN_SLUG, LEN_USERS, LEN_TEXT, LEN_NOTE = 255, 100, 10000, 20000, 500
+LEN_TITLE, LEN_USERS, LEN_TEXT, LEN_NOTE = 255, 10000, 20000, 500
 JURY_MODES = ("accept_reject", "in_app_validate")
 REJECT_ACTIONS = ("hold_batch", "instant_revert")
 
