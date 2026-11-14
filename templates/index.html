@@ -208,7 +208,7 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 flex-wrap">
                     <span class="ps-chip !text-[10px] !font-bold uppercase tracking-wider !py-0 text-ws-cerulean dark:text-ws-nature">{{ t('centralShort') }}</span>
-                    <span :class="titleWeight(row.central.title)" class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.central.title }}</span>
+                    <span :class="titleWeight(row.central.title, true)" class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.central.title }}</span>
                   </div>
                   <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">{{ fmtNum(row.central.project_count) }} {{ t('projectsWord') }} · {{ formatDateShort(row.central.start_iso) }} – {{ formatDateShort(row.central.end_iso) }} (UTC)</div>
                 </div>
@@ -237,7 +237,7 @@
              class="ps-row ps-spine group no-underline pl-5 pr-4 py-3" :class="'is-' + row.contest.status">
             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5">
               <div class="min-w-0 flex-1">
-                <div :class="titleWeight(row.contest.title)" class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.contest.title }}</div>
+                <div :class="titleWeight(row.contest.title, true)" class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.contest.title }}</div>
                 <div class="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                   <span class="font-semibold text-ws-cerulean dark:text-ws-nature">{{ projectLabel(row.contest.wiki_domain) }}</span>
                   <span>{{ formatDateShort(row.contest.start_iso) }} – {{ formatDateShort(row.contest.end_iso) }} (UTC)</span>
@@ -2433,8 +2433,11 @@ createApp({
       this.notify(this.t(this.homeProjectPinned ? 'filterPinned' : 'filterUnpinned'), 'success');
     },
     /* Bangla serif has no bold cut: a thin stroke reads lighter than the browser's fake bold.
-     * Other scripts keep their real bold face. */
-    titleWeight(title) { return /[\u0980-\u09FF]/.test(title || '') ? 'ps-title-strong' : 'font-bold'; },
+     * Other scripts keep their real bold face. In the home list titles are bold on phones only. */
+    titleWeight(title, inList) {
+      const w = /[\u0980-\u09FF]/.test(title || '') ? 'ps-title-strong' : 'font-bold';
+      return inList ? w + ' ps-title-list md:font-normal' : w;   // home list: bold on phones only
+    },
     clearHomeFilters() { this.homeSearch = ''; this.homeProject = ''; },
 
     // ---------- session / lists ----------
