@@ -103,6 +103,12 @@
   /* Contest titles: the Bangla serif has no bold cut and the browser's synthetic bold is too heavy,
    * so thicken the regular weight a touch with a thin stroke instead (scales with the font size). */
   .ps-title-strong { font-weight: 400; font-synthesis: none; -webkit-text-stroke: .028em currentColor; }
+  /* Desktop screens (Windows especially) draw the stroke heavier: use a thinner one there,
+   * and none at all in the home list, where titles stay regular on wide screens. */
+  @media (min-width: 768px) {
+    .ps-title-strong { -webkit-text-stroke-width: .016em; }
+    .ps-title-strong.ps-title-list { -webkit-text-stroke-width: 0; }
+  }
   .ps-eyebrow { font-size: .6875rem; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--ps-text-subtle); }
 
   /* buttons — Codex Button: 32px min height, 2px radius, bold label */
