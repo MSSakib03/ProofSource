@@ -153,7 +153,7 @@
         <div class="ps-tabs" role="tablist">
           <button v-for="tab in ['running', 'upcoming', 'ended', 'pending_approval', 'all']" :key="tab" role="tab" :aria-selected="homeFilter === tab"
                   @click="homeFilter = tab" class="ps-tab" :class="homeFilter === tab ? 'is-active' : ''">
-            {{ t(tab) }}<span class="ps-count">{{ fmtNum(countByStatus(tab)) }}</span>
+            {{ t(tab) }}<span class="ps-count">{{ fmtNum(countByStatus(tab, homeProject)) }}</span>
           </button>
         </div>
 
@@ -162,10 +162,18 @@
             <svg class="w-4 h-4 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.6" y2="16.6"></line></svg>
             <input v-model.trim="homeSearch" type="search" :placeholder="t('searchContests')" :aria-label="t('searchContests')" class="ps-input !pl-8" />
           </div>
-          <select v-model="homeProject" class="ps-input sm:!w-64" :aria-label="t('allProjects')">
-            <option value="">{{ t('allProjects') }}</option>
-            <option v-for="d in homeProjectOptions" :key="d" :value="d">{{ projectLabel(d) }}</option>
-          </select>
+          <div class="flex gap-2 sm:w-auto min-w-0">
+            <select v-model="homeProject" class="ps-input flex-1 min-w-0 sm:!w-64" :aria-label="t('allProjects')">
+              <option value="">{{ t('allProjects') }}</option>
+              <option v-for="d in homeProjectOptions" :key="d" :value="d">{{ projectLabel(d) }}</option>
+              <option v-if="homeProject && !homeProjectOptions.includes(homeProject)" :value="homeProject">{{ projectLabel(homeProject) }}</option>
+            </select>
+            <button v-if="homeProject" type="button" @click="toggleProjectPin" class="ps-btn ps-btn-icon shrink-0"
+                    :class="homeProjectPinned ? '!bg-ws-cerulean !border-ws-cerulean !text-white' : ''"
+                    :aria-pressed="homeProjectPinned ? 'true' : 'false'" :title="homeProjectPinned ? t('unpinFilter') : t('pinFilter')" :aria-label="homeProjectPinned ? t('unpinFilter') : t('pinFilter')">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" :fill="homeProjectPinned ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M12 17v5"></path><path d="M9 3h6l-1 6 3 4H7l3-4z"></path></svg>
+            </button>
+          </div>
         </div>
       </div>
 
@@ -184,6 +192,7 @@
       <div v-else-if="homeRows.length === 0" class="ps-card p-10 sm:p-14 text-center space-y-2">
         <svg class="w-10 h-10 mx-auto text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M2 5.5Q7 4 11.5 6v13Q7 17 2 18.5z"/><path d="M22 5.5Q17 4 12.5 6v13q4.5-2 9.5-.5z"/></svg>
         <p class="text-sm text-slate-600 dark:text-slate-400">{{ t('noContests') }}</p>
+        <button v-if="homeProject || homeSearch" @click="clearHomeFilters" class="ps-btn ps-btn-quiet">{{ t('clearFilters') }}</button>
       </div>
 
       <div v-else class="space-y-2.5">
@@ -199,7 +208,7 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 flex-wrap">
                     <span class="ps-chip !text-[10px] !font-bold uppercase tracking-wider !py-0 text-ws-cerulean dark:text-ws-nature">{{ t('centralShort') }}</span>
-                    <span class="ps-serif font-bold text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.central.title }}</span>
+                    <span :class="titleWeight(row.central.title)" class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.central.title }}</span>
                   </div>
                   <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">{{ fmtNum(row.central.project_count) }} {{ t('projectsWord') }} · {{ formatDateShort(row.central.start_iso) }} – {{ formatDateShort(row.central.end_iso) }} (UTC)</div>
                 </div>
@@ -228,7 +237,7 @@
              class="ps-row ps-spine group no-underline pl-5 pr-4 py-3" :class="'is-' + row.contest.status">
             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5">
               <div class="min-w-0 flex-1">
-                <div class="ps-serif font-bold text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.contest.title }}</div>
+                <div :class="titleWeight(row.contest.title)" class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.contest.title }}</div>
                 <div class="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                   <span class="font-semibold text-ws-cerulean dark:text-ws-nature">{{ projectLabel(row.contest.wiki_domain) }}</span>
                   <span>{{ formatDateShort(row.contest.start_iso) }} – {{ formatDateShort(row.contest.end_iso) }} (UTC)</span>
@@ -561,7 +570,7 @@
                 <span class="ps-chip" :class="statusClass(active.contest.status)"><span class="ps-dot" :class="statusDot(active.contest.status)"></span>{{ t(active.contest.status) }}</span>
                 <span v-if="!active.contest.review_enabled" class="ps-chip">{{ t('withoutReview') }}</span>
               </div>
-              <h1 class="ps-serif font-bold text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
+              <h1 :class="titleWeight(active.contest.title)" class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
                 <a v-if="safeUrl(active.contest.link)" :href="safeUrl(active.contest.link)" target="_blank" rel="noopener" class="ps-title-link">{{ active.contest.title }}</a>
                 <template v-else>{{ active.contest.title }}</template>
               </h1>
@@ -1013,7 +1022,7 @@
           <div class="flex flex-col md:flex-row md:items-start justify-between gap-3">
             <div class="min-w-0 space-y-1.5">
               <div class="ps-eyebrow !text-ws-cerulean dark:!text-ws-nature">{{ t('centralContest') }}</div>
-              <h1 class="ps-serif font-bold text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
+              <h1 :class="titleWeight(central.central.title)" class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
                 <a v-if="safeUrl(central.central.link)" :href="safeUrl(central.central.link)" target="_blank" rel="noopener" class="ps-title-link">{{ central.central.title }}</a>
                 <template v-else>{{ central.central.title }}</template>
               </h1>
@@ -1723,7 +1732,7 @@ const I18N = {
     addBooksHint: 'No books yet — open this project to add Index pages.', shareOfTotal: 'Share', validatePointsShort: 'Validation pts',
     childRulesNotice: 'Dates, points and some rules are set by the central contest:', allowCustomBookPoints: 'Allow custom points per book in this project',
     customPointsOff: 'Custom points per book are not allowed in this contest',
-    searchContests: 'Search contests…', allProjects: 'All languages / projects', expand: 'Expand', collapse: 'Collapse',
+    searchContests: 'Search contests…', allProjects: 'All languages / projects', pinFilter: 'Remember this filter', unpinFilter: 'Stop remembering this filter', filterPinned: 'Filter remembered — it stays after a refresh', filterUnpinned: 'Filter will reset on refresh', clearFilters: 'Clear filters', expand: 'Expand', collapse: 'Collapse',
     reviewDistribution: 'Review distribution', distOpen: 'Open for all', distOpenDesc: 'any reviewer can review any page',
     distEqual: 'Equal share', distEqualDesc: 'pages are divided equally among reviewers, in book order',
     myReviewed: 'Reviewed by me', assignedRemaining: 'Assigned to me (remaining)', equalModeBadge: 'Showing pages assigned to you',
@@ -1911,7 +1920,7 @@ const I18N = {
     addBooksHint: 'এখনো কোনো বই নেই — প্রকল্পটি খুলে নির্ঘণ্ট পাতা যোগ করুন।', shareOfTotal: 'অংশ', validatePointsShort: 'বৈধকরণ পয়েন্ট',
     childRulesNotice: 'তারিখ, পয়েন্ট ও কিছু নিয়ম কেন্দ্রীয় প্রতিযোগিতা থেকে নির্ধারিত:', allowCustomBookPoints: 'এই প্রকল্পে বইভিত্তিক কাস্টম পয়েন্ট চালু রাখুন',
     customPointsOff: 'এই প্রতিযোগিতায় বইভিত্তিক কাস্টম পয়েন্ট অনুমোদিত নয়',
-    searchContests: 'প্রতিযোগিতা খুঁজুন…', allProjects: 'সব ভাষা / প্রকল্প', expand: 'খুলুন', collapse: 'বন্ধ করুন',
+    searchContests: 'প্রতিযোগিতা খুঁজুন…', allProjects: 'সব ভাষা / প্রকল্প', pinFilter: 'এই ফিল্টার মনে রাখুন', unpinFilter: 'ফিল্টার আর মনে রাখবেন না', filterPinned: 'ফিল্টার মনে রাখা হলো — রিফ্রেশ করলেও থাকবে', filterUnpinned: 'রিফ্রেশ করলে ফিল্টার উঠে যাবে', clearFilters: 'ফিল্টার মুছুন', expand: 'খুলুন', collapse: 'বন্ধ করুন',
     reviewDistribution: 'পর্যালোচনা বণ্টন', distOpen: 'সবার জন্য উন্মুক্ত', distOpenDesc: 'যেকোনো পর্যালোচক যেকোনো পাতা পর্যালোচনা করতে পারবেন',
     distEqual: 'সমান ভাগ', distEqualDesc: 'পাতাগুলো বইয়ের ক্রম অনুযায়ী পর্যালোচকদের মধ্যে সমানভাবে ভাগ হবে',
     myReviewed: 'আমার পর্যালোচিত', assignedRemaining: 'আমাকে দেওয়া (বাকি)', equalModeBadge: 'আপনাকে বরাদ্দ পাতাগুলো দেখানো হচ্ছে',
@@ -2083,6 +2092,7 @@ const AUDIT_ACTIONS = ['contest_create', 'contest_approval', 'config_change', 'c
   'batch_revert', 'backup_export', 'backup_restore'];
 
 function safeStore(key, val) { try { localStorage.setItem(key, val); } catch (e) { /* storage may be unavailable */ } }
+function safeDrop(key) { try { localStorage.removeItem(key); } catch (e) { /* ignore */ } }
 function safeLoad(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
 if (window.DOMPurify) {
   // Inline styles carry Wikisource formatting (centring, sizes…) and stay; positioning is dropped so
@@ -2110,7 +2120,7 @@ createApp({
       view: 'home', homeFilter: 'running', busy: false, syncing: false,
       notice: '', noticeType: 'info', noticeTimer: null,
       loggedIn: false, currentUser: null, wikiProjects: WIKI_PROJECTS, userMenuCompact: false, userMenuOpen: false,
-      contests: [], centrals: [], deleteRequests: [], showAllJuries: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '',
+      contests: [], centrals: [], deleteRequests: [], showAllJuries: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
       expanded: {}, central: null, centralTab: 'leaderboard', cform: {}, upages: null, loadingBar: 0,
       juryStats: null, juryScope: null, selectMode: false, selectedIds: [], lastSelIdx: null, prefetchedAt: {},
       active: null, nowTick: Date.now(),
@@ -2203,7 +2213,10 @@ createApp({
   },
   watch: {
     view() { window.scrollTo(0, 0); this.selectMode = false; this.selectedIds = []; },
-    homeProject(v) { safeStore('ps_home_project', v); },
+    homeProject(v) {
+      if (!v) { this.homeProjectPinned = false; safeDrop('ps_home_project'); }
+      else if (this.homeProjectPinned) safeStore('ps_home_project', v);
+    },
     currentUser() { this.fitUserMenu(); },
     lang() { this.fitUserMenu(); }
   },
@@ -2419,7 +2432,20 @@ createApp({
     toggleLang() { this.lang = this.lang === 'en' ? 'bn' : 'en'; safeStore('ws_lang', this.lang); document.documentElement.lang = this.lang; },
     toggleTheme() { this.darkMode = !this.darkMode; safeStore('ws_theme', this.darkMode ? 'dark' : 'light'); this.applyTheme(); },
     applyTheme() { document.documentElement.classList.toggle('dark', this.darkMode); },
-    countByStatus(st) { return st === 'all' ? this.contests.length : this.contests.filter(c => c.status === st).length; },
+    countByStatus(st, project) {
+      return this.contests.filter(c => (st === 'all' || c.status === st) && (!project || c.wiki_domain === project)).length;
+    },
+    /* The project filter lasts for this visit only, unless pinned: a pinned filter is remembered. */
+    toggleProjectPin() {
+      this.homeProjectPinned = !this.homeProjectPinned;
+      if (this.homeProjectPinned) safeStore('ps_home_project', this.homeProject);
+      else safeDrop('ps_home_project');
+      this.notify(this.t(this.homeProjectPinned ? 'filterPinned' : 'filterUnpinned'), 'success');
+    },
+    /* Bangla serif has no bold cut: a thin stroke reads lighter than the browser's fake bold.
+     * Other scripts keep their real bold face. */
+    titleWeight(title) { return /[\u0980-\u09FF]/.test(title || '') ? 'ps-title-strong' : 'font-bold'; },
+    clearHomeFilters() { this.homeSearch = ''; this.homeProject = ''; },
 
     // ---------- session / lists ----------
     async loadSession() {
