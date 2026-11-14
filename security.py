@@ -40,11 +40,6 @@ def csrf_token() -> str:
     return tok
 
 
-def rotate_csrf_token() -> str:
-    session.pop(CSRF_SESSION_KEY, None)
-    return csrf_token()
-
-
 def csrf_failure_reason(allowed_hosts=()):
     """Returns None when the request is allowed, else a short reason code.
     `allowed_hosts`: extra public host names (e.g. from OAUTH2_REDIRECT_URI) in case a proxy
@@ -164,11 +159,6 @@ def decrypt_secret(value, secret_key: str):
         return f.decrypt(value[len(_ENC_PREFIX):].encode("ascii")).decode("utf-8")
     except (InvalidToken, ValueError):
         return None
-
-
-def sign(data: str, secret_key: str) -> str:
-    return hmac.new(("proofsource-backup:" + secret_key).encode("utf-8"), data.encode("utf-8"),
-                    hashlib.sha256).hexdigest()
 
 
 # ---------------------------------------------------------------- rate limiting
