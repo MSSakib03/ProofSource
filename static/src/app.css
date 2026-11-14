@@ -125,14 +125,15 @@
   .ps-btn:focus-visible { outline: none; border-color: var(--ps-progressive); box-shadow: inset 0 0 0 1px var(--ps-progressive); }
   .ps-btn:disabled { opacity: .5; cursor: not-allowed; }
   .ps-btn-icon { padding: .3rem .45rem; min-width: 32px; }
-  /* Secondary buttons (sync, configuration, My Pages…): a light tint of the progressive blue
-   * instead of grey, so they read as part of the same family as the dark-blue primary button. */
+  /* Secondary buttons (sync, configuration, My Pages…): Codex "normal progressive" style — a pale
+   * blue fill, a clear blue outline and blue text — instead of grey, so they belong with the
+   * dark-blue primary button. */
   .ps-btn:not(.ps-btn-primary):not(.ps-btn-danger):not(.ps-btn-success):not(.ps-btn-quiet):not(.ps-btn-quiet-danger) {
-    background: rgba(35, 103, 152, .07); border-color: rgba(35, 103, 152, .28); color: #1f4f7a; }
+    background: #eaf2fa; border-color: #4d8ac0; color: #1f5f8f; }
   .ps-btn:not(.ps-btn-primary):not(.ps-btn-danger):not(.ps-btn-success):not(.ps-btn-quiet):not(.ps-btn-quiet-danger):hover:not(:disabled) {
-    background: rgba(35, 103, 152, .13); border-color: rgba(35, 103, 152, .45); color: #294584; }
+    background: #dbe9f6; border-color: #236798; color: #294584; }
   .ps-btn:not(.ps-btn-primary):not(.ps-btn-danger):not(.ps-btn-success):not(.ps-btn-quiet):not(.ps-btn-quiet-danger):active:not(:disabled) {
-    background: rgba(35, 103, 152, .2); }
+    background: #cadff1; }
   .dark .ps-btn:not(.ps-btn-primary):not(.ps-btn-danger):not(.ps-btn-success):not(.ps-btn-quiet):not(.ps-btn-quiet-danger) {
     background: rgba(111, 163, 216, .15); border-color: rgba(111, 163, 216, .4); color: #b4d1ee; }
   .dark .ps-btn:not(.ps-btn-primary):not(.ps-btn-danger):not(.ps-btn-success):not(.ps-btn-quiet):not(.ps-btn-quiet-danger):hover:not(:disabled) {
@@ -224,7 +225,7 @@
 
   /* header & footer */
   .ps-wordmark { font-family: theme('fontFamily.serif'); font-size: 1.35rem; line-height: 1; color: var(--ps-text); letter-spacing: -.01em; }
-  @media (max-width: 479px) { header .ps-wordmark { font-size: 1.05rem; } header .ps-logo { width: 28px; height: 20px; } }
+  @media (max-width: 479px) { header .ps-wordmark { font-size: 1.05rem; } }
   .ps-title-link { color: inherit; text-decoration: none; }
   .ps-title-link:hover { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .15em; }
   .ps-nav-link { position: relative; padding: 1.05rem .15rem; font-size: .875rem; font-weight: 600; color: rgba(255, 255, 255, .8); }
@@ -240,6 +241,10 @@
                    background-image: repeating-linear-gradient(180deg, transparent 0 27px, var(--ps-border-muted) 27px 28px);
                    -webkit-mask-image: linear-gradient(90deg, transparent 35%, #000 100%); mask-image: linear-gradient(90deg, transparent 35%, #000 100%); }
   .ps-hero-margin { position: absolute; top: 0; bottom: 0; left: 1.1rem; width: 1px; background: #4d8ac0; opacity: .5; pointer-events: none; }
+  /* home page totals (desktop only): Codex icon beside a slightly larger label and number */
+  .ps-hero-stat-l { display: flex; align-items: center; gap: .55rem; font-size: .875rem; }
+  .ps-hero-stat-icon { width: 20px; height: 20px; flex-shrink: 0; color: var(--ps-progressive); }
+  .ps-hero-stat-v { font-size: 2.05rem; }
 
   /* list rows */
   .ps-row { display: block; background: var(--ps-surface); border: 1px solid var(--ps-border-muted); border-radius: 4px; box-shadow: var(--ps-shadow);
@@ -272,12 +277,11 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .ps-logo { width: 34px; height: 24px; }
-  /* header logo: the book mark sits on a soft rounded tile so it stands apart from the blue bar */
+  /* header logo: a thin rounded outline (no fill) around the book mark sets it apart from the blue bar */
   .ps-logo-tile { display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 34px; border-radius: 8px;
-                  background: rgba(255, 255, 255, .13); border: 1px solid rgba(255, 255, 255, .24);
-                  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .12), 0 1px 2px rgba(0, 0, 0, .12); --ps-logo-ring: #4d6a9e; }
+                  background: transparent; border: 1px solid rgba(255, 255, 255, .38); }
   .ps-logo-tile .ps-logo { width: 28px; height: 20px; }
-  .dark .ps-logo-tile { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .14); --ps-logo-ring: #26344a; }
+  .dark .ps-logo-tile { border-color: rgba(255, 255, 255, .2); }
   @media (max-width: 479px) { header .ps-logo-tile { width: 32px; height: 29px; border-radius: 7px; } header .ps-logo-tile .ps-logo { width: 24px; height: 17px; } }
   .ps-progress { position: fixed; top: 0; left: 0; height: 3px; z-index: 70;
                  background: linear-gradient(90deg, #236798, #4d8ac0, #006699);
