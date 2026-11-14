@@ -35,6 +35,7 @@
     <div class="max-w-7xl mx-auto px-3 sm:px-6 h-[46px] sm:h-[48px] flex items-center justify-between gap-2" ref="headerRow">
       <div class="flex items-center gap-4 sm:gap-7 self-stretch" :class="userMenuCompact ? 'shrink-0' : 'min-w-0'">
         <a href="/" @click.prevent="goHome" class="flex items-center gap-2.5 shrink-0 no-underline !text-white" aria-label="ProofSource">
+          <span class="ps-logo-tile shrink-0" aria-hidden="true">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="4 12 58 40" class="ps-logo shrink-0" aria-hidden="true">
   <defs>
     <linearGradient id="psl" x1="0" x2="1"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#dce8f4"/></linearGradient>
@@ -52,7 +53,7 @@
   </g>
   <circle cx="51" cy="44.5" r="8.6" fill="#4D8AC0" style="stroke:var(--ps-logo-ring,#2f4f8c)" stroke-width="3.2"/>
   <path d="M47.2 44.7l2.8 2.8 5.1-5.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
-</svg>
+</svg></span>
           <span ref="wordmark" class="ps-wordmark !text-white leading-none whitespace-nowrap max-[380px]:hidden">ProofSource</span>
         </a>
         <nav class="hidden md:flex items-stretch gap-5 self-stretch" :aria-label="t('contests')">
@@ -596,8 +597,10 @@
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
                 <span>{{ t('myPages') }} <span class="font-normal tabular-nums">({{ fmtNum(active.contest.my_pages_count) }})</span></span>
               </button>
-              <button @click="syncContestNow" :disabled="busy || syncing" class="ps-btn ps-btn-icon" :class="loggedIn ? '' : 'max-md:order-first'" :title="(busy || syncing) ? t('syncing') : t('syncWithWiki')" :aria-label="t('syncWithWiki')">
+              <button @click="syncContestNow" :disabled="busy || syncing" class="ps-btn ps-btn-icon min-[380px]:!px-2.5" :class="loggedIn ? '' : 'max-md:order-first'" :title="(busy || syncing) ? t('syncing') : t('syncWithWiki')" :aria-label="t('syncWithWiki')">
                 <svg class="w-4 h-4" :class="{'animate-spin': busy || syncing}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path></svg>
+                <!-- label hidden on the narrowest phones, where the row has no room for it -->
+                <span class="max-[379px]:hidden" aria-hidden="true">{{ t('syncShort') }}</span>
               </button>
               <button v-if="active.contest.is_admin" @click="openEditConfig" class="ps-btn ps-btn-icon" :title="t('configure')" :aria-label="t('configure')">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -1818,7 +1821,7 @@ const I18N = {
     saveConfiguration: 'Save Configuration', saving: 'Saving...', cancel: 'Cancel', confirm: 'Confirm',
     pendingApprovalBannerTitle: 'This contest is awaiting administrator approval',
     pendingApprovalBannerDesc: 'Tool Admin (MS Sakib) or a local Wikisource Administrator must approve this contest to activate it.',
-    approveContest: 'Approve & Activate', myPages: 'My Pages', syncWithWiki: 'Sync Now', syncing: 'Syncing...',
+    approveContest: 'Approve & Activate', myPages: 'My Pages', syncWithWiki: 'Sync Now', syncShort: 'Sync', syncing: 'Syncing...',
     lastSynced: 'Last synced', configure: 'Configuration', juryPanel: 'Review',
     totalBookPages: 'Eligible Pages', proofreadListed: 'Proofread / Validated', accepted: 'Accepted', reviewed: 'Reviewed',
     pendingReview: 'Pending Review', pending: 'Pending', needsFix: 'Needs Fix', myNeedsFixTitle: 'Pages Requiring Your Revision',
@@ -2006,7 +2009,7 @@ const I18N = {
     saveConfiguration: 'কনফিগারেশন সংরক্ষণ করুন', saving: 'সংরক্ষিত হচ্ছে...', cancel: 'বাতিল', confirm: 'নিশ্চিত করুন',
     pendingApprovalBannerTitle: 'এই প্রতিযোগিতাটি অনুমোদনের অপেক্ষায় রয়েছে',
     pendingApprovalBannerDesc: 'টুল অ্যাডমিন (MS Sakib) অথবা সংশ্লিষ্ট উইকিসংকলনের প্রশাসক অনুমোদন করলেই প্রতিযোগিতাটি চালু হবে।',
-    approveContest: 'অনুমোদন ও চালু করুন', myPages: 'আমার পাতাসমূহ', syncWithWiki: 'উইকি সিঙ্ক করুন', syncing: 'সিঙ্ক হচ্ছে...',
+    approveContest: 'অনুমোদন ও চালু করুন', myPages: 'আমার পাতাসমূহ', syncWithWiki: 'উইকি সিঙ্ক করুন', syncShort: 'সিঙ্ক', syncing: 'সিঙ্ক হচ্ছে...',
     lastSynced: 'সর্বশেষ সিঙ্ক', configure: 'কনফিগারেশন', juryPanel: 'পর্যালোচনা করুন',
     totalBookPages: 'বইয়ের মোট পাতা', proofreadListed: 'মুদ্রণ সংশোধিত ও বৈধকৃত', accepted: 'গৃহীত', reviewed: 'পর্যালোচিত',
     pendingReview: 'অপেক্ষমাণ', pending: 'অপেক্ষমাণ', needsFix: 'সংশোধন প্রয়োজন', myNeedsFixTitle: 'আপনার যে পাতাগুলোতে সংশোধন প্রয়োজন',
