@@ -6,6 +6,7 @@ import json
 import base64
 import hashlib
 import logging
+import bisect
 import random
 import secrets
 import time
@@ -1681,6 +1682,47 @@ def api_remove_contest_book(cid, bid):
     return jsonify({"success": True})
 
 
+# Pages handed out by "Proofread any page" keep at least this many pages away from anything
+# already submitted, proofread on the wiki, or reserved by someone else (when the book allows).
+PAGE_GAP_STEPS = (10, 8, 5, 3, 1)
+
+
+def _pick_spaced_page(book, wiki_domain, now, rng):
+    """A random unproofread page of `book`, as far from other people's work as the book allows."""
+    live_levels = fetch_all_existing_page_levels(wiki_domain, book.base_name)
+    excluded_set = parse_excluded_pages_spec(book.excluded_pages)
+    max_p = min(book.total_pages, 100000) if book.total_pages > 0 else 200
+
+    locked = (db.session.query(ContestPage.page_number, ContestPage.reserved_by_user)
+              .filter(ContestPage.book_id == book.id, ContestPage.user_lock_expires > now).all())
+    taken = {n for (n,) in db.session.query(ContestPage.page_number)
+             .filter(ContestPage.book_id == book.id, ContestPage.review_status != 'unproofread').all()}  # incl. eligible/reverted
+    taken |= {n for n, _ in locked}   # others' reservations, and your own earlier ones: each press gives a new page
+    taken |= {n for n, lvl in live_levels.items() if lvl >= 3}
+
+    available = [n for n in range(1, max_p + 1)
+                 if live_levels.get(n, 1) < 3 and n not in excluded_set and n not in taken]
+    if not available:
+        return None
+    if not taken:
+        return rng.choice(available)
+    marks = sorted(taken)
+
+    def distance(n):
+        i = bisect.bisect_left(marks, n)
+        d = marks[i] - n if i < len(marks) else max_p
+        if i:
+            d = min(d, n - marks[i - 1])
+        return d
+
+    dist = {n: distance(n) for n in available}
+    for gap in PAGE_GAP_STEPS:
+        pool = [n for n in available if dist[n] > gap]
+        if pool:
+            return rng.choice(pool)
+    return rng.choice(available)
+
+
 @app.route("/api/contests/<int:cid>/reserve-page", methods=["POST"])
 def api_reserve_contest_page(cid):
     c = Contest.query.get_or_404(cid)
@@ -1701,32 +1743,20 @@ def api_reserve_contest_page(cid):
     if not active_books:
         return err("no_active_book", 404)
 
-    book = random.choice(active_books) if not book_id else active_books[0]
-    live_levels = fetch_all_existing_page_levels(c.wiki_domain, book.base_name)
+    # Any book: try the books in random order, so every press can land in a different one.
+    rng = random.SystemRandom()
+    order = active_books[:]
+    rng.shuffle(order)
     prefixes = get_namespace_prefixes(c.wiki_domain)
-    excluded_set = parse_excluded_pages_spec(book.excluded_pages)
     now = datetime.utcnow()
-    max_p = min(book.total_pages, 100000) if book.total_pages > 0 else 200
-
-    locked = (db.session.query(ContestPage.page_number, ContestPage.reserved_by_user)
-              .filter(ContestPage.book_id == book.id, ContestPage.user_lock_expires > now).all())
-    reserved_nums = {n for n, u in locked if u != current_user}
-    submitted_nums = [n for (n,) in db.session.query(ContestPage.page_number)
-                      .filter(ContestPage.book_id == book.id, ContestPage.review_status != 'unproofread').all()]   # incl. eligible/reverted
-    submitted_nums += [n for n, _ in locked]
-
-    available_nums = [n for n in range(1, max_p + 1)
-                      if live_levels.get(n, 1) < 3 and n not in reserved_nums and n not in excluded_set]
-    if not available_nums:
-        return err("no_unproofread_pages", 404)
-
-    chosen_num = None
-    if submitted_nums:
-        spaced = [n for n in available_nums if n >= max(submitted_nums) + 11]
-        if spaced:
-            chosen_num = spaced[0]
+    book = chosen_num = None
+    for candidate in order[:4]:
+        chosen_num = _pick_spaced_page(candidate, c.wiki_domain, now, rng)
+        if chosen_num:
+            book = candidate
+            break
     if not chosen_num:
-        chosen_num = random.choice(available_nums)
+        return err("no_unproofread_pages", 404)
 
     page_title = f"{prefixes['page']}:{book.base_name}/{chosen_num}"
     p_rec = ContestPage.query.filter_by(book_id=book.id, page_number=chosen_num).first()

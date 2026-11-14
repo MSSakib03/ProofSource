@@ -242,5 +242,26 @@ class CentralPolicyTests(Base):
                          "invalid_value")
 
 
+class ProofreadAnyPageTests(Base):
+    def test_random_page_keeps_away_from_submitted_pages(self):
+        cid = self.make_contest(entries={50: ("Alice", 3, 1)})
+        self.c.post(f"/api/contests/{cid}/sync", json={"force": True})
+        orig = A.fetch_all_existing_page_levels
+        A.fetch_all_existing_page_levels = lambda d, b: {50: 3}
+        try:
+            got = set()
+            for _ in range(12):
+                r = self.c.post(f"/api/contests/{cid}/reserve-page", json={})
+                self.assertEqual(r.status_code, 200, r.json)
+                n = int(r.json["page_title"].rsplit("/", 1)[1])
+                if len(got) < 3:                  # room for wide gaps in a 100-page book
+                    self.assertTrue(all(abs(n - m) > 10 for m in got | {50}), (n, got))
+                self.assertNotIn(n, got)          # a fresh page on every press
+                got.add(n)
+        finally:
+            A.fetch_all_existing_page_levels = orig
+        self.assertGreater(len({n // 10 for n in got}), 1)   # spread out, not one fixed page
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -31,8 +31,8 @@
   <a href="#ps-main" class="sr-only focus:not-sr-only focus:absolute focus:z-[80] focus:top-2 focus:left-2 ps-btn ps-btn-primary">{{ t('skipToContent') }}</a>
 
   <header class="bg-gradient-to-r from-ws-dark via-ws-chambray to-ws-cerulean dark:from-slate-900 dark:via-slate-900 dark:to-slate-900 text-white border-b border-white/10 dark:border-slate-800 sticky top-0 z-30 shadow-sm">
-    <div class="max-w-7xl mx-auto px-3 sm:px-6 h-[50px] sm:h-[52px] flex items-center justify-between gap-2">
-      <div class="flex items-center gap-4 sm:gap-7 min-w-0 self-stretch">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 h-[46px] sm:h-[48px] flex items-center justify-between gap-2" ref="headerRow">
+      <div class="flex items-center gap-4 sm:gap-7 self-stretch" :class="userMenuCompact ? 'shrink-0' : 'min-w-0'">
         <a href="/" @click.prevent="goHome" class="flex items-center gap-2.5 shrink-0 no-underline !text-white" aria-label="ProofSource">
                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="4 12 58 40" class="ps-logo shrink-0" aria-hidden="true">
   <defs>
@@ -52,10 +52,7 @@
   <circle cx="51" cy="44.5" r="8.6" fill="#4D8AC0" style="stroke:var(--ps-logo-ring,#2f4f8c)" stroke-width="3.2"/>
   <path d="M47.2 44.7l2.8 2.8 5.1-5.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>
-          <span class="flex flex-col leading-none min-w-0 max-[380px]:hidden">
-            <span class="ps-wordmark !text-white">ProofSource</span>
-            <span class="hidden sm:block text-[10px] tracking-[.14em] uppercase text-white/70 mt-1">{{ t('tagline') }}</span>
-          </span>
+          <span ref="wordmark" class="ps-wordmark !text-white leading-none whitespace-nowrap max-[380px]:hidden">ProofSource</span>
         </a>
         <nav class="hidden md:flex items-stretch gap-5 self-stretch" :aria-label="t('contests')">
           <a href="/" @click.prevent="goHome" class="ps-nav-link flex items-center" :class="view === 'home' ? 'is-active' : ''">{{ t('contests') }}</a>
@@ -65,12 +62,12 @@
         </nav>
       </div>
 
-      <div class="flex items-center gap-1.5 sm:gap-2 shrink-0">
-        <button @click="toggleLang" class="ps-hbtn" :title="t('switchLanguage')">
+      <div class="flex items-center gap-1.5 sm:gap-2" :class="userMenuCompact ? 'min-w-0 justify-end' : 'shrink-0'">
+        <button @click="toggleLang" class="ps-hbtn shrink-0" :title="t('switchLanguage')">
           <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
           <span>{{ lang === 'en' ? 'বাংলা' : 'EN' }}</span>
         </button>
-        <button @click="toggleTheme" :title="darkMode ? t('light') : t('dark')" :aria-label="darkMode ? t('light') : t('dark')" class="ps-hbtn">
+        <button @click="toggleTheme" :title="darkMode ? t('light') : t('dark')" :aria-label="darkMode ? t('light') : t('dark')" class="ps-hbtn shrink-0">
           <svg v-if="darkMode" class="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
           <svg v-else class="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
           <span class="hidden sm:inline">{{ darkMode ? t('light') : t('dark') }}</span>
@@ -81,10 +78,23 @@
           <span class="sm:hidden">{{ t('loginShort') }}</span><span class="hidden sm:inline">{{ t('loginWikimedia') }}</span>
         </a>
 
-        <div v-else class="ps-hbtn !pr-1 !cursor-default max-w-[180px] sm:max-w-none">
+        <div v-else-if="!userMenuCompact" ref="userBox" class="ps-hbtn !pr-1 !cursor-default min-w-0">
           <svg class="w-3.5 h-3.5 text-ws-nature shrink-0 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
-          <span class="font-medium truncate whitespace-nowrap">{{ currentUser }}</span>
+          <span ref="userName" class="font-medium whitespace-nowrap">{{ currentUser }}</span>
           <button @click="logoutOAuth" :title="t('logout')" class="ml-0.5 px-2 py-0.5 rounded bg-black/25 hover:bg-rose-600 text-white transition text-[11px] whitespace-nowrap shrink-0">{{ t('logout') }}</button>
+        </div>
+        <div v-else ref="userBox" class="relative min-w-0" @keydown.esc="userMenuOpen = false">
+          <button @click.stop="userMenuOpen = !userMenuOpen" class="ps-hbtn max-w-full sm:max-w-[16rem]" aria-haspopup="menu" :aria-expanded="userMenuOpen ? 'true' : 'false'" :title="currentUser">
+            <span class="font-medium truncate whitespace-nowrap min-w-0">{{ currentUser }}</span>
+            <svg class="w-3 h-3 shrink-0 transition-transform" :class="userMenuOpen ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+          </button>
+          <div v-if="userMenuOpen" role="menu" @click.stop class="absolute right-0 top-full mt-1.5 min-w-[11rem] max-w-[80vw] ps-card shadow-xl py-1 text-sm text-slate-800 dark:text-slate-100 z-40">
+            <div class="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 break-words border-b border-slate-200 dark:border-slate-800">{{ currentUser }}</div>
+            <button role="menuitem" @click="userMenuOpen = false; logoutOAuth()" class="w-full text-left px-3 py-2 flex items-center gap-2 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-rose-700 dark:text-rose-400 font-semibold">
+              <svg class="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg>
+              {{ t('logout') }}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -107,7 +117,7 @@
       <section class="ps-hero">
         <div class="ps-hero-lines hidden md:block" aria-hidden="true"></div>
         <div class="ps-hero-margin hidden md:block" aria-hidden="true"></div>
-        <div class="relative grid md:grid-cols-[1.4fr_1fr] gap-5 md:gap-10 p-4 sm:p-6 lg:px-8">
+        <div class="relative grid md:grid-cols-[1.75fr_1fr] gap-5 md:gap-8 lg:gap-10 p-4 sm:p-6 lg:px-8">
           <div class="space-y-3.5 min-w-0">
             <div class="ps-eyebrow flex items-center gap-2 !text-ws-cerulean dark:!text-ws-nature">
               <svg class="w-4 h-4 text-ws-cerulean dark:text-ws-nature" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 5.5Q7 4 11.5 6v13Q7 17 2 18.5z"/><path d="M22 5.5Q17 4 12.5 6v13q4.5-2 9.5-.5z"/></svg>
@@ -126,12 +136,12 @@
               </button>
               <a v-if="!loggedIn" href="/login" class="ps-btn ps-btn-primary no-underline">{{ t('loginToTakePart') }}</a>
               <button v-if="isSuperAdmin" @click="openToolAdmins" class="ps-btn md:hidden">{{ t('toolAdmins') }}</button>
-              <a href="https://github.com/MSSakib03/ProofSource#readme" target="_blank" rel="noopener" class="ps-btn ps-btn-quiet no-underline">{{ t('howItWorks') }} ↗</a>
+              <a href="https://github.com/MSSakib03/ProofSource#readme" target="_blank" rel="noopener" class="ps-btn ps-btn-quiet no-underline max-md:hidden">{{ t('howItWorks') }} ↗</a>
             </div>
           </div>
-          <dl class="grid grid-cols-3 md:grid-cols-1 gap-2 sm:gap-2.5 self-center">
-            <div v-for="st in [['activeContests', countByStatus('running'), 'is-success'], ['pagesProofreadAll', homeTotals.pages, 'is-warning'], ['wikisourcesWord', homeTotals.projects, 'is-progressive']]" :key="st[0]"
-                 class="ps-stat flex flex-col md:flex-row md:items-center md:justify-between gap-0.5 md:!py-3 md:!px-4" :class="st[2]">
+          <dl class="hidden md:grid grid-rows-3 gap-2.5 self-stretch">
+            <div v-for="st in [['activeContests', countByStatus('running')], ['pagesProofreadAll', homeTotals.pages], ['wikisourcesWord', homeTotals.projects]]" :key="st[0]"
+                 class="ps-stat is-progressive flex items-center justify-between gap-3 !py-2 !px-4">
               <dt class="ps-stat-l">{{ t(st[0]) }}</dt>
               <dd class="ps-stat-v !mt-0 md:!text-[1.85rem]">{{ fmtNum(st[1]) }}</dd>
             </div>
@@ -189,7 +199,7 @@
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 flex-wrap">
                     <span class="ps-chip !text-[10px] !font-bold uppercase tracking-wider !py-0 text-ws-cerulean dark:text-ws-nature">{{ t('centralShort') }}</span>
-                    <span class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.central.title }}</span>
+                    <span class="ps-serif font-bold text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.central.title }}</span>
                   </div>
                   <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">{{ fmtNum(row.central.project_count) }} {{ t('projectsWord') }} · {{ formatDateShort(row.central.start_iso) }} – {{ formatDateShort(row.central.end_iso) }} (UTC)</div>
                 </div>
@@ -218,7 +228,7 @@
              class="ps-row ps-spine group no-underline pl-5 pr-4 py-3" :class="'is-' + row.contest.status">
             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-5">
               <div class="min-w-0 flex-1">
-                <div class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.contest.title }}</div>
+                <div class="ps-serif font-bold text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.contest.title }}</div>
                 <div class="text-xs text-slate-600 dark:text-slate-400 mt-1 flex flex-wrap gap-x-3 gap-y-0.5">
                   <span class="font-semibold text-ws-cerulean dark:text-ws-nature">{{ projectLabel(row.contest.wiki_domain) }}</span>
                   <span>{{ formatDateShort(row.contest.start_iso) }} – {{ formatDateShort(row.contest.end_iso) }} (UTC)</span>
@@ -550,9 +560,8 @@
                 <span class="ps-chip !text-ws-cerulean dark:!text-ws-nature"><svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 5.5Q7 4 11.5 6v13Q7 17 2 18.5z"/><path d="M22 5.5Q17 4 12.5 6v13q4.5-2 9.5-.5z"/></svg>{{ projectLabel(active.contest.wiki_domain) }}</span>
                 <span class="ps-chip" :class="statusClass(active.contest.status)"><span class="ps-dot" :class="statusDot(active.contest.status)"></span>{{ t(active.contest.status) }}</span>
                 <span v-if="!active.contest.review_enabled" class="ps-chip">{{ t('withoutReview') }}</span>
-                <span v-if="active.contest.submission_mode !== 'auto'" class="ps-chip" :title="t('mode_' + active.contest.submission_mode + '_desc')">{{ t('mode_' + active.contest.submission_mode) }}</span>
               </div>
-              <h1 class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
+              <h1 class="ps-serif font-bold text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
                 <a v-if="safeUrl(active.contest.link)" :href="safeUrl(active.contest.link)" target="_blank" rel="noopener" class="ps-title-link">{{ active.contest.title }}</a>
                 <template v-else>{{ active.contest.title }}</template>
               </h1>
@@ -1004,7 +1013,7 @@
           <div class="flex flex-col md:flex-row md:items-start justify-between gap-3">
             <div class="min-w-0 space-y-1.5">
               <div class="ps-eyebrow !text-ws-cerulean dark:!text-ws-nature">{{ t('centralContest') }}</div>
-              <h1 class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
+              <h1 class="ps-serif font-bold text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
                 <a v-if="safeUrl(central.central.link)" :href="safeUrl(central.central.link)" target="_blank" rel="noopener" class="ps-title-link">{{ central.central.title }}</a>
                 <template v-else>{{ central.central.title }}</template>
               </h1>
@@ -1096,8 +1105,7 @@
             <div><div class="text-[10px] text-slate-500">{{ t('proofread') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.listed) }}</div></div>
             <div><div class="text-[10px] text-slate-500">{{ t('points') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.points) }}</div></div>
           </div>
-          <div v-if="p.reverted || p.submission_mode !== 'auto'" class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-            <span v-if="p.submission_mode !== 'auto'" class="ps-chip !text-[11px]">{{ t('mode_' + p.submission_mode) }}</span>
+          <div v-if="p.reverted" class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
             <span v-if="p.reverted" class="ps-chip !text-[11px]">{{ t('reverted') }}: {{ fmtNum(p.reverted) }}</span>
           </div>
           <div v-if="p.books === 0 && p.is_admin" class="mt-3 text-[11px] text-amber-700 dark:text-amber-300">{{ t('addBooksHint') }}</div>
@@ -1578,15 +1586,13 @@
 
   <footer class="ps-footer mt-8">
     <div class="h-1 bg-gradient-to-r from-ws-dark via-ws-cerulean to-ws-nature" aria-hidden="true"></div>
-    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-6 grid gap-4 sm:grid-cols-[1fr_auto] items-start text-xs leading-relaxed">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-5 grid gap-3 sm:grid-cols-[1fr_auto] items-center text-xs leading-relaxed">
       <div class="space-y-1">
         <div class="flex flex-wrap items-baseline gap-x-2">
           <span class="ps-wordmark !text-base !font-bold">ProofSource</span>
           <span class="text-slate-400 dark:text-slate-600" aria-hidden="true">·</span>
           <span>{{ t('createdByPrefix') }} <a href="https://meta.wikimedia.org/wiki/User:MS_Sakib" target="_blank" rel="noopener author" class="font-semibold">MS Sakib</a></span>
         </div>
-        <p>{{ t('footerAbout') }}</p>
-        <p>{{ t('footerTimes') }}</p>
       </div>
       <nav class="flex flex-wrap gap-x-4 gap-y-1 sm:justify-end" :aria-label="t('footerLinks')">
         <a href="https://github.com/MSSakib03/ProofSource" target="_blank" rel="noopener">{{ t('sourceCode') }}</a>
@@ -2103,7 +2109,7 @@ createApp({
       darkMode: document.documentElement.classList.contains('dark'), csrfToken: (window.PS_INITIAL || {}).csrf_token || '',
       view: 'home', homeFilter: 'running', busy: false, syncing: false,
       notice: '', noticeType: 'info', noticeTimer: null,
-      loggedIn: false, currentUser: null, wikiProjects: WIKI_PROJECTS,
+      loggedIn: false, currentUser: null, wikiProjects: WIKI_PROJECTS, userMenuCompact: false, userMenuOpen: false,
       contests: [], centrals: [], deleteRequests: [], showAllJuries: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '',
       expanded: {}, central: null, centralTab: 'leaderboard', cform: {}, upages: null, loadingBar: 0,
       juryStats: null, juryScope: null, selectMode: false, selectedIds: [], lastSelIdx: null, prefetchedAt: {},
@@ -2197,7 +2203,9 @@ createApp({
   },
   watch: {
     view() { window.scrollTo(0, 0); this.selectMode = false; this.selectedIds = []; },
-    homeProject(v) { safeStore('ps_home_project', v); }
+    homeProject(v) { safeStore('ps_home_project', v); },
+    currentUser() { this.fitUserMenu(); },
+    lang() { this.fitUserMenu(); }
   },
   mounted() {
     const boot = document.getElementById('ps-boot');
@@ -2211,8 +2219,25 @@ createApp({
     }, 600000);
     window.addEventListener('keydown', this.handleKeyShortcuts);
     window.addEventListener('popstate', this.handleRoutePop);
+    let fitTimer = null;
+    window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(this.fitUserMenu, 120); });
+    document.addEventListener('click', () => { this.userMenuOpen = false; });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(this.fitUserMenu);
   },
   methods: {
+    /* The name and Logout sit side by side while they fit; when a long name would crowd the
+     * ProofSource wordmark (or overflow the bar), Logout moves into a menu under the name. */
+    async fitUserMenu() {
+      if (!this.loggedIn) { this.userMenuCompact = false; return; }
+      this.userMenuOpen = false;
+      this.userMenuCompact = false;
+      await this.$nextTick();
+      const row = this.$refs.headerRow, box = this.$refs.userBox, mark = this.$refs.wordmark;
+      if (!row || !box) return;
+      let crowded = row.scrollWidth > row.clientWidth + 1 || box.scrollWidth > box.clientWidth + 1;
+      if (!crowded && mark && mark.offsetParent) crowded = mark.getBoundingClientRect().right + 8 > box.getBoundingClientRect().left;
+      this.userMenuCompact = crowded;
+    },
     t(key) { return (I18N[this.lang] && I18N[this.lang][key]) || I18N.en[key] || key; },
     fmtNum(n) {
       const v = Number(n || 0);
