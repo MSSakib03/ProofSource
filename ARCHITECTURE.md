@@ -10,7 +10,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-236798)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-006699)
 ![Vue](https://img.shields.io/badge/Vue-3-4D8AC0)
-![Tests](https://img.shields.io/badge/tests-89%20passing-2e7d32)
+![Tests](https://img.shields.io/badge/tests-95%20passing-2e7d32)
 
 </div>
 
@@ -173,7 +173,7 @@ Uses the page's **full revision history** (oldest → newest, paged up to 500 re
 - **Incremental**: if a page's latest revision id equals the stored `last_rev_id`, it is skipped (no history fetch).
 - **Never destructive on failure**: the fetch returns `(results, complete)`. Pages missing from an incomplete listing are not reset; a network error on one page skips that page.
 - Bots (wiki `bot` group) and excluded users are filtered at sync time.
-- A per-contest lock (`sync_started_at`, 10 min) prevents two workers syncing the same contest.
+- A per-contest lock (`sync_started_at`, 10 min) prevents two workers syncing the same contest. It is taken with one conditional `UPDATE`, so two workers starting at the same moment cannot both get it.
 - Changing the contest/book window clears `last_rev_id`, so the next sync re-checks every page.
 - `GET /api/contests/<id>` returns **cached** data instantly; the frontend calls `POST /sync` in the background when data is stale (> 5 min).
 
@@ -230,8 +230,16 @@ Every permission is checked in the backend; the UI only hides buttons. Tool admi
 - **No third-party assets:** Vue and DOMPurify are served from `static/vendor`, the CSS is built locally, and fonts are the system fonts plus self-hosted Bangla fonts (`static/fonts/`) — no visitor data reaches a CDN.
 - **Output:** wiki-rendered HTML is sanitised again with DOMPurify; announcement markup is escaped before the few wiki-link conversions; links shown from user input must be `http(s)`.
 - **Backups:** signed with HMAC-SHA256 (server secret); only signed files of the same contest can be restored by contest admins (the tool admin may restore legacy/unsigned files). Approval, creator, wiki and slug are never taken from a backup.
+- **Exports:** CSV cells that a spreadsheet would run as a formula (`=`, `+`, `-`, `@` first) are prefixed with an apostrophe (`backup_engine.csv_safe`).
 - **Abuse limits:** forced syncs, page reservations (login required), previews, restores, backups and contest creation are rate-limited per user; numeric/enum inputs are validated (400, never 500); text fields are length-capped.
 - **Robust parsing:** the page-quality parser is linear-time (the old regex could be frozen by one crafted wiki page).
+
+### 5.6b The list of Wikisource wikis
+- Nothing in the tool names the wikis it supports. `wiki_engine.list_wikisources()` reads Meta-Wiki's site matrix (`action=sitematrix`), keeps the open, public sites whose code is `wikisource` plus the multilingual `wikisource.org`, and caches the result per worker for 24 hours. A newly created Wikisource therefore appears in the contest form by itself, at the latest a day after it is created.
+- If Meta cannot be reached, the last good list is served; right after a restart a short built-in list is used and Meta is asked again ten minutes later. The frontend keeps the last live list in `localStorage` (`ps_wikis`).
+- The form also has **Other Wikisource**: any domain (or bare language code) can be typed. The only rule, in the browser and in the backend, is the allowlist pattern of §5.6a, so a contest can be set up on a wiki that is not in the list yet.
+- Namespace names (Page, Index) are never hard-coded per wiki: they come from the wiki's own `siteinfo` (`get_namespace_prefixes`).
+- A contest that already has recorded pages cannot be moved to another wiki (`wiki_has_data`).
 
 ### 5.7 Data safety
 - JSON backup per contest (with SHA-256 checksum and record counts). A server-side copy is saved on every download.
@@ -248,6 +256,8 @@ Every permission is checked in the backend; the UI only hides buttons. Tool admi
 Pages (all render `index.html` with `window.PS_INITIAL` for instant direct links): `/`, `/contest/<lang>/<slug>`, `/contest/<lang>/<slug>/me`, `/contest/<lang>/<slug>/user/<name>`, `/central/<slug>` (`/hub/<slug>` → 301).
 
 Auth: `/login`, `/auth/callback`, `/logout`, `GET /api/session`.
+
+Wikis: `GET /api/wikis` (the list of Wikisource wikis, see §5.6b).
 
 Submission: `POST …/enroll`, `GET …/my-eligible`, `POST …/submit`.
 
@@ -276,7 +286,10 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 - Buttons: the main action is solid blue (`.ps-btn-primary`); every other `.ps-btn` uses the Codex *normal progressive* look (pale blue fill, blue outline and text). The sync button carries a "Sync" label except on phones narrower than 380 px. The header logo sits in a thin rounded outline (`.ps-logo-tile`).
 - Icons for the home-page totals (desktop only) are taken from the Wikimedia Codex icon set (`@wikimedia/codex-icons`, MIT): `cdxIconLive`, `cdxIconArticleCheck`, `cdxIconLogoWikisource`, inlined as SVG.
 - The reviewer chips on the contest page are measured (`fitJuries`): as many as fit on one line beside the dates on wide screens, two lines on phones, then "+N".
-- Dates are always UTC, with Bangla digits and month names in Bangla.
+- Dates are always UTC, with Bangla digits and month names in Bangla. On the contest page the dates sit at the left edge and the countdown at the right edge of one line; phones get the short forms (`formatDateRange` writes a shared year once, `countdownShort` keeps the two largest units).
+- Text size: the **AA** button in the header sets `data-ps-size` (`s`/`l`/`xl`) on `<html>`, which changes the root font size (87.5 % / 112.5 % / 125 %). Every size in the template and stylesheet is in `rem`, so the whole interface scales; never add `px` font sizes. The choice is stored in `ps_text_size` and applied before first paint. On phones the theme switch lives in the same menu.
+- The header and the reviewer chips are re-measured when a web font finishes loading (`document.fonts` `loadingdone`), because the Bangla fonts arrive after the first layout.
+- "Proofread any page" opens its tab during the click and fills in the address when the server answers; a tab opened after the answer is blocked by most mobile browsers.
 - Keyboard shortcuts use `event.code` (Alt+A accept, Alt+F needs fix, Alt+R reject, Alt+N next), so they work with Bangla/Avro layouts and never fire inside text fields.
 - Cached contest/central data (localStorage) is shown instantly, then refreshed; links prefetch on hover; there is a top progress bar and fade transitions.
 - Design system: ProofSource's **original colour theme** — the Wikisource-logo blues `ws.dark #294584`, `ws.chambray #375493`, `ws.cerulean #236798`, `ws.bright #006699`, `ws.nature #4D8AC0` on Tailwind slate, with emerald/amber/rose/sky for status — combined with Wikimedia **Codex** component conventions (2–4 px radii, 32 px controls, quiet/progressive buttons, underline tabs, system fonts, serif headings like the wikis). Progress bars show accepted (green) and pending (amber) pages. Shared classes: `.ps-card`, `.ps-row`, `.ps-stat`, `.ps-btn*` (Codex Button), `.ps-input`/`.ps-label` (Codex TextInput), `.ps-tabs`/`.ps-tab` (Codex Tabs), `.ps-chip`, `.ps-qbar`.
@@ -287,7 +300,7 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 
 ## 8. Testing
 
-- `python3 -m unittest discover -s tests` (89 tests, network fully mocked): OAuth flow, counting rules, sync safety, review rules, equal distribution, bulk review, central contests, my-pages visibility, backup/restore/tamper, audit append-only, migration of an old database, deletion workflow, and `tests/test_security.py` (CSRF, headers/CSP, wiki allowlist, XSS, signed backups, exact tool-admin match, login expiry, token encryption + PKCE, ReDoS, rate limits, review locks).
+- `python3 -m unittest discover -s tests` (95 tests, network fully mocked): OAuth flow, counting rules, sync safety, review rules, equal distribution, bulk review, central contests, my-pages visibility, backup/restore/tamper, audit append-only, migration of an old database, deletion workflow, and `tests/test_security.py` (CSRF, headers/CSP, wiki allowlist, XSS, signed backups, exact tool-admin match, login expiry, token encryption + PKCE, ReDoS, rate limits, review locks).
 - The same suite runs against MariaDB: `PROOFSOURCE_TEST_DATABASE_URL='mysql+pymysql://user:pw@localhost/db?charset=utf8mb4' python3 -m unittest discover -s tests`.
 - Load test (local, SQLite): 1k / 10k / 50k / 100k pages; 4 concurrent reviewers; restore of 50k pages ≈ 4 s.
 - Browser tests were run with Playwright + Chromium: direct links, i18n, shortcuts, bulk selection, mobile (375 px) without horizontal overflow.

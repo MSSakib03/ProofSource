@@ -69,7 +69,7 @@ ProofSource finds every page that is proofread on Wikisource during a contest, l
 
 1. Open **https://proofsource.toolforge.org**.
 2. Click **MediaWiki Login** (top right) and press **Allow** on Meta-Wiki. The tool never sees your password.
-3. Use the **বাংলা / EN** button to switch the language (English is the default) and **Dark / Light** for the theme. The tool always opens in the light theme until you choose dark; your choice is remembered.
+3. Use the **বাংলা / EN** button to switch the language (English is the default) and **Dark / Light** for the theme. The tool always opens in the light theme until you choose dark; your choice is remembered. The **AA** button changes the text size of the whole tool (small, default, large, extra large); on phones the same button also holds the theme switch.
 
 All dates and times are shown in **UTC**.
 
@@ -175,7 +175,7 @@ Click **Create Contest** on the home page and fill in:
 
 | Field | Notes |
 |---|---|
-| Name, project, description | |
+| Name, project, description | The project list holds every Wikisource and updates itself when a new one is created. A wiki that is not listed yet can be typed under **Other Wikisource** (language code or domain). The project cannot be changed once pages are recorded. |
 | Link slug | e.g. `wcnov26` → `/contest/bn/wcnov26`. Leave empty for a random one. |
 | Start / end (UTC) | |
 | Points | Default points per page; validation points (0 = validation is not counted or shown); max bonus. |

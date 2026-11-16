@@ -487,6 +487,7 @@ def find_contest_by_slug(slug: str):
 LISTED_STATUSES = ('pending_review', 'accepted', 'needs_fix', 'rejected')
 SUBMISSION_MODES = ('auto', 'enroll', 'manual')
 SYNC_ACTOR = "ProofSource (sync)"
+SYNC_LOCK_SECONDS = 600              # a sync that died keeps its lock no longer than this
 SUBMIT_GRACE = timedelta(hours=24)   # manual submissions stay open one day after the contest ends
 
 
@@ -669,10 +670,16 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
 def sync_contest_books(contest: Contest, full: bool = False) -> dict:
     """Guarded so two workers never sync the same contest at the same time."""
     now = datetime.utcnow()
-    if contest.sync_started_at and (now - contest.sync_started_at).total_seconds() < 600:
-        return {"skipped": True, "reason": "sync_in_progress"}
-    contest.sync_started_at = now
+    # Taken with one conditional UPDATE: two workers that start at the same moment cannot both
+    # get the lock (a check followed by a write could, and both would then insert the same pages).
+    got = (Contest.query.filter(Contest.id == contest.id,
+                                or_(Contest.sync_started_at.is_(None),
+                                    Contest.sync_started_at < now - timedelta(seconds=SYNC_LOCK_SECONDS)))
+           .update({"sync_started_at": now}, synchronize_session=False))
     db.session.commit()
+    db.session.refresh(contest)
+    if not got:
+        return {"skipped": True, "reason": "sync_in_progress"}
     complete = True
     try:
         for book in list(contest.books):
@@ -1086,6 +1093,13 @@ def api_session():
     })
 
 
+@app.route("/api/wikis", methods=["GET"])
+def api_wikis():
+    """Every Wikisource a contest can run on (live from Meta-Wiki's site matrix, cached for a day).
+    A new Wikisource appears here by itself; a domain missing from the list can still be typed in."""
+    return jsonify(wiki_engine.list_wikisources())
+
+
 # =====================================================================
 #  Contests
 # =====================================================================
@@ -1460,6 +1474,12 @@ def api_update_contest_config(cid):
             return err("invalid_project")
         data["wiki_domain"] = dom
         domain_changed = dom != c.wiki_domain
+        if domain_changed and ContestPage.query.filter(
+                ContestPage.contest_id == c.id,
+                ContestPage.review_status.in_(LISTED_STATUSES + ('reverted',))).count():
+            # the books and pages belong to the old wiki; pointing them at another one would
+            # leave every page title and proofreader wrong
+            return err("wiki_has_data")
 
     changes = {}
     try:
@@ -2330,7 +2350,7 @@ def api_export_csv(cid):
     cw.writerow(["Rank", "Participant", "Proofread", "Accepted", "Validated", "Pending", "Needs Fix",
                  "Rejected", "Bonus Points", "Total Points"])
     for idx, r in enumerate(compute_contest_leaderboard(c), start=1):
-        cw.writerow([idx, r["username"], r["submitted"], r["accepted"], r["validated"], r["pending"],
+        cw.writerow([idx, backup_engine.csv_safe(r["username"]), r["submitted"], r["accepted"], r["validated"], r["pending"],
                      r["needs_fix"], r["rejected"], r["bonus"], r["points"]])
     return Response(si.getvalue().encode("utf-8-sig"), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment;filename=proofsource_{c.slug}_results.csv"})

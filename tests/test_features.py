@@ -265,3 +265,113 @@ class ProofreadAnyPageTests(Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+SITEMATRIX = {"sitematrix": {
+    "count": 4,
+    "0": {"code": "bn", "name": "বাংলা", "localname": "Bangla", "site": [
+        {"url": "https://bn.wikipedia.org", "code": "wiki", "sitename": "উইকিপিডিয়া"},
+        {"url": "https://bn.wikisource.org", "code": "wikisource", "sitename": "উইকিসংকলন"}]},
+    "1": {"code": "en", "name": "English", "localname": "English", "site": [
+        {"url": "https://en.wikisource.org", "code": "wikisource", "sitename": "Wikisource"}]},
+    "2": {"code": "xx", "name": "Xx", "localname": "Brand new", "site": [
+        {"url": "https://xx.wikisource.org", "code": "wikisource", "sitename": "Wikisource"}]},
+    "3": {"code": "ang", "name": "Ænglisc", "localname": "Old English", "site": [
+        {"url": "https://ang.wikisource.org", "code": "wikisource", "sitename": "Wikisource", "closed": ""}]},
+    "4": {"code": "ta", "name": "தமிழ்", "localname": "Tamil", "site": [
+        {"url": "https://ta.wikisource.org", "code": "wikisource", "sitename": "விக்கிமூலம்"}]},
+    "5": {"code": "hi", "name": "हिन्दी", "localname": "Hindi", "site": [
+        {"url": "https://hi.wikisource.org", "code": "wikisource", "sitename": "विकिस्रोत"}]},
+    "6": {"code": "fr", "name": "français", "localname": "French", "site": [
+        {"url": "https://fr.wikisource.org", "code": "wikisource", "sitename": "Wikisource"},
+        {"url": "https://evil.example.org", "code": "wikisource", "sitename": "Fake"}]},
+    "specials": [{"url": "https://wikisource.org", "code": "sources", "sitename": "Wikisource"},
+                 {"url": "https://commons.wikimedia.org", "code": "commons", "sitename": "Commons"}],
+}}
+
+
+class _Resp:
+    def __init__(self, payload):
+        self._payload = payload
+
+    def json(self):
+        return self._payload
+
+
+class WikiListTests(Base):
+    """The Wikisource list comes from Meta-Wiki's site matrix: a new wiki needs no code change."""
+
+    def setUp(self):
+        super().setUp()
+        self._get = A.wiki_engine.requests.get
+        A.wiki_engine._WIKI_LIST.update(at=None, ok=False, wikis=None)
+
+    def tearDown(self):
+        A.wiki_engine.requests.get = self._get
+        A.wiki_engine._WIKI_LIST.update(at=None, ok=False, wikis=None)
+        super().tearDown()
+
+    def test_live_list_has_new_wikis_and_skips_closed_and_foreign_ones(self):
+        calls = []
+        A.wiki_engine.requests.get = lambda url, **kw: calls.append(url) or _Resp(SITEMATRIX)
+        d = A.app.test_client().get("/api/wikis").json
+        self.assertTrue(d["live"])
+        by_domain = {w["domain"]: w for w in d["wikis"]}
+        self.assertEqual(set(by_domain), {"bn.wikisource.org", "en.wikisource.org", "xx.wikisource.org", "ta.wikisource.org",
+                                          "hi.wikisource.org", "fr.wikisource.org", "wikisource.org"})
+        self.assertEqual(by_domain["bn.wikisource.org"]["label"], "বাংলা উইকিসংকলন")
+        self.assertEqual(by_domain["xx.wikisource.org"]["name_en"], "Brand new")
+        self.assertEqual(d["wikis"][-1]["domain"], "wikisource.org")          # multilingual comes last
+        self.assertEqual(calls, ["https://meta.wikimedia.org/w/api.php"])
+        A.app.test_client().get("/api/wikis")
+        self.assertEqual(len(calls), 1)                                        # cached: Meta is asked once a day
+
+    def test_meta_down_serves_the_builtin_list_and_retries_later(self):
+        def boom(url, **kw):
+            raise RuntimeError("network down")
+        A.wiki_engine.requests.get = boom
+        d = A.app.test_client().get("/api/wikis").json
+        self.assertFalse(d["live"])
+        self.assertIn("bn.wikisource.org", [w["domain"] for w in d["wikis"]])
+        # once Meta answers again (after the retry delay) the live list replaces the fallback
+        A.wiki_engine._WIKI_LIST["at"] -= A.wiki_engine.WIKI_LIST_RETRY + 1
+        A.wiki_engine.requests.get = lambda url, **kw: _Resp(SITEMATRIX)
+        self.assertTrue(A.app.test_client().get("/api/wikis").json["live"])
+
+    def test_contest_on_an_unlisted_new_wikisource_is_accepted(self):
+        self.login("Admin")
+        r = self.c.post("/api/contests", json={"title": "New wiki", "wiki_domain": "zz-new.wikisource.org",
+                                               "start_time": "2026-01-01T00:00", "end_time": "2026-02-01T00:00"})
+        self.assertTrue(r.json["success"])
+        self.assertEqual(r.json["lang_code"], "zz-new")
+
+
+class DeepCheckTests(Base):
+    def test_wiki_cannot_change_once_pages_are_recorded(self):
+        cid = self.make_contest(entries={1: ("Alice", 3, 1)})
+        r = self.c.post(f"/api/contests/{cid}/config", json={"wiki_domain": "en.wikisource.org"})
+        self.assertEqual(r.json["error_code"], "wiki_has_data")
+        with A.app.app_context():
+            self.assertEqual(db.session.get(Contest, cid).wiki_domain, "bn.wikisource.org")
+
+    def test_sync_lock_is_taken_atomically(self):
+        cid = self.make_contest(entries={1: ("Alice", 3, 1)})
+        with A.app.app_context():
+            c = db.session.get(Contest, cid)
+            c.sync_started_at = datetime.utcnow()            # another worker holds the lock
+            db.session.commit()
+            self.assertEqual(A.sync_contest_books(c), {"skipped": True, "reason": "sync_in_progress"})
+            c.sync_started_at = datetime.utcnow() - timedelta(seconds=A.SYNC_LOCK_SECONDS + 5)   # a dead worker's lock
+            db.session.commit()
+            self.assertFalse(A.sync_contest_books(c)["skipped"])
+            self.assertIsNone(db.session.get(Contest, cid).sync_started_at)
+            self.assertEqual(ContestPage.query.filter_by(contest_id=cid).count(), 1)             # no duplicate rows
+
+    def test_csv_cells_cannot_become_spreadsheet_formulas(self):
+        cid = self.make_contest(entries={1: ("=HYPERLINK(1)", 3, 1), 2: ("Bob", 3, 2)})
+        body = self.c.get(f"/api/contests/{cid}/export-csv").data.decode("utf-8-sig")
+        self.assertIn("'=HYPERLINK(1)", body)
+        self.assertNotIn("\n1,=HYPERLINK", body)
+        pages = self.c.get(f"/api/contests/{cid}/backup-pages.csv").data.decode("utf-8-sig")
+        self.assertIn("'=HYPERLINK(1)", pages)
+        self.assertEqual(A.backup_engine.csv_safe("Bob"), "Bob")

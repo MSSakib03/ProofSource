@@ -19,6 +19,8 @@
           document.documentElement.classList.add('dark');
           document.getElementById('ps-theme-color').setAttribute('content', '#111b2e');
         }
+        var size = localStorage.getItem('ps_text_size');
+        if (size === 's' || size === 'l' || size === 'xl') document.documentElement.setAttribute('data-ps-size', size);
       } catch (e) {}
     })();
   </script>
@@ -64,16 +66,34 @@
         </nav>
       </div>
 
-      <div class="flex items-center gap-1.5 sm:gap-2" :class="userMenuCompact ? 'min-w-0 justify-end' : 'shrink-0'">
+      <div ref="headerRight" class="flex items-center gap-1.5 sm:gap-2" :class="userMenuCompact ? 'min-w-0 justify-end' : 'shrink-0'">
         <button @click="toggleLang" class="ps-hbtn shrink-0" :title="t('switchLanguage')">
           <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
           <span>{{ lang === 'en' ? 'বাংলা' : 'EN' }}</span>
         </button>
-        <button @click="toggleTheme" :title="darkMode ? t('light') : t('dark')" :aria-label="darkMode ? t('light') : t('dark')" class="ps-hbtn shrink-0">
+        <button @click="toggleTheme" :title="darkMode ? t('light') : t('dark')" :aria-label="darkMode ? t('light') : t('dark')" class="ps-hbtn shrink-0 max-sm:!hidden">
           <svg v-if="darkMode" class="w-4 h-4 sm:w-3.5 sm:h-3.5 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
           <svg v-else class="w-4 h-4 sm:w-3.5 sm:h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
           <span class="hidden sm:inline">{{ darkMode ? t('light') : t('dark') }}</span>
         </button>
+        <div class="relative shrink-0" @keydown.esc="sizeMenuOpen = false">
+          <!-- phones: one "display" button holds text size and theme, so the bar stays as short as before -->
+          <button @click.stop="sizeMenuOpen = !sizeMenuOpen; userMenuOpen = false" class="ps-hbtn" data-size-menu :title="t('textSize')" :aria-label="t('displaySettings')" aria-haspopup="menu" :aria-expanded="sizeMenuOpen ? 'true' : 'false'">
+            <span class="ps-size-glyph" aria-hidden="true"><span>A</span>A</span>
+          </button>
+          <div v-if="sizeMenuOpen" role="menu" :aria-label="t('textSize')" @click.stop class="absolute right-0 top-full mt-1.5 ps-card shadow-xl p-2.5 z-40 w-max text-slate-800 dark:text-slate-100">
+            <div class="ps-eyebrow pb-1.5">{{ t('textSize') }}</div>
+            <div class="flex items-stretch gap-1.5">
+              <button v-for="o in textSizes" :key="o.id" role="menuitemradio" :aria-checked="textSize === o.id ? 'true' : 'false'" @click="setTextSize(o.id)"
+                      class="ps-size-opt" :class="textSize === o.id ? 'is-active' : ''" :title="t(o.label)" :aria-label="t(o.label)"><span :style="{ fontSize: o.px + 'px' }" aria-hidden="true">A</span></button>
+            </div>
+            <button role="menuitem" @click="toggleTheme" class="sm:hidden ps-btn w-full mt-2.5 !justify-start">
+              <svg v-if="darkMode" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+              <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              <span>{{ darkMode ? t('light') : t('dark') }}</span>
+            </button>
+          </div>
+        </div>
 
         <a v-if="!loggedIn" href="/login" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded bg-white !text-ws-dark hover:bg-slate-100 shadow-sm transition whitespace-nowrap no-underline">
           <svg class="w-3.5 h-3.5 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
@@ -83,7 +103,7 @@
         <div v-else-if="!userMenuCompact" ref="userBox" class="ps-hbtn !pr-1 !cursor-default min-w-0">
           <svg class="w-3.5 h-3.5 text-ws-nature shrink-0 hidden sm:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
           <span ref="userName" class="font-medium whitespace-nowrap">{{ currentUser }}</span>
-          <button @click="logoutOAuth" :title="t('logout')" class="ml-0.5 px-2 py-0.5 rounded bg-black/25 hover:bg-rose-600 text-white transition text-[11px] whitespace-nowrap shrink-0">{{ t('logout') }}</button>
+          <button @click="logoutOAuth" :title="t('logout')" class="ml-0.5 px-2 py-0.5 rounded bg-black/25 hover:bg-rose-600 text-white transition text-[0.6875rem] whitespace-nowrap shrink-0">{{ t('logout') }}</button>
         </div>
         <div v-else ref="userBox" class="relative min-w-0" @keydown.esc="userMenuOpen = false">
           <button @click.stop="userMenuOpen = !userMenuOpen" class="ps-hbtn max-w-full sm:max-w-[16rem]" aria-haspopup="menu" :aria-expanded="userMenuOpen ? 'true' : 'false'" :title="currentUser">
@@ -126,7 +146,7 @@
               <span>{{ t('heroEyebrow') }}</span>
             </div>
             <h1 class="ps-serif text-[1.9rem] sm:text-[2.45rem] leading-[1.12] text-slate-900 dark:text-slate-50">{{ t('heroTitle') }}</h1>
-            <p class="text-[15px] leading-relaxed text-slate-600 dark:text-slate-400 max-w-xl">{{ t('heroSubtitle') }}</p>
+            <p class="text-[0.9375rem] leading-relaxed text-slate-600 dark:text-slate-400 max-w-xl">{{ t('heroSubtitle') }}</p>
             <div class="flex flex-wrap gap-2 pt-1">
               <button v-if="loggedIn" @click="openCreateContest" class="ps-btn ps-btn-primary">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
@@ -217,7 +237,7 @@
                  class="group flex-1 min-w-0 py-3 pr-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-inherit no-underline hover:bg-slate-50 dark:hover:bg-slate-800/40 transition">
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center gap-2 flex-wrap">
-                    <span class="ps-chip !text-[10px] !font-bold uppercase tracking-wider !py-0 text-ws-cerulean dark:text-ws-nature">{{ t('centralShort') }}</span>
+                    <span class="ps-chip !text-[0.625rem] !font-bold uppercase tracking-wider !py-0 text-ws-cerulean dark:text-ws-nature">{{ t('centralShort') }}</span>
                     <span :class="titleWeight(row.central.title, true)" class="ps-serif text-lg leading-snug text-slate-900 dark:text-slate-50 group-hover:text-ws-dark dark:group-hover:text-[#8fb8e0] break-words transition-colors">{{ row.central.title }}</span>
                   </div>
                   <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">{{ fmtNum(row.central.project_count) }} {{ t('projectsWord') }} · {{ formatDateShort(row.central.start_iso) }} – {{ formatDateShort(row.central.end_iso) }} (UTC)</div>
@@ -257,7 +277,7 @@
               </div>
               <div class="flex items-center gap-4 shrink-0">
                 <div class="hidden sm:block w-40" :title="t('accepted') + ': ' + fmtNum(row.contest.accepted_pages) + ' · ' + t('proofread') + ': ' + fmtNum(row.contest.listed_pages) + (row.contest.total_pages ? ' / ' + fmtNum(row.contest.total_pages) : '')">
-                  <div class="flex justify-between gap-2 text-[11px] text-slate-600 dark:text-slate-400 tabular-nums mb-1">
+                  <div class="flex justify-between gap-2 text-[0.6875rem] text-slate-600 dark:text-slate-400 tabular-nums mb-1">
                     <span>{{ t('proofread') }}</span>
                     <span><b class="font-semibold text-slate-800 dark:text-slate-200">{{ fmtNum(row.contest.listed_pages) }}</b><template v-if="row.contest.total_pages"> / {{ fmtNum(row.contest.total_pages) }}</template></span>
                   </div>
@@ -294,9 +314,8 @@
 
           <div>
             <label class="ps-label">{{ t('wikisourceProject') }}</label>
-            <select v-model="form.wiki_domain" :disabled="isLocked('wiki_domain')" class="ps-input">
-              <option v-for="p in wikiProjects" :key="p.domain" :value="p.domain">{{ p.label }} ({{ p.domain }})</option>
-            </select>
+            <wiki-picker v-model="form.wiki_domain" :wikis="wikiProjects" :disabled="isLocked('wiki_domain')"
+                         :other-label="t('otherWikisource')" :hint="t('wikiDomainHint')"></wiki-picker>
           </div>
 
           <div>
@@ -464,9 +483,9 @@
                   </div>
                   <div class="flex items-center gap-1 flex-wrap" :title="t('bookWindowHint')">
                     <span class="text-slate-500">{{ t('bookWindow') }} (UTC):</span>
-                    <input v-model="b.start_local" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 text-[11px]" />
+                    <input v-model="b.start_local" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 text-[0.6875rem]" />
                     <span>–</span>
-                    <input v-model="b.end_local" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 text-[11px]" />
+                    <input v-model="b.end_local" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 text-[0.6875rem]" />
                   </div>
                   <button @click="saveBookSettings(b)" class="px-2.5 py-1 bg-ws-cerulean text-white rounded font-medium">
                     {{ t('update') }}
@@ -508,7 +527,7 @@
         </div>
         <div class="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-2">
           <label class="ps-label">{{ t('restoreTitle') }}</label>
-          <p class="text-[11px] text-slate-500">{{ t('restoreDesc') }}</p>
+          <p class="text-[0.6875rem] text-slate-500">{{ t('restoreDesc') }}</p>
           <input type="file" accept=".json,application/json" @change="onRestoreFile" class="block w-full text-xs file:mr-3 file:px-3 file:py-1.5 file:rounded-lg file:border-0 file:bg-slate-200 dark:file:bg-slate-800 file:text-xs" />
           <div v-if="restore.checked" class="text-xs p-3 rounded-lg border" :class="restore.problems.length ? 'border-rose-500/40 bg-rose-500/5' : 'border-emerald-500/40 bg-emerald-500/5'">
             <div v-if="restore.problems.length" class="text-rose-700 dark:text-rose-300">
@@ -523,7 +542,7 @@
 
         <div v-if="active.contest.can_request_delete || active.contest.can_delete" class="border-t border-rose-500/30 pt-4 space-y-2">
           <label class="block text-xs font-semibold text-rose-700 dark:text-rose-300">{{ t('dangerZone') }}</label>
-          <p class="text-[11px] text-slate-500">{{ t('deleteExplain') }}</p>
+          <p class="text-[0.6875rem] text-slate-500">{{ t('deleteExplain') }}</p>
           <div class="flex flex-wrap gap-2">
             <button v-if="active.contest.can_request_delete && !active.contest.delete_request" @click="requestDelete('contest')" class="ps-btn ps-btn-quiet-danger">{{ t('requestDelete') }}</button>
             <button v-if="active.contest.can_request_delete && active.contest.delete_request" @click="cancelDeleteRequest('contest')" class="ps-btn ps-btn-ghost">{{ t('cancelRequest') }}</button>
@@ -585,7 +604,7 @@
                 <template v-else>{{ active.contest.title }}</template>
               </h1>
               <p v-if="active.contest.description" @click="descOpen = !descOpen" :class="descOpen ? '' : 'line-clamp-2'"
-                 class="text-sm sm:text-[15px] text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl cursor-pointer">{{ active.contest.description }}</p>
+                 class="text-sm sm:text-[0.9375rem] text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl cursor-pointer">{{ active.contest.description }}</p>
             </div>
             <div class="flex flex-wrap items-center gap-1.5 max-md:gap-y-0 shrink-0 max-md:w-full">
               <template v-if="active.contest.submission_mode === 'enroll'">
@@ -640,14 +659,16 @@
           </div>
 
           <div class="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-2 lg:gap-4 text-xs">
-            <div class="flex flex-wrap items-center gap-1.5 sm:gap-2 lg:shrink-0">
-              <span class="ps-chip !font-semibold !text-slate-700 dark:!text-slate-300 !rounded max-sm:!text-[11px] max-sm:!px-1.5 max-sm:!gap-1">
+            <!-- dates at the left edge, countdown at the right edge; both on one line, phones included -->
+            <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 lg:justify-start lg:shrink-0">
+              <span class="ps-chip !font-semibold !text-slate-700 dark:!text-slate-300 !rounded max-sm:!text-[0.6875rem] max-sm:!px-1.5 max-sm:!gap-1">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
-                <span class="sm:hidden">{{ formatDateShort(active.contest.start_iso) }} – {{ formatDateShort(active.contest.end_iso) }}</span>
-                <span class="hidden sm:inline">{{ formatDateReadable(active.contest.start_iso) }} – {{ formatDateReadable(active.contest.end_iso) }} (UTC)</span>
+                <span class="sm:hidden">{{ formatDateRange(active.contest.start_iso, active.contest.end_iso, true) }}</span>
+                <span class="hidden sm:inline">{{ formatDateRange(active.contest.start_iso, active.contest.end_iso, false) }} (UTC)</span>
               </span>
-              <span v-if="countdownText" class="ps-chip !font-bold !rounded !text-slate-900 dark:!text-slate-100 max-sm:!text-[11px] max-sm:!px-1.5 max-sm:!gap-1">
-                <span class="ps-dot" :class="countdownState === 'running' ? 'bg-emerald-500 animate-pulse' : countdownState === 'upcoming' ? 'bg-ws-cerulean' : 'bg-slate-400'"></span>{{ countdownText }}
+              <span v-if="countdownText" class="ps-chip ml-auto lg:ml-0 !font-bold !rounded !text-slate-900 dark:!text-slate-100 max-sm:!text-[0.6875rem] max-sm:!px-1.5 max-sm:!gap-1" :title="countdownText">
+                <span class="ps-dot" :class="countdownState === 'running' ? 'bg-emerald-500 animate-pulse' : countdownState === 'upcoming' ? 'bg-ws-cerulean' : 'bg-slate-400'"></span>
+                <span class="sm:hidden">{{ countdownShort }}</span><span class="hidden sm:inline">{{ countdownText }}</span>
               </span>
             </div>
             <!-- reviewers: as many as fit on one line beside the dates (desktop) or on two lines (phones), then "+N" -->
@@ -763,14 +784,14 @@
                     {{ r.username }}
                   </button>
                 </td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-[13px]">{{ fmtNum(r.submitted) }}</td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
+                <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]">{{ fmtNum(r.submitted) }}</td>
+                <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
                 <template v-if="active.contest.review_enabled">
-                  <td class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.pending ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(r.pending) }}</td>
-                  <td class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.needs_fix ? 'text-orange-600 dark:text-orange-400' : 'ps-zero'">{{ fmtNum(r.needs_fix) }}</td>
-                  <td class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(r.rejected) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.pending ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(r.pending) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.needs_fix ? 'text-orange-600 dark:text-orange-400' : 'ps-zero'">{{ fmtNum(r.needs_fix) }}</td>
+                  <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(r.rejected) }}</td>
                 </template>
-                <td v-if="hasReverted" class="py-2.5 px-4 text-right tabular-nums text-[13px]" :class="r.reverted ? 'text-slate-600 dark:text-slate-300' : 'ps-zero'">{{ fmtNum(r.reverted || 0) }}</td>
+                <td v-if="hasReverted" class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.reverted ? 'text-slate-600 dark:text-slate-300' : 'ps-zero'">{{ fmtNum(r.reverted || 0) }}</td>
                 <td class="py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
               </tr>
             </tbody>
@@ -798,9 +819,9 @@
             </div>
             <div class="flex items-center gap-1 text-xs flex-wrap" :title="t('bookWindowHint')">
               <span class="text-slate-500">{{ t('bookWindow') }}:</span>
-              <input v-model="newBookStart" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 text-[11px]" />
+              <input v-model="newBookStart" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 text-[0.6875rem]" />
               <span>–</span>
-              <input v-model="newBookEnd" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 text-[11px]" />
+              <input v-model="newBookEnd" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-1.5 py-1 text-[0.6875rem]" />
             </div>
             <button @click="addBookToContest" :disabled="busy" class="bg-ws-cerulean hover:bg-ws-dark text-white text-xs font-semibold px-3.5 py-2 rounded-lg">
               {{ t('addBook') }}
@@ -827,10 +848,10 @@
                        class="font-medium text-ws-cerulean dark:text-ws-nature hover:underline block truncate">
                       {{ b.title }}
                     </a>
-                    <div v-if="b.start_iso || b.end_iso" class="text-[11px] text-ws-cerulean dark:text-ws-nature mt-0.5">
+                    <div v-if="b.start_iso || b.end_iso" class="text-[0.6875rem] text-ws-cerulean dark:text-ws-nature mt-0.5">
                       {{ t('bookWindow') }}: {{ formatDateShort(b.effective_start_iso) }} – {{ formatDateShort(b.effective_end_iso) }} (UTC)
                     </div>
-                    <div v-if="b.excluded_pages" class="text-[11px] text-slate-400 mt-0.5">
+                    <div v-if="b.excluded_pages" class="text-[0.6875rem] text-slate-400 mt-0.5">
                       {{ t('excludedPages') }}: <span class="font-mono">{{ b.excluded_pages }}</span>
                     </div>
                   </td>
@@ -844,7 +865,7 @@
                       <div class="bg-emerald-500 h-full" :style="{ width: Math.min(100, (b.accepted / Math.max(1, b.effective_pages)) * 100) + '%' }"></div>
                       <div class="bg-amber-400 h-full" :style="{ width: Math.min(100, (b.pending / Math.max(1, b.effective_pages)) * 100) + '%' }"></div>
                     </div>
-                    <div class="flex justify-between text-[11px] text-slate-500 mt-1 tabular-nums">
+                    <div class="flex justify-between text-[0.6875rem] text-slate-500 mt-1 tabular-nums">
                       <span>{{ t('accepted') }}: {{ b.accepted }}</span>
                       <span v-if="active.contest.review_enabled">{{ t('pending') }}: {{ b.pending }}</span>
                     </div>
@@ -882,7 +903,7 @@
               <tr v-for="r in active.reverted" :key="r.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
                 <td class="py-2.5 px-4 max-w-[18rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(r.page_title)" target="_blank" rel="noopener" class="font-semibold hover:underline block truncate" :title="r.page_title">{{ r.page_title }}</a></td>
                 <td class="py-2.5 px-4"><button @click="openUserPages(r.proofreader)" class="font-semibold text-ws-cerulean dark:text-ws-nature hover:underline">{{ r.proofreader }}</button></td>
-                <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded-full border text-[11px]" :class="reviewStatusClass(r.reverted_from)">{{ statusLabel(r.reverted_from) }}</span></td>
+                <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(r.reverted_from)">{{ statusLabel(r.reverted_from) }}</span></td>
                 <td class="py-2.5 px-4 text-xs">{{ t('revert_' + r.reason) }}<span v-if="r.reason === 'not_proofread'" class="text-slate-500"> ({{ wikiLevelLabel(r.wiki_level) }})</span></td>
                 <td class="py-2.5 px-4 text-right text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ formatDateTime(r.reverted_iso) }}</td>
               </tr>
@@ -922,16 +943,16 @@
         <div v-if="active.daily_activity && active.daily_activity.length > 0" class="ps-card p-4 sm:p-5">
           <div class="flex items-center justify-between mb-3">
             <span class="text-xs font-bold text-slate-600 dark:text-slate-400">{{ t('dailyActivityChart') }}</span>
-            <span class="text-[11px] text-slate-400">{{ active.contest.last_synced_iso ? t('lastSynced') + ': ' + formatDateTime(active.contest.last_synced_iso) : '' }}</span>
+            <span class="text-[0.6875rem] text-slate-400">{{ active.contest.last_synced_iso ? t('lastSynced') + ': ' + formatDateTime(active.contest.last_synced_iso) : '' }}</span>
           </div>
           <div class="overflow-x-auto w-full pb-1">
             <div class="h-28 min-w-[320px] flex items-end gap-2 pt-4 border-b border-slate-100 dark:border-slate-800">
               <div v-for="d in active.daily_activity" :key="d.date" class="flex-1 flex flex-col items-center group">
-                <span class="text-[10px] font-semibold text-ws-cerulean dark:text-ws-nature mb-1 tabular-nums">{{ d.proofread }}</span>
+                <span class="text-[0.625rem] font-semibold text-ws-cerulean dark:text-ws-nature mb-1 tabular-nums">{{ d.proofread }}</span>
                 <div class="w-full max-w-[32px] bg-ws-cerulean/85 dark:bg-ws-nature/80 hover:bg-ws-dark rounded-t transition-all"
                      :style="{ height: Math.max(8, Math.round((d.proofread / maxDailyCount) * 70)) + 'px' }"
                      :title="d.date + ': ' + d.proofread"></div>
-                <span class="text-[10px] font-mono text-slate-400 mt-1.5">{{ formatDayMonth(d.date) }}</span>
+                <span class="text-[0.625rem] font-mono text-slate-400 mt-1.5">{{ formatDayMonth(d.date) }}</span>
               </div>
             </div>
           </div>
@@ -998,7 +1019,7 @@
                 <td class="py-2 px-4 max-w-[12rem] truncate" :title="e.target">{{ e.target }}</td>
                 <td class="py-2 px-4 text-slate-500 break-words max-w-[22rem]">
                   <span v-if="e.old_value || e.new_value"><del class="text-rose-600/80">{{ shorten(e.old_value, 80) }}</del> → <ins class="no-underline text-emerald-700 dark:text-emerald-400">{{ shorten(e.new_value, 80) }}</ins></span>
-                  <span v-if="e.details" class="block font-mono text-[10px]">{{ shorten(e.details, 160) }}</span>
+                  <span v-if="e.details" class="block font-mono text-[0.625rem]">{{ shorten(e.details, 160) }}</span>
                 </td>
               </tr>
             </tbody>
@@ -1099,7 +1120,7 @@
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td class="py-2.5 px-4 text-xs text-slate-500 tabular-nums">{{ fmtNum(i + 1) }}</td>
               <td class="py-2.5 px-4 font-semibold">{{ r.username }}</td>
-              <td class="py-2.5 px-4 text-[11px] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="mr-2 whitespace-nowrap">{{ projectShort(dom) }}: {{ fmtNum(pts) }}</span></td>
+              <td class="py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="mr-2 whitespace-nowrap">{{ projectShort(dom) }}: {{ fmtNum(pts) }}</span></td>
               <td class="py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
               <td class="py-2.5 px-4 text-right tabular-nums text-xs" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
               <td class="py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
@@ -1117,20 +1138,20 @@
           <div class="flex items-start justify-between gap-2">
             <div class="min-w-0">
               <div class="font-semibold text-ws-cerulean dark:text-ws-nature truncate">{{ projectLabel(p.wiki_domain) }}</div>
-              <div class="text-[11px] text-slate-500 mt-0.5 truncate">{{ t('admins') }}: {{ p.admins_list.join(', ') || '—' }}</div>
+              <div class="text-[0.6875rem] text-slate-500 mt-0.5 truncate">{{ t('admins') }}: {{ p.admins_list.join(', ') || '—' }}</div>
             </div>
-            <span v-if="p.is_admin" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-ws-nature/15 text-ws-dark dark:text-ws-nature shrink-0">{{ t('youAreAdmin') }}</span>
+            <span v-if="p.is_admin" class="text-[0.625rem] font-semibold px-2 py-0.5 rounded-full bg-ws-nature/15 text-ws-dark dark:text-ws-nature shrink-0">{{ t('youAreAdmin') }}</span>
           </div>
           <div class="grid grid-cols-4 gap-2 mt-3 text-center">
-            <div><div class="text-[10px] text-slate-500">{{ t('books') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.books) }}</div></div>
-            <div><div class="text-[10px] text-slate-500">{{ t('participants') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.participants) }}</div></div>
-            <div><div class="text-[10px] text-slate-500">{{ t('proofread') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.listed) }}</div></div>
-            <div><div class="text-[10px] text-slate-500">{{ t('points') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.points) }}</div></div>
+            <div><div class="text-[0.625rem] text-slate-500">{{ t('books') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.books) }}</div></div>
+            <div><div class="text-[0.625rem] text-slate-500">{{ t('participants') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.participants) }}</div></div>
+            <div><div class="text-[0.625rem] text-slate-500">{{ t('proofread') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.listed) }}</div></div>
+            <div><div class="text-[0.625rem] text-slate-500">{{ t('points') }}</div><div class="font-bold tabular-nums">{{ fmtNum(p.points) }}</div></div>
           </div>
-          <div v-if="p.reverted" class="mt-2 flex flex-wrap gap-1.5 text-[11px]">
-            <span v-if="p.reverted" class="ps-chip !text-[11px]">{{ t('reverted') }}: {{ fmtNum(p.reverted) }}</span>
+          <div v-if="p.reverted" class="mt-2 flex flex-wrap gap-1.5 text-[0.6875rem]">
+            <span v-if="p.reverted" class="ps-chip !text-[0.6875rem]">{{ t('reverted') }}: {{ fmtNum(p.reverted) }}</span>
           </div>
-          <div v-if="p.books === 0 && p.is_admin" class="mt-3 text-[11px] text-amber-700 dark:text-amber-300">{{ t('addBooksHint') }}</div>
+          <div v-if="p.books === 0 && p.is_admin" class="mt-3 text-[0.6875rem] text-amber-700 dark:text-amber-300">{{ t('addBooksHint') }}</div>
         </a>
       </div>
 
@@ -1151,9 +1172,9 @@
           <div v-if="central.stats.daily.length === 0" class="text-xs text-slate-500 py-6 text-center">{{ t('noSubmissionsYet') }}</div>
           <div v-else class="overflow-x-auto"><div class="h-28 min-w-[320px] flex items-end gap-2 pt-4 border-b border-slate-100 dark:border-slate-800">
             <div v-for="d in central.stats.daily" :key="d.date" class="flex-1 flex flex-col items-center">
-              <span class="text-[10px] font-semibold text-ws-cerulean mb-1 tabular-nums">{{ fmtNum(d.proofread) }}</span>
+              <span class="text-[0.625rem] font-semibold text-ws-cerulean mb-1 tabular-nums">{{ fmtNum(d.proofread) }}</span>
               <div class="w-full max-w-[32px] bg-ws-nature/80 rounded-t" :style="{ height: Math.max(8, Math.round((d.proofread / Math.max(1, ...central.stats.daily.map(x => x.proofread))) * 70)) + 'px' }"></div>
-              <span class="text-[10px] text-slate-400 mt-1.5">{{ formatDayMonth(d.date) }}</span>
+              <span class="text-[0.625rem] text-slate-400 mt-1.5">{{ formatDayMonth(d.date) }}</span>
             </div>
           </div></div>
         </div>
@@ -1230,18 +1251,16 @@
             <button type="button" @click="cform.projects.push({ wiki_domain: '', admins: '' })" class="text-xs font-semibold text-ws-chambray dark:text-ws-nature hover:underline">+ {{ t('addProject') }}</button>
           </div>
           <div v-for="(p, i) in cform.projects" :key="i" class="flex flex-col sm:flex-row gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
-            <select v-model="p.wiki_domain" class="sm:w-60 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs">
-              <option value="">{{ t('selectProject') }}</option>
-              <option v-for="w in wikiProjects" :key="w.domain" :value="w.domain">{{ w.label }}</option>
-            </select>
-            <input v-model="p.admins" type="text" :placeholder="t('projectAdminsPh')" class="flex-1 min-w-0 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-2.5 py-1.5 text-xs" />
-            <button type="button" @click="cform.projects.splice(i, 1)" class="text-xs text-rose-600 hover:underline px-2 self-start sm:self-center">{{ t('remove') }}</button>
+            <wiki-picker v-model="p.wiki_domain" :wikis="wikiProjects" allow-empty :empty-label="t('selectProject')" class="sm:w-64 shrink-0"
+                         :other-label="t('otherWikisource')" :hint="t('wikiDomainHint')"></wiki-picker>
+            <input v-model="p.admins" type="text" :placeholder="t('projectAdminsPh')" class="ps-input flex-1 min-w-0 self-start" />
+            <button type="button" @click="cform.projects.splice(i, 1)" class="text-xs text-rose-600 dark:text-rose-400 hover:underline px-2 self-start sm:mt-2">{{ t('remove') }}</button>
           </div>
         </div>
 
         <div v-if="cform.editing && central && (central.central.can_request_delete || central.central.can_delete)" class="border-t border-rose-500/30 pt-4 space-y-2">
           <label class="block text-xs font-semibold text-rose-700 dark:text-rose-300">{{ t('dangerZone') }}</label>
-          <p class="text-[11px] text-slate-500">{{ t('deleteExplainCentral') }}</p>
+          <p class="text-[0.6875rem] text-slate-500">{{ t('deleteExplainCentral') }}</p>
           <div class="flex flex-wrap gap-2">
             <button v-if="central.central.can_request_delete && !central.central.delete_request" @click="requestDelete('central')" class="ps-btn ps-btn-quiet-danger">{{ t('requestDelete') }}</button>
             <button v-if="central.central.can_request_delete && central.central.delete_request" @click="cancelDeleteRequest('central')" class="ps-btn ps-btn-ghost">{{ t('cancelRequest') }}</button>
@@ -1265,9 +1284,9 @@
           <a :href="'https://' + active.contest.wiki_domain + '/wiki/Special:Contributions/' + encodeURIComponent(upages.username)" target="_blank" rel="noopener" class="text-xs text-ws-cerulean dark:text-ws-nature hover:underline">{{ t('wikiContributions') }} ↗</a>
         </div>
         <div v-if="upages.summary.rank" class="text-center px-5 py-2 rounded-xl bg-ws-nature/10 border border-ws-nature/25">
-          <div class="text-[10px] uppercase text-slate-500">{{ t('rank') }}</div>
+          <div class="text-[0.625rem] uppercase text-slate-500">{{ t('rank') }}</div>
           <div class="text-2xl font-bold text-ws-dark dark:text-ws-nature tabular-nums">#{{ fmtNum(upages.summary.rank) }}</div>
-          <div class="text-[10px] text-slate-500">/ {{ fmtNum(upages.summary.participants) }}</div>
+          <div class="text-[0.625rem] text-slate-500">/ {{ fmtNum(upages.summary.participants) }}</div>
         </div>
       </div>
       <div class="ps-stats">
@@ -1307,8 +1326,8 @@
             <tr v-if="upages.pages.length === 0"><td colspan="4" class="py-8 text-center text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="p in upages.pages" :key="p.id + p.role" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td class="py-2.5 px-4 max-w-[16rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(p.page_title)" target="_blank" rel="noopener" class="font-medium text-ws-cerulean dark:text-ws-nature hover:underline block truncate" :title="p.page_title">{{ p.page_title }}</a>
-                <span v-if="p.role === 'validator'" class="text-[10px] text-slate-500">{{ t('validated') }}</span></td>
-              <td class="py-2.5 px-4 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full border text-[11px]" :class="reviewStatusClass(p.review_status)">{{ statusLabel(p.review_status) }}</span></td>
+                <span v-if="p.role === 'validator'" class="text-[0.625rem] text-slate-500">{{ t('validated') }}</span></td>
+              <td class="py-2.5 px-4 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(p.review_status)">{{ statusLabel(p.review_status) }}</span></td>
               <td class="py-2.5 px-4 text-right tabular-nums font-semibold">{{ fmtNum(p.total_points) }}</td>
               <td v-if="upages.review_enabled" class="py-2.5 px-4 text-slate-500">{{ p.jury_note || '—' }}</td>
             </tr>
@@ -1377,11 +1396,11 @@
           <span class="flex-1"></span>
           <button :disabled="!selectedIds.length || bulk.running" @click="askBulk('accepted')" class="px-3 py-1.5 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-40">{{ t('bulkAccept') }}</button>
           <button :disabled="!selectedIds.length || bulk.running" @click="askBulk('rejected')" class="px-3 py-1.5 rounded-lg font-semibold bg-rose-600 hover:bg-rose-700 text-white disabled:opacity-40">{{ t('bulkReject') }}</button>
-          <div class="w-full text-[11px] text-slate-500">{{ t('selectHint') }}</div>
+          <div class="w-full text-[0.6875rem] text-slate-500">{{ t('selectHint') }}</div>
           <div v-if="bulk.running" class="w-full h-1.5 bg-slate-200 dark:bg-slate-800 rounded overflow-hidden"><div class="h-full bg-ws-nature transition-all" :style="{ width: bulk.progress + '%' }"></div></div>
           <div v-if="bulk.result" class="w-full">
             {{ t('bulkDone') }}: {{ fmtNum(bulk.result.done) }} · {{ t('bulkSkippedOwn') }}: {{ fmtNum(bulk.result.skipped_own) }} · {{ t('bulkUnchanged') }}: {{ fmtNum(bulk.result.unchanged) }} · {{ t('bulkFailed') }}: {{ fmtNum(bulk.result.failed.length) }}
-            <div v-for="f in bulk.result.failed.slice(0, 10)" :key="f.id" class="text-rose-600 font-mono text-[11px]">#{{ f.id }} — {{ errText(f) }}</div>
+            <div v-for="f in bulk.result.failed.slice(0, 10)" :key="f.id" class="text-rose-600 font-mono text-[0.6875rem]">#{{ f.id }} — {{ errText(f) }}</div>
           </div>
         </div>
 
@@ -1480,17 +1499,17 @@
 
             <div v-else-if="juryPaneTab === 'edit'" class="p-3.5 sm:p-4 space-y-3 flex-1">
               <div>
-                <label class="block text-[11px] font-medium text-slate-500 uppercase mb-1">{{ t('header') }}</label>
+                <label class="block text-[0.6875rem] font-medium text-slate-500 uppercase mb-1">{{ t('header') }}</label>
                 <input v-model="juryPage.header" type="text"
                        class="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-ws-cerulean" />
               </div>
               <div>
-                <label class="block text-[11px] font-medium text-slate-500 uppercase mb-1">{{ t('body') }}</label>
+                <label class="block text-[0.6875rem] font-medium text-slate-500 uppercase mb-1">{{ t('body') }}</label>
                 <textarea v-model="juryPage.body" rows="13"
                           class="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg p-3 text-sm leading-relaxed focus:outline-none focus:border-ws-cerulean"></textarea>
               </div>
               <div>
-                <label class="block text-[11px] font-medium text-slate-500 uppercase mb-1">{{ t('footer') }}</label>
+                <label class="block text-[0.6875rem] font-medium text-slate-500 uppercase mb-1">{{ t('footer') }}</label>
                 <input v-model="juryPage.footer" type="text"
                        class="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded-lg px-3 py-1.5 text-xs font-mono focus:outline-none focus:border-ws-cerulean" />
               </div>
@@ -1541,7 +1560,7 @@
 
         <div class="ps-card p-3.5 sm:p-4 space-y-3">
           <div class="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-            <span class="text-[11px] font-medium text-slate-500 mr-1 shrink-0">{{ t('quickNotes') }}:</span>
+            <span class="text-[0.6875rem] font-medium text-slate-500 mr-1 shrink-0">{{ t('quickNotes') }}:</span>
             <button v-for="chip in quickChips" :key="chip" @click="appendJuryNote(chip)"
                     class="text-xs px-2.5 py-1 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-ws-nature/20 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700 transition shrink-0">
               + {{ chip }}
@@ -1664,7 +1683,7 @@
           <dt>{{ view === 'create' ? t('books') : t('pv_newBooks') }}</dt>
           <dd><span v-if="!pvLines(form.books).length" class="ps-zero">—</span>
             <template v-else><b class="tabular-nums">{{ fmtNum(pvLines(form.books).length) }}</b>
-              <span class="block font-mono text-[11px] text-slate-600 dark:text-slate-400 break-all">{{ pvLines(form.books).slice(0, 3).join(', ') }}<template v-if="pvLines(form.books).length > 3"> +{{ fmtNum(pvLines(form.books).length - 3) }}</template></span></template></dd>
+              <span class="block font-mono text-[0.6875rem] text-slate-600 dark:text-slate-400 break-all">{{ pvLines(form.books).slice(0, 3).join(', ') }}<template v-if="pvLines(form.books).length > 3"> +{{ fmtNum(pvLines(form.books).length - 3) }}</template></span></template></dd>
         </dl>
       </div>
       <div class="px-4 sm:px-5 py-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2 shrink-0 bg-slate-50 dark:bg-slate-900/60">
@@ -1748,6 +1767,8 @@
 </div>
 
 {% endraw %}<script nonce="{{ csp_nonce() }}">{% raw %}
+// Every Wikisource comes from /api/wikis (Meta-Wiki's site matrix), so a new Wikisource needs no
+// change here. The last list is kept in the browser; this short list is only the very first paint.
 const WIKI_PROJECTS = [
   { domain: 'bn.wikisource.org', label: 'বাংলা উইকিসংকলন' },
   { domain: 'en.wikisource.org', label: 'English Wikisource' },
@@ -1767,6 +1788,70 @@ const WIKI_PROJECTS = [
   { domain: 'ar.wikisource.org', label: 'العربية ويكي مصدر' },
   { domain: 'wikisource.org', label: 'Multilingual Wikisource' }
 ];
+const WIKI_DOMAIN_RE = /^(?:[a-z0-9-]{1,30}\.)?wikisource\.org$/;
+/* "bn", "BN.wikisource.org", "https://bn.wikisource.org/wiki/…" -> "bn.wikisource.org" */
+function cleanWikiDomain(raw) {
+  let d = String(raw || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '');
+  if (d === 'mul') return 'wikisource.org';
+  if (d && !d.includes('.')) d += '.wikisource.org';
+  return d;
+}
+function loadCachedWikis() {
+  try {
+    const list = JSON.parse(localStorage.getItem('ps_wikis') || 'null');
+    if (Array.isArray(list) && list.length && list.every(w => w && WIKI_DOMAIN_RE.test(w.domain) && typeof w.label === 'string')) return list;
+  } catch (e) { /* ignore */ }
+  return WIKI_PROJECTS;
+}
+
+/* Wikisource chooser: the full list, plus "Other" to type a domain that is not listed (yet). */
+const WikiPicker = {
+  props: { modelValue: { type: String, default: '' }, wikis: { type: Array, default: () => [] }, disabled: Boolean,
+           allowEmpty: Boolean, emptyLabel: { type: String, default: '' }, otherLabel: { type: String, default: 'Other' },
+           hint: { type: String, default: '' } },
+  emits: ['update:modelValue'],
+  data() { return { custom: false, typed: '' }; },
+  computed: {
+    known() { return this.wikis.some(w => w.domain === this.modelValue); },
+    isCustom() { return this.custom || (!!this.modelValue && !this.known); },
+    selected() { return this.isCustom ? '__other__' : (this.modelValue || ''); },
+    valid() { return WIKI_DOMAIN_RE.test(this.modelValue || ''); }
+  },
+  watch: {
+    modelValue: { immediate: true, handler(v) {
+      if (v && !this.known && cleanWikiDomain(this.typed) !== v) this.typed = v;
+      if (this.custom && v !== cleanWikiDomain(this.typed)) this.custom = false;   // the form was reset from outside
+    } }
+  },
+  methods: {
+    optionText(w) {
+      const en = w.name_en && !w.label.toLowerCase().startsWith(w.name_en.toLowerCase()) ? ` (${w.name_en})` : '';
+      return `${w.code || w.domain.split('.')[0]} · ${w.label}${en}`;
+    },
+    pick(v) {
+      if (v === '__other__') { this.custom = true; this.typed = ''; this.$emit('update:modelValue', ''); this.$nextTick(() => this.$refs.box && this.$refs.box.focus()); }
+      else { this.custom = false; this.$emit('update:modelValue', v); }
+    },
+    type(v) { this.custom = true; this.typed = v; this.$emit('update:modelValue', cleanWikiDomain(v)); }
+  },
+  template: `
+    <div class="min-w-0">
+      <select :value="selected" @change="pick($event.target.value)" :disabled="disabled" class="ps-input">
+        <option v-if="allowEmpty" value="">{{ emptyLabel }}</option>
+        <option v-for="w in wikis" :key="w.domain" :value="w.domain">{{ optionText(w) }}</option>
+        <option value="__other__">{{ otherLabel }}</option>
+      </select>
+      <template v-if="isCustom">
+        <input ref="box" :value="typed" @input="type($event.target.value)" :disabled="disabled" type="text" inputmode="url"
+               autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="xx.wikisource.org" dir="ltr"
+               :aria-label="otherLabel" :aria-invalid="valid ? 'false' : 'true'" class="ps-input font-mono mt-1.5" />
+        <p class="text-xs mt-1" :class="valid || !typed ? 'text-slate-500 dark:text-slate-400' : 'text-rose-600 dark:text-rose-400'">
+          <span v-if="valid" class="font-mono font-semibold" dir="ltr">{{ modelValue }} · </span>{{ hint }}
+        </p>
+      </template>
+    </div>`
+};
+const TEXT_SIZES = [{ id: 's', label: 'sizeS', px: 12 }, { id: 'm', label: 'sizeM', px: 15 }, { id: 'l', label: 'sizeL', px: 18 }, { id: 'xl', label: 'sizeXL', px: 21 }];
 
 // ---------------------------------------------------------------------------
 //  Central translation system. Every UI string lives here (en = fallback).
@@ -1926,6 +2011,10 @@ const I18N = {
     err_invalid_link: 'The link must start with https://', bk_signature_invalid: 'not a backup made by this server (only the tool admin can restore it)',
     bk_bad_page_row: 'a page record is damaged', bk_bad_book_row: 'a book record is damaged', bk_not_json_object: 'not a backup file',
     skipToContent: 'Skip to content', switchLanguage: 'Switch language', close: 'Close',
+    textSize: 'Text size', displaySettings: 'Text size and theme', sizeS: 'Small', sizeM: 'Default', sizeL: 'Large', sizeXL: 'Extra large',
+    otherWikisource: 'Other Wikisource (type the domain)…', wikiDomainHint: 'Type the language code or the domain, e.g. “bn” or “bn.wikisource.org”.',
+    err_wiki_has_data: 'This contest already has recorded pages, so its Wikisource project cannot be changed',
+    startsInShort: 'Starts in {t}', endsInShort: 'Ends in {t}', popupBlocked: 'Your browser blocked the new tab — the page opens here instead.',
     heroEyebrow: 'Proofreading contests · every Wikisource',
     heroTitle: 'Turn scanned books into proofread text, together.',
     heroSubtitle: 'ProofSource follows every page proofread on Wikisource during your contest, lets reviewers check them, and keeps a live leaderboard — for any language, or many at once.',
@@ -2105,6 +2194,10 @@ const I18N = {
     err_invalid_link: 'লিংকটি https:// দিয়ে শুরু হতে হবে', bk_signature_invalid: 'এই সার্ভারে তৈরি ব্যাকআপ নয় (শুধু টুল অ্যাডমিন এটি পুনরুদ্ধার করতে পারেন)',
     bk_bad_page_row: 'একটি পাতার তথ্য ক্ষতিগ্রস্ত', bk_bad_book_row: 'একটি বইয়ের তথ্য ক্ষতিগ্রস্ত', bk_not_json_object: 'এটি ব্যাকআপ ফাইল নয়',
     skipToContent: 'মূল বিষয়বস্তুতে যান', switchLanguage: 'ভাষা বদলান', close: 'বন্ধ করুন',
+    textSize: 'লেখার আকার', displaySettings: 'লেখার আকার ও থিম', sizeS: 'ছোট', sizeM: 'স্বাভাবিক', sizeL: 'বড়', sizeXL: 'আরও বড়',
+    otherWikisource: 'অন্য উইকিসংকলন (ডোমেইন লিখুন)…', wikiDomainHint: 'ভাষা কোড বা ডোমেইন লিখুন, যেমন “bn” বা “bn.wikisource.org”।',
+    err_wiki_has_data: 'এই প্রতিযোগিতায় ইতিমধ্যে পাতা জমা পড়েছে, তাই উইকিসংকলন প্রকল্প বদলানো যাবে না',
+    startsInShort: 'শুরু {t} পর', endsInShort: '{t} বাকি', popupBlocked: 'ব্রাউজার নতুন ট্যাব আটকে দিয়েছে — পাতাটি এখানেই খুলছে।',
     heroEyebrow: 'মুদ্রণ সংশোধন প্রতিযোগিতা · সব উইকিসংকলনে',
     heroTitle: 'স্ক্যান করা বই হয়ে উঠুক নির্ভুল পাঠ — সবাই মিলে।',
     heroSubtitle: 'প্রতিযোগিতা চলাকালে উইকিসংকলনে মুদ্রণ সংশোধিত প্রতিটি পাতা ProofSource খুঁজে নেয়, পর্যালোচকেরা তা যাচাই করেন, আর লিডারবোর্ড সঙ্গে সঙ্গে হালনাগাদ হয় — যেকোনো ভাষায়, একসঙ্গে অনেক ভাষাতেও।',
@@ -2179,13 +2272,15 @@ function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp
 const { createApp } = Vue;
 
 createApp({
+  components: { WikiPicker },
   data() {
     return {
       lang: safeLoad('ws_lang') || 'en',
       darkMode: document.documentElement.classList.contains('dark'), csrfToken: (window.PS_INITIAL || {}).csrf_token || '',
       view: 'home', homeFilter: 'running', busy: false, syncing: false,
       notice: '', noticeType: 'info', noticeTimer: null,
-      loggedIn: false, currentUser: null, wikiProjects: WIKI_PROJECTS, userMenuCompact: false, userMenuOpen: false,
+      loggedIn: false, currentUser: null, wikiProjects: loadCachedWikis(), userMenuCompact: false, userMenuOpen: false,
+      textSize: document.documentElement.getAttribute('data-ps-size') || 'm', textSizes: TEXT_SIZES, sizeMenuOpen: false,
       contests: [], centrals: [], deleteRequests: [], showAllJuries: false, cfgPreview: { open: false }, juryFit: 99, juryMeasuring: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
       expanded: {}, central: null, centralTab: 'leaderboard', cform: {}, upages: null, loadingBar: 0,
       juryStats: null, juryScope: null, selectMode: false, selectedIds: [], lastSelIdx: null, prefetchedAt: {},
@@ -2259,6 +2354,10 @@ createApp({
       if (!this.active || !this.active.contest) return '';
       return this.countdownFor(this.active.contest.start_iso, this.active.contest.end_iso);
     },
+    countdownShort() {
+      if (!this.active || !this.active.contest) return '';
+      return this.countdownFor(this.active.contest.start_iso, this.active.contest.end_iso, true);
+    },
     announcementHtml() {
       if (!this.active) return '';
       const c = this.active.contest;
@@ -2298,8 +2397,14 @@ createApp({
     window.addEventListener('popstate', this.handleRoutePop);
     let fitTimer = null;
     window.addEventListener('resize', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { this.fitUserMenu(); this.fitJuries(); }, 120); });
-    document.addEventListener('click', () => { this.userMenuOpen = false; });
+    document.addEventListener('click', () => { this.userMenuOpen = false; this.sizeMenuOpen = false; });
     if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.fitUserMenu(); this.fitJuries(); });
+    // The Bangla fonts load only when Bangla text first appears (unicode-range), i.e. after the
+    // first measurement: measure again whenever a font arrives, or the header and reviewer chips
+    // stay fitted to the fallback font's widths.
+    if (document.fonts && document.fonts.addEventListener) {
+      document.fonts.addEventListener('loadingdone', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { this.fitUserMenu(); this.fitJuries(); }, 60); });
+    }
   },
   methods: {
     /* The name and Logout sit side by side while they fit; when a long name would crowd the
@@ -2312,7 +2417,8 @@ createApp({
       const row = this.$refs.headerRow, box = this.$refs.userBox, mark = this.$refs.wordmark;
       if (!row || !box) return;
       let crowded = row.scrollWidth > row.clientWidth + 1 || box.scrollWidth > box.clientWidth + 1;
-      if (!crowded && mark && mark.offsetParent) crowded = mark.getBoundingClientRect().right + 8 > box.getBoundingClientRect().left;
+      const right = this.$refs.headerRight || box;   // the wordmark must clear the whole button group, not only the name
+      if (!crowded && mark && mark.offsetParent) crowded = mark.getBoundingClientRect().right + 4 > right.getBoundingClientRect().left;
       this.userMenuCompact = crowded;
     },
     // How many reviewer chips fit: one line beside the dates on wide screens, two lines on phones.
@@ -2351,16 +2457,18 @@ createApp({
       return String(str).replace(/\d/g, d => '০১২৩৪৫৬৭৮৯'[d]);
     },
     shorten(s, n) { s = s || ''; return s.length > n ? s.slice(0, n - 1) + '…' : s; },
-    countdownFor(startIso, endIso) {
+    /* compact (phones): the two largest units only — "25d 20h", or "20h 53m" on the last day */
+    countdownFor(startIso, endIso, compact = false) {
       const s = Date.parse(startIso), e = Date.parse(endIso);
       if (isNaN(s) || isNaN(e)) return '';
       const fmt = (ms) => {
         const totalMin = Math.max(0, Math.floor(ms / 60000));
         const d = Math.floor(totalMin / 1440), h = Math.floor((totalMin % 1440) / 60), m = totalMin % 60;
-        return `${this.fmtNum(d)}${this.t('dayShort')} ${this.fmtNum(h)}${this.t('hourShort')} ${this.fmtNum(m)}${this.t('minShort')}`;
+        const parts = [`${this.fmtNum(d)}${this.t('dayShort')}`, `${this.fmtNum(h)}${this.t('hourShort')}`, `${this.fmtNum(m)}${this.t('minShort')}`];
+        return (compact ? (d > 0 ? parts.slice(0, 2) : parts.slice(1)) : parts).join(' ');
       };
-      if (this.nowTick < s) return this.t('startsIn').replace('{t}', fmt(s - this.nowTick));
-      if (this.nowTick <= e) return this.t('endsIn').replace('{t}', fmt(e - this.nowTick));
+      if (this.nowTick < s) return this.t(compact ? 'startsInShort' : 'startsIn').replace('{t}', fmt(s - this.nowTick));
+      if (this.nowTick <= e) return this.t(compact ? 'endsInShort' : 'endsIn').replace('{t}', fmt(e - this.nowTick));
       return this.t('completed');
     },
     statusClass(st) {
@@ -2410,6 +2518,15 @@ createApp({
       const m = (MONTHS[this.lang] || MONTHS.en)[d.getUTCMonth()];
       return this.digits(`${d.getUTCDate()} ${this.lang === 'bn' ? m : m.slice(0, 3)} ${d.getUTCFullYear()}`);
     },
+    /* "12 Oct – 12 Dec 2026": the year is written once when both dates share it */
+    formatDateRange(startIso, endIso, short) {
+      const a = this.parseIso(startIso), b = this.parseIso(endIso);
+      const one = short ? this.formatDateShort : this.formatDateReadable;
+      if (!a || !b) return [one(startIso), one(endIso)].filter(Boolean).join(' – ');
+      let first = one(startIso);
+      if (a.getUTCFullYear() === b.getUTCFullYear()) first = first.replace(new RegExp('\\s*' + this.digits(String(a.getUTCFullYear())) + '$'), '');
+      return `${first} – ${one(endIso)}`;
+    },
     formatDateTime(iso) {
       const d = this.parseIso(iso); if (!d) return '';
       const hh = String(d.getUTCHours()).padStart(2, '0'), mm = String(d.getUTCMinutes()).padStart(2, '0');
@@ -2454,6 +2571,7 @@ createApp({
     // ---------- boot & routing ----------
     async initApp() {
       const init = window.PS_INITIAL || {};
+      this.loadWikis();
       await this.loadSession();
       if (init.contest_id) {
         if (init.subview === 'me' || init.subview === 'user') {
@@ -2521,6 +2639,20 @@ createApp({
     },
     toggleLang() { this.lang = this.lang === 'en' ? 'bn' : 'en'; safeStore('ws_lang', this.lang); document.documentElement.lang = this.lang; },
     toggleTheme() { this.darkMode = !this.darkMode; safeStore('ws_theme', this.darkMode ? 'dark' : 'light'); this.applyTheme(); },
+    setTextSize(id) {
+      this.textSize = id; this.sizeMenuOpen = false;
+      if (id === 'm') { document.documentElement.removeAttribute('data-ps-size'); safeDrop('ps_text_size'); }
+      else { document.documentElement.setAttribute('data-ps-size', id); safeStore('ps_text_size', id); }
+      this.$nextTick(() => { this.fitUserMenu(); this.fitJuries(); });
+    },
+    async loadWikis() {
+      const r = await this.api('/api/wikis');
+      const list = r.data && r.data.wikis;
+      if (!Array.isArray(list) || !list.length) return;
+      this.wikiProjects = list.filter(w => w && WIKI_DOMAIN_RE.test(w.domain) && typeof w.label === 'string');
+      if (r.data.live) safeStore('ps_wikis', JSON.stringify(this.wikiProjects));
+    },
+    wikiDomainOk(d) { return WIKI_DOMAIN_RE.test(d || ''); },
     applyTheme() {
       document.documentElement.classList.toggle('dark', this.darkMode);
       const m = document.getElementById('ps-theme-color'); if (m) m.setAttribute('content', this.darkMode ? '#111b2e' : '#ffffff');
@@ -2611,6 +2743,7 @@ createApp({
       if (!this.cform.title) { this.notify(this.t('err_title_required'), 'error'); return; }
       const body = Object.assign({}, this.cform); delete body.editing;
       body.projects = body.projects.filter(p => p.wiki_domain);
+      if (body.projects.some(p => !this.wikiDomainOk(p.wiki_domain))) { this.notify(this.t('err_invalid_project'), 'error'); return; }
       this.busy = true;
       const url = this.cform.editing ? `/api/central/${this.cform.slug}/config` : '/api/central';
       const r = await this.api(url, { method: 'POST', json: body });
@@ -2692,6 +2825,7 @@ createApp({
     pvDate(v) { return v ? this.digits(String(v).replace('T', ' ')) : '—'; },
     openConfigPreview() {
       if (!this.form.title) { this.notify(this.t('err_title_required'), 'error'); return; }
+      if (!this.wikiDomainOk(this.form.wiki_domain)) { this.notify(this.t('err_invalid_project'), 'error'); return; }
       this.cfgPreview.open = true;
     },
     confirmConfigSave() {
@@ -2883,8 +3017,15 @@ createApp({
 
     async reserveUnproofreadPage() {
       if (!this.loggedIn) { window.location.href = '/login'; return; }
+      // The tab is opened during the tap itself: a window opened only after the server has answered
+      // is blocked by most browsers (phones above all), and the button then seems to do nothing.
+      let tab = null;
+      try { tab = window.open('', '_blank'); } catch (e) { tab = null; }
       const r = await this.api(`/api/contests/${this.active.contest.id}/reserve-page`, { method: 'POST', json: { book_id: this.reserveBookId } });
-      if (r.ok && safeUrl(r.data.edit_url)) window.open(r.data.edit_url, '_blank', 'noopener'); else this.notify(this.errText(r.data), 'error');
+      const url = r.ok ? safeUrl(r.data.edit_url) : '';
+      if (!url) { if (tab) tab.close(); this.notify(this.errText(r.data), 'error'); return; }
+      if (tab && !tab.closed) { try { tab.opener = null; } catch (e) { /* ignore */ } tab.location.replace(url); }
+      else { this.notify(this.t('popupBlocked')); setTimeout(() => { window.location.href = url; }, 900); }
     },
     async openUserPages(username, push = true) {
       if (!username || !this.active) return;
