@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event, inspect, text
@@ -121,6 +122,8 @@ class IndexBook(db.Model):
     # --- v6: optional per-book window (falls back to contest window) ---
     start_time = db.Column(db.DateTime, nullable=True)
     end_time = db.Column(db.DateTime, nullable=True)
+    # --- v9: books are synced oldest first, so a sync that runs out of time continues where it stopped ---
+    last_synced_at = db.Column(db.DateTime, nullable=True)
 
     pages = db.relationship('ContestPage', backref='book', cascade="all, delete-orphan", lazy=True)
 
@@ -132,7 +135,8 @@ class ContestPage(db.Model):
     __tablename__ = 'contest_pages'
     __table_args__ = (
         db.Index('ix_cp_contest_status', 'contest_id', 'review_status'),
-        db.Index('ix_cp_book_page', 'book_id', 'page_number'),
+        # one row per page of a book: two syncs running at once can never record a page twice
+        db.Index('uq_cp_book_page', 'book_id', 'page_number', unique=True),
         db.Index('ix_cp_contest_proofreader', 'contest_id', 'proofreader'),
         MYSQL_TABLE_ARGS,
     )
@@ -247,6 +251,29 @@ class OAuthLogin(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
 
+# Which of two rows for the same page survives the clean-up: the one that carries a decision.
+_STATUS_RANK = {"accepted": 6, "rejected": 5, "needs_fix": 5, "pending_review": 4, "reverted": 3, "eligible": 2, "unproofread": 1}
+
+
+def dedupe_contest_pages(conn) -> int:
+    """Removes duplicate (book, page number) rows left by older versions, keeping the row with the
+    most advanced review state (then the oldest). Returns how many rows were removed."""
+    removed = 0
+    dups = conn.execute(text("SELECT book_id, page_number FROM contest_pages "
+                             "GROUP BY book_id, page_number HAVING COUNT(*) > 1")).fetchall()
+    for book_id, number in dups:
+        rows = conn.execute(text("SELECT id, review_status, reviewed_at FROM contest_pages "
+                                 "WHERE book_id = :b AND page_number = :n"), {"b": book_id, "n": number}).fetchall()
+        keep = max(rows, key=lambda r: (_STATUS_RANK.get(r[1], 0), r[2] is not None, -r[0]))
+        for r in rows:
+            if r[0] != keep[0]:
+                conn.execute(text("DELETE FROM contest_pages WHERE id = :i"), {"i": r[0]})
+                removed += 1
+    if removed:
+        logging.getLogger("proofsource").warning("removed %s duplicate page rows before adding the unique index", removed)
+    return removed
+
+
 def migrate_schema():
     """
     Backward-compatible migration: create new tables, then ADD any missing columns /
@@ -278,6 +305,8 @@ def migrate_schema():
             for idx in table.indexes:
                 if idx.name and idx.name not in existing_idx:
                     try:
+                        if idx.name == "uq_cp_book_page":
+                            dedupe_contest_pages(conn)
                         idx.create(conn)
                     except Exception:
-                        pass
+                        logging.getLogger("proofsource").exception("could not create index %s", idx.name)

@@ -460,7 +460,59 @@ def fetch_index_page_count(wiki_domain: str, base_name: str) -> int:
                 return int(ii["pagecount"])
     except Exception:
         pass
-    return 0
+    return count_index_pages(wiki_domain, base_name)
+
+
+def count_index_pages(wiki_domain: str, base_name: str) -> int:
+    """Books that are not one PDF/DjVu file (an index built from separate images) have no page
+    count on the file: ask ProofreadPage for the pages of the index instead. 0 when unknown."""
+    try:
+        prefixes = get_namespace_prefixes(wiki_domain)
+        res = requests.get(get_api_url(wiki_domain), params={
+            "action": "query", "list": "proofreadpagesinindex",
+            "prppiititle": f"{prefixes['index']}:{base_name}", "prppiiprop": "ids", "format": "json"
+        }, headers={"User-Agent": USER_AGENT}, timeout=15).json()
+        pages = res.get("query", {}).get("proofreadpagesinindex")
+        return len(pages) if isinstance(pages, list) else 0
+    except Exception:
+        return 0
+
+
+def search_index_titles(wiki_domain: str, query: str, limit: int = 10) -> list:
+    """Index pages whose name starts with `query` (suggestions while typing a book name)."""
+    prefixes = get_namespace_prefixes(wiki_domain)
+    base = extract_base_book_name(wiki_domain, query)
+    if not base:
+        return []
+    res = requests.get(get_api_url(wiki_domain), params={
+        "action": "query", "list": "prefixsearch", "pssearch": f"{prefixes['index']}:{base}",
+        "psnamespace": prefixes["index_ns_id"], "pslimit": max(1, min(int(limit), 20)), "format": "json"
+    }, headers={"User-Agent": USER_AGENT}, timeout=8).json()
+    return [str(p.get("title")) for p in res.get("query", {}).get("prefixsearch", []) if p.get("title")]
+
+
+def index_info(wiki_domain: str, raw_title: str) -> dict:
+    """Does this index exist on the wiki, and how many pages does the book have?"""
+    prefixes = get_namespace_prefixes(wiki_domain)
+    base = extract_base_book_name(wiki_domain, raw_title)
+    title = f"{prefixes['index']}:{base}"
+    exists, total = None, 0
+    try:
+        res = requests.get(get_api_url(wiki_domain), params={
+            "action": "query", "titles": f"{title}|File:{base}", "prop": "imageinfo|info",
+            "iiprop": "size", "format": "json"
+        }, headers={"User-Agent": USER_AGENT}, timeout=10).json()
+        for pdata in res.get("query", {}).get("pages", {}).values():
+            if pdata.get("ns") == prefixes["index_ns_id"]:
+                exists = "missing" not in pdata and "invalid" not in pdata
+            ii = (pdata.get("imageinfo") or [{}])[0]
+            if "pagecount" in ii:
+                total = int(ii["pagecount"])
+    except Exception:
+        return {"title": title, "base_name": base, "exists": None, "total_pages": 0}
+    if exists and not total:
+        total = count_index_pages(wiki_domain, base)
+    return {"title": title, "base_name": base, "exists": exists, "total_pages": total}
 
 def _content_key(parsed: dict) -> str:
     """Page text without the quality tag; used to detect 'status-only' edits."""
@@ -483,14 +535,14 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
       5. The page must still be Proofread/Validated now.
       6. Validation credit: the first upgrade to level 4 inside the window, after rule 1 is met.
     """
-    if not revisions:
-        return {"eligible": False}
+    seen_any = False
     prev_level = 1
     prev_key = None
     first = None
     validator = None
     text_editors = set()          # users who changed the text at least once so far
-    for rev in revisions:
+    for rev in revisions:          # any iterable: long histories are read page by page, never held in memory
+        seen_any = True
         parsed = parse_proofread_page(rev.get("slots", {}).get("main", {}).get("*", "") or "")
         lvl = parsed["level"]
         key = _content_key(parsed)
@@ -514,6 +566,8 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
         prev_level = lvl
         prev_key = key
 
+    if not seen_any:
+        return {"eligible": False}
     current_level = prev_level
     if not first:
         return {"eligible": False, "current_level": current_level, "reason": "never_proofread"}
@@ -533,8 +587,40 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
     }
 
 
+MAX_HISTORY_REVISIONS = 5000
+
+
+def iter_revision_history(api_url: str, page_title: str, max_revs: int = MAX_HISTORY_REVISIONS):
+    """Yields the revisions with content, oldest -> newest, 50 at a time, to the very end of the
+    history. Raises on a network/API error, and when a page has more than `max_revs` revisions:
+    judging a page on a cut-off history could credit the wrong person, so such a page is left
+    untouched (and reported as an incomplete sync) instead."""
+    count, cont = 0, None
+    while True:
+        params = {
+            "action": "query", "titles": page_title, "prop": "revisions",
+            "rvprop": "ids|timestamp|user|content", "rvslots": "main",
+            "rvlimit": 50, "rvdir": "newer", "format": "json"
+        }
+        if cont:
+            params["rvcontinue"] = cont
+        res = requests.get(api_url, params=params, headers={"User-Agent": USER_AGENT}, timeout=15).json()
+        if "error" in res:
+            raise RuntimeError(res["error"].get("info", "api error"))
+        pages = res.get("query", {}).get("pages", {})
+        p_obj = next(iter(pages.values()), {})
+        for rev in p_obj.get("revisions", []):
+            count += 1
+            if count > max_revs:
+                raise RuntimeError("history_too_long")
+            yield rev
+        cont = res.get("continue", {}).get("rvcontinue")
+        if not cont:
+            return
+
+
 def fetch_revision_history(api_url: str, page_title: str, max_revs: int = 500) -> list:
-    """Oldest -> newest revisions with content (paged). Raises on network/API error."""
+    """Oldest -> newest revisions with content (paged), at most `max_revs`. Raises on network/API error."""
     revs, cont = [], None
     while len(revs) < max_revs:
         params = {
@@ -558,8 +644,11 @@ def fetch_revision_history(api_url: str, page_title: str, max_revs: int = 500) -
 
 def verify_page_in_contest_window(api_url: str, page_title: str, start_time: datetime, end_time: datetime) -> dict:
     try:
-        return analyze_page_history(fetch_revision_history(api_url, page_title), start_time, end_time)
-    except Exception:
+        return analyze_page_history(iter_revision_history(api_url, page_title), start_time, end_time)
+    except Exception as e:
+        if str(e) == "history_too_long":
+            logging.getLogger("proofsource").warning("history of %s is longer than %s revisions; page skipped",
+                                                     page_title, MAX_HISTORY_REVISIONS)
         return {"eligible": False, "error": True}
 
 
@@ -605,13 +694,17 @@ def fetch_all_existing_page_levels(wiki_domain: str, base_name: str) -> dict:
             break
     return levels
 
-def fetch_live_book_pages_from_wiki(wiki_domain: str, base_name: str, start_time: datetime, end_time: datetime, known_revs: dict = None):
+def fetch_live_book_pages_from_wiki(wiki_domain: str, base_name: str, start_time: datetime, end_time: datetime,
+                                    known_revs: dict = None, deadline: float = None):
     """
     Returns (results, complete).
     - results[page_num] = {...}; pages whose latest revision equals known_revs[page_num]
       are returned as {"unchanged": True, "rev_latest": ...} without extra API calls (incremental sync).
     - complete is False if any API request failed; callers must then NOT treat missing
       pages as removed (prevents wiping points on a network glitch).
+    - deadline (time.monotonic() value): stop when it has passed and return what was read so
+      far with complete=False. The pages already read keep their revision id, so the next sync
+      skips them and carries on from there.
     """
     api_url = get_api_url(wiki_domain)
     prefixes = get_namespace_prefixes(wiki_domain)
@@ -620,7 +713,13 @@ def fetch_live_book_pages_from_wiki(wiki_domain: str, base_name: str, start_time
     complete = True
     gapcontinue = None
 
+    def out_of_time():
+        return deadline is not None and time.monotonic() > deadline
+
     while True:
+        if out_of_time():
+            complete = False
+            break
         params = {
             "action": "query",
             "generator": "allpages",
@@ -676,6 +775,9 @@ def fetch_live_book_pages_from_wiki(wiki_domain: str, base_name: str, start_time
                 if latest_dt < start_time:
                     continue
 
+                if out_of_time():          # the history walk is the slow part: stop before it, not after
+                    complete = False
+                    continue
                 check = verify_page_in_contest_window(api_url, title, start_time, end_time)
                 if check.get("error"):
                     complete = False
