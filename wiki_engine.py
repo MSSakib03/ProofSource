@@ -85,6 +85,104 @@ def is_valid_wiki_domain(raw) -> bool:
     return normalize_wiki_domain(raw) is not None
 
 
+# ---------------------------------------------------------------------------
+#  The list of Wikisource wikis
+#  Taken live from Meta-Wiki's site matrix, so a newly created Wikisource shows up in the
+#  contest form without any change to this tool. The short list below is only the fallback
+#  for the first minutes after a restart with Meta unreachable; whatever happens, any
+#  "<code>.wikisource.org" domain typed by hand is accepted too (see WIKISOURCE_DOMAIN_RE).
+# ---------------------------------------------------------------------------
+SITEMATRIX_API = "https://meta.wikimedia.org/w/api.php"
+WIKI_LIST_TTL = 24 * 3600        # a fresh list is fetched once a day ...
+WIKI_LIST_RETRY = 600            # ... and a failed fetch is retried after ten minutes
+MULTILINGUAL_DOMAIN = "wikisource.org"
+
+FALLBACK_WIKISOURCES = [
+    ("bn", "বাংলা উইকিসংকলন", "Bangla"), ("en", "English Wikisource", "English"),
+    ("hi", "हिन्दी विकिस्रोत", "Hindi"), ("as", "অসমীয়া ৱিকিউৎস", "Assamese"),
+    ("or", "ଓଡ଼ିଆ ଉଇକିପାଠାଗାର", "Odia"), ("ta", "தமிழ் விக்கிமூலம்", "Tamil"),
+    ("ml", "മലയാളം വിക്കിഗ്രന്ഥശാല", "Malayalam"), ("gu", "ગુજરાતી વિકિસ્રોત", "Gujarati"),
+    ("mr", "मराठी विकिस्रोत", "Marathi"), ("te", "తెలుగు వికీసోర్స్", "Telugu"),
+    ("kn", "ಕನ್ನಡ ವಿಕಿಸೋರ್ಸ್", "Kannada"), ("pa", "ਪੰਜਾਬੀ ਵਿਕੀਸਰੋਤ", "Punjabi"),
+    ("sa", "संस्कृतम् विकिस्रोत", "Sanskrit"), ("fr", "Français Wikisource", "French"),
+    ("de", "Deutsch Wikisource", "German"), ("ar", "العربية ويكي مصدر", "Arabic"),
+]
+_WIKI_LIST = {"at": None, "ok": False, "wikis": None}
+
+
+def _multilingual_entry() -> dict:
+    return {"domain": MULTILINGUAL_DOMAIN, "code": "mul", "label": "Multilingual Wikisource", "name_en": "Multilingual"}
+
+
+def fallback_wikisources() -> list:
+    out = [{"domain": f"{code}.wikisource.org", "code": code, "label": label, "name_en": name_en}
+           for code, label, name_en in FALLBACK_WIKISOURCES]
+    out.sort(key=lambda w: w["code"])
+    return out + [_multilingual_entry()]
+
+
+def parse_sitematrix(matrix: dict) -> list:
+    """Open, public Wikisource wikis out of an `action=sitematrix` answer."""
+    found = {}
+    for key, group in (matrix or {}).items():
+        if key in ("count", "specials") or not isinstance(group, dict):
+            continue
+        for site in group.get("site") or []:
+            if not isinstance(site, dict) or site.get("code") != "wikisource":
+                continue
+            if "closed" in site or "private" in site or "fishbowl" in site:
+                continue
+            domain = normalize_wiki_domain(site.get("url"))
+            if not domain or domain == MULTILINGUAL_DOMAIN:
+                continue
+            code = domain.split(".")[0]
+            name = str(group.get("name") or code).strip()
+            sitename = str(site.get("sitename") or "Wikisource").strip()
+            found[domain] = {"domain": domain, "code": code, "label": f"{name} {sitename}"[:120],
+                             "name_en": str(group.get("localname") or "").strip()[:80]}
+    wikis = sorted(found.values(), key=lambda w: w["code"])
+    for site in (matrix or {}).get("specials") or []:
+        if isinstance(site, dict) and normalize_wiki_domain(site.get("url")) == MULTILINGUAL_DOMAIN \
+                and "closed" not in site:
+            wikis.append(_multilingual_entry())
+            break
+    return wikis
+
+
+def fetch_wikisources() -> list:
+    """Asks Meta-Wiki for every Wikisource. Raises when the answer is unusable."""
+    wikis, cont = {}, None
+    for _ in range(10):
+        params = {"action": "sitematrix", "smtype": "language|special", "smlangprop": "code|name|site|localname",
+                  "smsiteprop": "url|sitename|code", "smlimit": "max", "format": "json"}
+        if cont:
+            params["smcontinue"] = cont
+        res = requests.get(SITEMATRIX_API, params=params, headers={"User-Agent": USER_AGENT}, timeout=10).json()
+        for w in parse_sitematrix(res.get("sitematrix") or {}):
+            wikis[w["domain"]] = w
+        cont = (res.get("continue") or {}).get("smcontinue")
+        if not cont:
+            break
+    if len(wikis) < 5:
+        raise RuntimeError("site matrix returned no Wikisource list")
+    multi = wikis.pop(MULTILINGUAL_DOMAIN, None) or _multilingual_entry()
+    return sorted(wikis.values(), key=lambda w: w["code"]) + [multi]
+
+
+def list_wikisources() -> dict:
+    """{"wikis": [...], "live": bool}. Cached per process; never raises and never returns an
+    empty list (the last good list, else the built-in fallback, is served when Meta is down)."""
+    now = time.monotonic()
+    at = _WIKI_LIST["at"]
+    fresh = at is not None and now - at < (WIKI_LIST_TTL if _WIKI_LIST["ok"] else WIKI_LIST_RETRY)
+    if not fresh:
+        try:
+            _WIKI_LIST.update(at=now, ok=True, wikis=fetch_wikisources())
+        except Exception:
+            _WIKI_LIST.update(at=now, ok=False)
+    return {"wikis": _WIKI_LIST["wikis"] or fallback_wikisources(), "live": _WIKI_LIST["wikis"] is not None}
+
+
 PAGEQUALITY_TAG_REGEX = re.compile(r'<pagequality\s+level=["\'](\d)["\']\s+user=["\'](.*?)["\']\s*/>')
 _PQ_PREFIX_RE = re.compile(r'<noinclude><pagequality level="(\d)" user="')
 _PQ_TAG_END_RE = re.compile(r'"\s*/>')
@@ -189,6 +287,9 @@ def is_user_wiki_admin(wiki_domain: str, username: str) -> bool:
             return is_sysop
     except Exception:
         pass
+    # unknown user or wiki unreachable: remember "no" for a minute, so a slow or broken wiki
+    # is not asked again on every request
+    ADMIN_CACHE[cache_key] = (False, time.monotonic() - ADMIN_CACHE_TTL + 60)
     return False
 
 def identify_bot_users(wiki_domain: str, usernames: list) -> set:

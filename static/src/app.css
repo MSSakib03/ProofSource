@@ -89,6 +89,10 @@
 /* ---------------------------------------------------------------- base */
 @layer base {
   html { -webkit-text-size-adjust: 100%; }
+  /* Text size chosen in the header ("AA"). Every size in the tool is in rem, so this scales it all. */
+  html[data-ps-size="s"] { font-size: 87.5%; }
+  html[data-ps-size="l"] { font-size: 112.5%; }
+  html[data-ps-size="xl"] { font-size: 125%; }
   body { background: var(--ps-bg); color: var(--ps-text); }
   a { color: var(--ps-progressive); }
   a:hover { color: var(--ps-progressive-hover); }
@@ -157,6 +161,14 @@
              color: #fff; background: rgba(255, 255, 255, .1); border: 1px solid rgba(255, 255, 255, .15); border-radius: 4px; white-space: nowrap;
              transition: background-color .15s; }
   .ps-hbtn:hover { background: rgba(255, 255, 255, .2); }
+  /* text-size control: fixed px on purpose, so the control itself never jumps when the size changes */
+  .ps-size-glyph { font-family: theme('fontFamily.serif'); font-size: 15px; line-height: 1; letter-spacing: .01em; }
+  .ps-size-glyph > span { font-size: 11px; }
+  .ps-size-opt { display: inline-flex; align-items: flex-end; justify-content: center; width: 38px; height: 38px; padding-bottom: 7px;
+                 border: 1px solid var(--ps-border); border-radius: 2px; background: var(--ps-surface, transparent); color: var(--ps-text);
+                 font-family: theme('fontFamily.serif'); line-height: 1; cursor: pointer; }
+  .ps-size-opt:hover { border-color: var(--ps-progressive); color: var(--ps-progressive); }
+  .ps-size-opt.is-active { border-color: var(--ps-progressive); background: var(--ps-progressive); color: #fff; }
   .dark .ps-hbtn { background: rgba(255, 255, 255, .06); border-color: rgba(255, 255, 255, .1); }
   .dark .ps-hbtn:hover { background: rgba(255, 255, 255, .12); }
   header { --ps-logo-ring: #2f4f8c; } .dark header { --ps-logo-ring: #13213a; }
@@ -226,6 +238,8 @@
   /* header & footer */
   .ps-wordmark { font-family: theme('fontFamily.serif'); font-size: 1.35rem; line-height: 1; color: var(--ps-text); letter-spacing: -.01em; }
   @media (max-width: 479px) { header .ps-wordmark { font-size: 1.05rem; } }
+  /* larger text on a phone: the bar keeps its buttons, the wordmark steps aside (the logo stays) */
+  @media (max-width: 479px) { html[data-ps-size="l"] header .ps-wordmark, html[data-ps-size="xl"] header .ps-wordmark { display: none; } }
   .ps-title-link { color: inherit; text-decoration: none; }
   .ps-title-link:hover { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .15em; }
   .ps-nav-link { position: relative; padding: 1.05rem .15rem; font-size: .875rem; font-weight: 600; color: rgba(255, 255, 255, .8); }

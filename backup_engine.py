@@ -307,6 +307,13 @@ def restore_contest(db, contest, payload, models, username: str) -> dict:
     return {"pages": len(data["pages"]), "books": len(data["books"]), "safety_copy": os.path.basename(safety_path)}
 
 
+def csv_safe(value) -> str:
+    """Text that a spreadsheet would run as a formula (=, +, -, @ first) is prefixed with an
+    apostrophe. User names and reviewer notes are free text typed by other people."""
+    text = "" if value is None else str(value)
+    return "'" + text if text[:1] in ("=", "+", "-", "@", "\t", "\r") else text
+
+
 def pages_csv_iter(contest, ContestPage, chunk: int = 2000):
     """Streams a CSV of every page record (for spreadsheets; JSON is the restorable format)."""
     titles = {b.id: b.title for b in contest.books}
@@ -329,10 +336,10 @@ def _pages_csv_gen(contest_id, titles, ContestPage, chunk):
         if not rows:
             break
         for p in rows:
-            w.writerow([titles.get(p.book_id, ""), p.page_number, p.page_title, p.wiki_level,
-                        p.proofreader or "", p.validator or "", p.review_status, p.reviewed_by or "",
+            w.writerow([csv_safe(titles.get(p.book_id, "")), p.page_number, csv_safe(p.page_title), p.wiki_level,
+                        csv_safe(p.proofreader), csv_safe(p.validator), p.review_status, csv_safe(p.reviewed_by),
                         _dt(p.reviewed_at) or "", p.base_points, p.bonus_points,
-                        _dt(p.proofread_time) or "", p.proofread_rev_id or "", p.jury_note or ""])
+                        _dt(p.proofread_time) or "", p.proofread_rev_id or "", csv_safe(p.jury_note)])
         last_id = rows[-1].id
         yield buf.getvalue(); buf.seek(0); buf.truncate()
 
