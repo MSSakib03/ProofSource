@@ -18,6 +18,15 @@ ProofSource maintenance commands (run from the repository root, inside the tool'
   python3 manage.py snapshot [--reason NAME]
       Write a whole-database snapshot to the backup folder now (suitable for a scheduled job:
       toolforge jobs run --schedule "17 */12 * * *" --command "..." snapshot).
+
+  python3 manage.py sync [--stale-minutes N] [--all]
+      Sync every approved, running contest with its wiki, with no time limit (the web pages only
+      sync in short slices). Run it from a scheduled job so the leaderboards stay fresh even when
+      nobody has a contest open:
+        toolforge jobs run proofsource-sync --image python3.11 --schedule "*/15 * * * *" \
+          --command "cd ~/www/python/src && ~/www/python/venv/bin/python manage.py sync"
+      --stale-minutes: skip contests synced more recently than this (default 10).
+      --all: also contests that ended up to 2 days ago (late edits, final results).
 """
 import argparse
 import gzip
@@ -137,6 +146,31 @@ def copy_db(source: str, target_url: str, force: bool = False) -> dict:
     return copied
 
 
+def cmd_sync(stale_minutes: int = 10, include_ended: bool = False) -> int:
+    from datetime import timedelta
+    import app as web
+    from models import Contest, migrate_schema
+    failed = 0
+    with web.app.app_context():
+        migrate_schema()
+        now = datetime.utcnow()
+        grace = timedelta(days=2) if include_ended else timedelta(0)
+        contests = Contest.query.filter(Contest.approval_status == "approved", Contest.start_time <= now,
+                                        Contest.end_time >= now - grace).order_by(Contest.id).all()
+        for c in contests:
+            if c.last_synced_at and (now - c.last_synced_at) < timedelta(minutes=stale_minutes):
+                print(f"contest {c.id} ({c.slug}): fresh, skipped")
+                continue
+            try:
+                res = web.sync_contest_books(c)        # no deadline: runs to the end
+                print(f"contest {c.id} ({c.slug}): {res}")
+            except Exception as e:                     # one broken contest must not stop the others
+                web.db.session.rollback()
+                failed += 1
+                print(f"contest {c.id} ({c.slug}): FAILED {e!r}")
+    return 1 if failed else 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="ProofSource maintenance")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -147,6 +181,9 @@ def main(argv=None):
     cp.add_argument("--force", action="store_true")
     sp = sub.add_parser("snapshot")
     sp.add_argument("--reason", default="manual")
+    sy = sub.add_parser("sync")
+    sy.add_argument("--stale-minutes", type=int, default=10)
+    sy.add_argument("--all", action="store_true")
     args = ap.parse_args(argv)
 
     url = db_config.resolve_database_url()
@@ -164,6 +201,8 @@ def main(argv=None):
             print(f"  {k:15s} {v} rows")
         print("done. OAuth logins were not copied: users log in again once.")
         return 0
+    if args.cmd == "sync":
+        return cmd_sync(args.stale_minutes, args.all)
     if args.cmd == "snapshot":
         import backup_engine
         res = backup_engine.snapshot_database(_engine(url), args.reason)

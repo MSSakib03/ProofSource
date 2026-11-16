@@ -70,7 +70,7 @@ A.fetch_index_page_count = lambda domain, base: 100
 
 def live(entries, complete=True):
     """Build a fake fetch_live_book_pages_from_wiki returning the given pages."""
-    def _f(domain, base, start, end, known_revs=None):
+    def _f(domain, base, start, end, known_revs=None, deadline=None):
         _f.calls.append({"start": start, "end": end, "known": dict(known_revs or {})})
         out = {}
         for n, (user, lvl, rev) in entries.items():

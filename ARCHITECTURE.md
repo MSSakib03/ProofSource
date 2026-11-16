@@ -10,7 +10,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-236798)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-006699)
 ![Vue](https://img.shields.io/badge/Vue-3-4D8AC0)
-![Tests](https://img.shields.io/badge/tests-95%20passing-2e7d32)
+![Tests](https://img.shields.io/badge/tests-99%20passing-2e7d32)
 
 </div>
 
@@ -115,6 +115,7 @@ Set with `toolforge envvars create NAME VALUE`. Secrets are never stored in code
 | `PROOFSOURCE_SNAPSHOT_KEEP` | Number of snapshots kept | `21` |
 | `PROOFSOURCE_JSON_BACKUPS_KEEP` | Server-side JSON copies kept per contest | `10` |
 | `PROOFSOURCE_FORCED_SYNC_SECONDS` | Minimum gap between two forced syncs of a contest | `30` |
+| `PROOFSOURCE_SYNC_SECONDS` | Longest a sync may run inside one web request; the next request carries on (`0` = no limit) | `25` |
 | `PROOFSOURCE_MAX_UPLOAD_MB` | Largest accepted request (backup restore) | `200` |
 | `PROOFSOURCE_INSECURE_COOKIES` | `1` only for local http development | — |
 
@@ -152,7 +153,7 @@ On MariaDB every table is created as `utf8mb4` with the **binary** collation `ut
 
 **Migration** (`migrate_schema()`): runs on the first request. Creates missing tables, then `ALTER TABLE … ADD COLUMN` for any missing column and creates missing indexes. Never drops or rewrites data, so old databases upgrade in place.
 
-Indexes for scale: `(contest_id, review_status)`, `(book_id, page_number)`, `(contest_id, proofreader)`, plus single-column indexes.
+Indexes for scale: `(contest_id, review_status)`, `(contest_id, proofreader)`, plus single-column indexes. `(book_id, page_number)` is **unique** (`uq_cp_book_page`): a page can be recorded once per book, whatever two workers do at the same moment. On an older database the migration first removes duplicate rows (keeping the one with a review decision), then creates the index.
 
 ---
 
@@ -176,6 +177,9 @@ Uses the page's **full revision history** (oldest → newest, paged up to 500 re
 - A per-contest lock (`sync_started_at`, 10 min) prevents two workers syncing the same contest. It is taken with one conditional `UPDATE`, so two workers starting at the same moment cannot both get it.
 - Changing the contest/book window clears `last_rev_id`, so the next sync re-checks every page.
 - `GET /api/contests/<id>` returns **cached** data instantly; the frontend calls `POST /sync` in the background when data is stale (> 5 min).
+- **Time slices:** a sync inside a web request stops after `PROOFSOURCE_SYNC_SECONDS` and answers `partial: true` (the contest's `last_synced_at` is cleared, so it counts as stale). Books are taken oldest-synced first (`index_books.last_synced_at`) and pages already read keep their `last_rev_id`, so the next call continues instead of starting again; the frontend simply calls `/sync` until it is no longer partial. Adding or editing a book uses the same limit.
+- **Scheduled sync:** `python3 manage.py sync` syncs every approved, running contest with no time limit. Run it from a Toolforge scheduled job (§9) so leaderboards stay fresh without anyone having the page open.
+- **Histories:** a page's history is read to its end, 50 revisions at a time, without holding it in memory (`iter_revision_history`). A page with more than 5000 revisions is skipped and the sync reported as incomplete, rather than judged on a partial history.
 
 ### 5.2a Page lifecycle and submission modes
 | Status | Meaning | Counted |
@@ -237,7 +241,7 @@ Every permission is checked in the backend; the UI only hides buttons. Tool admi
 ### 5.6b The list of Wikisource wikis
 - Nothing in the tool names the wikis it supports. `wiki_engine.list_wikisources()` reads Meta-Wiki's site matrix (`action=sitematrix`), keeps the open, public sites whose code is `wikisource` plus the multilingual `wikisource.org`, and caches the result per worker for 24 hours. A newly created Wikisource therefore appears in the contest form by itself, at the latest a day after it is created.
 - If Meta cannot be reached, the last good list is served; right after a restart a short built-in list is used and Meta is asked again ten minutes later. The frontend keeps the last live list in `localStorage` (`ps_wikis`).
-- The form also has **Other Wikisource**: any domain (or bare language code) can be typed. The only rule, in the browser and in the backend, is the allowlist pattern of §5.6a, so a contest can be set up on a wiki that is not in the list yet.
+- The chooser (`WikiPicker`) opens the whole list with a search box: a language code or a name filters it and Enter picks the best match. The form also has **Other Wikisource**: a box for the language code alone, with `.wikisource.org` fixed beside it. The only rule, in the browser and in the backend, is the allowlist pattern of §5.6a, so a contest can be set up on a wiki that is not in the list yet.
 - Namespace names (Page, Index) are never hard-coded per wiki: they come from the wiki's own `siteinfo` (`get_namespace_prefixes`).
 - A contest that already has recorded pages cannot be moved to another wiki (`wiki_has_data`).
 
@@ -257,7 +261,7 @@ Pages (all render `index.html` with `window.PS_INITIAL` for instant direct links
 
 Auth: `/login`, `/auth/callback`, `/logout`, `GET /api/session`.
 
-Wikis: `GET /api/wikis` (the list of Wikisource wikis, see §5.6b).
+Wikis: `GET /api/wikis` (the list of Wikisource wikis, see §5.6b); `GET /api/wiki/index-search?wiki=&q=` (index names starting with `q`) and `GET /api/wiki/index-info?wiki=&title=` (exists? page count), both for logged-in users, used by the book adder.
 
 Submission: `POST …/enroll`, `GET …/my-eligible`, `POST …/submit`.
 
@@ -282,12 +286,14 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 - Single Vue 3 app (no JavaScript build step; Vue and DOMPurify are vendored in `static/vendor`). Views: `home` (status tabs, search, language/project filter, central contests as a collapsible tree), `contest`, `edit_config` / `create`, `jury` (review panel), `userpages`, `central`, `central_form`.
 - **i18n**: the `I18N = { en: {...}, bn: {...} }` table. No hard-coded UI text; English is the fallback. To add a language, copy `en`.
 - Theme: **light by default**, whatever the browser or OS prefers; dark mode only when the visitor chooses it (`ws_theme` in localStorage, applied before first paint). Dark mode uses the same tokens as light mode (`static/src/app.css`), and the template's `dark:slate-*` utilities are mapped onto them.
+- The configuration page is split into tabs (`cfgTab`): General, Rules & points, Review, Books, Backup. The first three are one form saved with one button; in the Books tab each book is a row that opens to edit and is saved on its own, and new books go through a checked list (`bookAdd`: suggestions from `index-search`, existence and page count from `index-info`, shared points and dates) and are added one by one with `POST …/books`.
 - Saving a contest configuration (create or edit) first opens a compact summary to confirm.
 - Buttons: the main action is solid blue (`.ps-btn-primary`); every other `.ps-btn` uses the Codex *normal progressive* look (pale blue fill, blue outline and text). The sync button carries a "Sync" label except on phones narrower than 380 px. The header logo sits in a thin rounded outline (`.ps-logo-tile`).
 - Icons for the home-page totals (desktop only) are taken from the Wikimedia Codex icon set (`@wikimedia/codex-icons`, MIT): `cdxIconLive`, `cdxIconArticleCheck`, `cdxIconLogoWikisource`, inlined as SVG.
-- The reviewer chips on the contest page are measured (`fitJuries`): as many as fit on one line beside the dates on wide screens, two lines on phones, then "+N".
-- Dates are always UTC, with Bangla digits and month names in Bangla. On the contest page the dates sit at the left edge and the countdown at the right edge of one line; phones get the short forms (`formatDateRange` writes a shared year once, `countdownShort` keeps the two largest units).
-- Text size: the **AA** button in the header sets `data-ps-size` (`s`/`l`/`xl`) on `<html>`, which changes the root font size (87.5 % / 112.5 % / 125 %). Every size in the template and stylesheet is in `rem`, so the whole interface scales; never add `px` font sizes. The choice is stored in `ps_text_size` and applied before first paint. On phones the theme switch lives in the same menu.
+- The reviewer chips on the contest page are measured (`fitJuries`): as many as fit on one line beside the dates on wide screens, two lines on tablets, then "+N". Phones use a two-column grid of equal-width chips (long names are cut with an ellipsis): two rows, the last cell being "+N".
+- Footer: on phones the two links about the host (Toolforge, terms of use) are left out.
+- Dates are always UTC, with Bangla digits and month names in Bangla. On the contest page the dates sit at the left edge and the countdown at the right edge of one line. `fitDateRow` measures it in three steps: the full countdown if it fits, else without its smallest unit, and if even that needs a second line both chips are left-aligned.
+- Text size: the **AA** button in the header sets `data-ps-size` (`s`/`l`/`xl`) on `<html>`, which changes the root font size (87.5 % / 112.5 % / 125 %). Every size in the template and stylesheet is in `rem`, so the whole interface scales; never add `px` font sizes. The choice is stored in `ps_text_size` and applied before first paint. On phones the theme switch lives in the same menu, and the button shows the theme icon beside an “A”.
 - The header and the reviewer chips are re-measured when a web font finishes loading (`document.fonts` `loadingdone`), because the Bangla fonts arrive after the first layout.
 - "Proofread any page" opens its tab during the click and fills in the address when the server answers; a tab opened after the answer is blocked by most mobile browsers.
 - Keyboard shortcuts use `event.code` (Alt+A accept, Alt+F needs fix, Alt+R reject, Alt+N next), so they work with Bangla/Avro layouts and never fire inside text fields.
@@ -300,7 +306,7 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 
 ## 8. Testing
 
-- `python3 -m unittest discover -s tests` (95 tests, network fully mocked): OAuth flow, counting rules, sync safety, review rules, equal distribution, bulk review, central contests, my-pages visibility, backup/restore/tamper, audit append-only, migration of an old database, deletion workflow, and `tests/test_security.py` (CSRF, headers/CSP, wiki allowlist, XSS, signed backups, exact tool-admin match, login expiry, token encryption + PKCE, ReDoS, rate limits, review locks).
+- `python3 -m unittest discover -s tests` (99 tests, network fully mocked): OAuth flow, counting rules, sync safety, review rules, equal distribution, bulk review, central contests, my-pages visibility, backup/restore/tamper, audit append-only, migration of an old database, deletion workflow, and `tests/test_security.py` (CSRF, headers/CSP, wiki allowlist, XSS, signed backups, exact tool-admin match, login expiry, token encryption + PKCE, ReDoS, rate limits, review locks).
 - The same suite runs against MariaDB: `PROOFSOURCE_TEST_DATABASE_URL='mysql+pymysql://user:pw@localhost/db?charset=utf8mb4' python3 -m unittest discover -s tests`.
 - Load test (local, SQLite): 1k / 10k / 50k / 100k pages; 4 concurrent reviewers; restore of 50k pages ≈ 4 s.
 - Browser tests were run with Playwright + Chromium: direct links, i18n, shortcuts, bulk selection, mobile (375 px) without horizontal overflow.
@@ -330,7 +336,12 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
    pip install -r ~/www/python/src/requirements.txt
    ```
 5. Start the service with `toolforge webservice python3.11 start`. Tables are created automatically.
-6. Optional but recommended — snapshots independent of web traffic:
+6. Recommended — keep contests synced without anyone having the page open:
+   ```bash
+   toolforge jobs run proofsource-sync --image python3.11 --schedule "*/15 * * * *" \
+     --command "cd ~/www/python/src && ~/www/python/venv/bin/python manage.py sync"
+   ```
+7. Optional but recommended — snapshots independent of web traffic:
    ```bash
    toolforge jobs run proofsource-snapshot --image python3.11 --schedule "17 */12 * * *" \
      --command "cd ~/www/python/src && ~/www/python/venv/bin/python manage.py snapshot"

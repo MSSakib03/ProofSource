@@ -175,7 +175,7 @@ Click **Create Contest** on the home page and fill in:
 
 | Field | Notes |
 |---|---|
-| Name, project, description | The project list holds every Wikisource and updates itself when a new one is created. A wiki that is not listed yet can be typed under **Other Wikisource** (language code or domain). The project cannot be changed once pages are recorded. |
+| Name, project, description | The project list holds every Wikisource and updates itself when a new one is created. Open it and scroll, or type a language code (`bn`, `as`) or a name and press Enter. For a wiki that is not listed yet choose **Other Wikisource** and type only its language code; `.wikisource.org` is already there. The project cannot be changed once pages are recorded. |
 | Link slug | e.g. `wcnov26` → `/contest/bn/wcnov26`. Leave empty for a random one. |
 | Start / end (UTC) | |
 | Points | Default points per page; validation points (0 = validation is not counted or shown); max bonus. |
@@ -187,7 +187,7 @@ Click **Create Contest** on the home page and fill in:
 | Submission | *Automatic*, *Semi-automatic (enrol)* or *Manual submission* (see [How your pages enter the contest](#how-your-pages-enter-the-contest)). Switching to automatic lists every page that is waiting; switching to semi-automatic lists the waiting pages of enrolled participants. |
 | Rejected pages | Revert in one batch after the contest, or immediately. |
 | Announcements | English and Bangla. |
-| Index pages | One per line, e.g. `Index:Book.djvu` or `নির্ঘণ্ট:বই.pdf`. |
+| Books (the **Books** tab) | Start typing an index name and pick a suggestion, or type the full name and press Enter; a pasted list (one book per line) is added in one go. Each book is checked on the wiki and shown with its page count before it is added. Points per page and an own start/end can be set for all the listed books at once. |
 
 Press **Save Configuration**: a short summary of the settings appears. Check it and press **Confirm & save** (or go back to editing). The same summary appears when you save changes later.
 
@@ -195,7 +195,8 @@ If you are an administrator of that Wikisource, the contest is active immediatel
 
 ### Configuration (⚙)
 - Every setting can be changed later, and each change is recorded in the **Activity Log**.
-- **Books:** set custom points, excluded pages and a book-specific time window, then press **Update**.
+- The configuration page has tabs: **General**, **Rules & points**, **Review**, **Books** and **Backup**. The first three are saved together with **Save configuration**.
+- **Books:** every book is one row; **Edit** opens it to set custom points, excluded pages and a book-specific time window, then press **Save book**. Books are saved one at a time, not with **Save configuration**.
   - Excluded pages: `1-5, 12` excludes pages 1 to 5 and page 12. Invalid input is rejected with a message.
   - An empty book window means the contest window applies. A book window may extend outside the contest dates.
 - **Removing a book:** *Retain pages & points* stops tracking but keeps earned points; *Delete book* removes its pages and points.

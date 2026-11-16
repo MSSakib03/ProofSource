@@ -375,3 +375,89 @@ class DeepCheckTests(Base):
         pages = self.c.get(f"/api/contests/{cid}/backup-pages.csv").data.decode("utf-8-sig")
         self.assertIn("'=HYPERLINK(1)", pages)
         self.assertEqual(A.backup_engine.csv_safe("Bob"), "Bob")
+
+
+class DataIntegrityTests(Base):
+    def test_old_database_with_duplicate_pages_is_cleaned_and_gets_the_unique_index(self):
+        from sqlalchemy import text, inspect
+        from models import migrate_schema
+        cid = self.make_contest(entries={1: ("Alice", 3, 1)})
+        with A.app.app_context():
+            page = ContestPage.query.filter_by(contest_id=cid).one()
+            page.review_status = "accepted"
+            db.session.commit()
+            with db.engine.begin() as conn:                      # the state of a database from before the index
+                conn.execute(text("DROP INDEX uq_cp_book_page" + ("" if db.engine.dialect.name == "sqlite" else " ON contest_pages")))
+                conn.execute(text("INSERT INTO contest_pages (contest_id, book_id, page_number, page_title, review_status) "
+                                  "VALUES (:c, :b, 1, 'dup', 'pending_review')"), {"c": cid, "b": page.book_id})
+            self.assertEqual(ContestPage.query.filter_by(contest_id=cid).count(), 2)
+            migrate_schema()
+            rows = ContestPage.query.filter_by(contest_id=cid).all()
+            self.assertEqual([r.review_status for r in rows], ["accepted"])      # the reviewed row is the one kept
+            self.assertIn("uq_cp_book_page", {i["name"] for i in inspect(db.engine).get_indexes("contest_pages")})
+            with self.assertRaises(Exception):
+                with db.engine.begin() as conn:
+                    conn.execute(text("INSERT INTO contest_pages (contest_id, book_id, page_number, page_title) "
+                                      "VALUES (:c, :b, 1, 'again')"), {"c": cid, "b": page.book_id})
+
+    def test_long_history_is_read_to_the_end(self):
+        """A page first proofread after its 500th revision used to be judged on a cut-off history."""
+        start, end = datetime(2026, 1, 1), datetime(2026, 2, 1)
+        raw = lambda lvl, user, body: (f'<noinclude><pagequality level="{lvl}" user="{user}" /></noinclude>'
+                                       f'{body}<noinclude></noinclude>')
+        revs = [{"revid": i, "user": "Typist", "timestamp": "2025-06-01T00:00:00Z",
+                 "slots": {"main": {"*": raw(1, "Typist", f"text {i}")}}} for i in range(1, 701)]
+        revs.append({"revid": 701, "user": "Alice", "timestamp": "2026-01-10T00:00:00Z",
+                     "slots": {"main": {"*": raw(3, "Alice", "final text")}}})
+        calls = []
+
+        def fake_get(url, params=None, **kw):
+            off = int(params.get("rvcontinue") or 0)
+            calls.append(off)
+            chunk = revs[off:off + 50]
+            out = {"query": {"pages": {"1": {"revisions": chunk}}}}
+            if off + 50 < len(revs):
+                out["continue"] = {"rvcontinue": str(off + 50)}
+            return _Resp(out)
+
+        real = A.wiki_engine.requests.get
+        A.wiki_engine.requests.get = fake_get
+        try:
+            res = A.wiki_engine.verify_page_in_contest_window("https://bn.wikisource.org/w/api.php", "Page:B/1", start, end)
+            self.assertTrue(res["eligible"])
+            self.assertEqual(res["proofreader"], "Alice")
+            self.assertEqual(len(calls), 15)
+            with self.assertRaises(RuntimeError):      # over the cap: an error, never a guess on a cut-off history
+                list(A.wiki_engine.iter_revision_history("https://bn.wikisource.org/w/api.php", "Page:B/1", max_revs=600))
+        finally:
+            A.wiki_engine.requests.get = real
+
+    def test_sync_that_runs_out_of_time_is_continued_by_the_next_call(self):
+        import time as _time
+        cid = self.make_contest(books="Index:A.pdf\nIndex:B.pdf", entries={1: ("Alice", 3, 1)})
+        with A.app.app_context():
+            c = db.session.get(Contest, cid)
+            res = A.sync_contest_books(c, deadline=_time.monotonic() - 1)      # no time at all
+            self.assertTrue(res["partial"])
+            self.assertFalse(res["complete"])
+            self.assertIsNone(db.session.get(Contest, cid).last_synced_at)     # marked unfinished ...
+            self.assertTrue(self.c.get(f"/api/contests/{cid}").json["contest"]["needs_sync"])
+            res = A.sync_contest_books(c, deadline=_time.monotonic() + 60)     # ... and the next call finishes it
+            self.assertEqual((res["partial"], res["complete"]), (False, True))
+            self.assertIsNotNone(db.session.get(Contest, cid).last_synced_at)
+            self.assertTrue(all(b.last_synced_at for b in c.books))
+
+    def test_book_lookup_needs_login_and_a_wikisource(self):
+        anon = A.app.test_client()
+        self.assertEqual(anon.get("/api/wiki/index-search?wiki=bn.wikisource.org&q=abc").status_code, 401)
+        self.login("Admin")
+        self.assertEqual(self.c.get("/api/wiki/index-search?wiki=evil.example&q=abc").json["error_code"], "invalid_project")
+        real_s, real_i = A.wiki_engine.search_index_titles, A.wiki_engine.index_info
+        A.wiki_engine.search_index_titles = lambda d, q, limit=10: [f"Index:{q}.pdf"]
+        A.wiki_engine.index_info = lambda d, t: {"title": t, "base_name": t, "exists": True, "total_pages": 120}
+        try:
+            self.assertEqual(self.c.get("/api/wiki/index-search?wiki=bn.wikisource.org&q=Boi").json["titles"], ["Index:Boi.pdf"])
+            self.assertEqual(self.c.get("/api/wiki/index-search?wiki=bn.wikisource.org&q=B").json["titles"], [])
+            self.assertEqual(self.c.get("/api/wiki/index-info?wiki=bn.wikisource.org&title=Index:Boi.pdf").json["total_pages"], 120)
+        finally:
+            A.wiki_engine.search_index_titles, A.wiki_engine.index_info = real_s, real_i

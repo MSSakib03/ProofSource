@@ -78,20 +78,26 @@
         </button>
         <div class="relative shrink-0" @keydown.esc="sizeMenuOpen = false">
           <!-- phones: one "display" button holds text size and theme, so the bar stays as short as before -->
-          <button @click.stop="sizeMenuOpen = !sizeMenuOpen; userMenuOpen = false" class="ps-hbtn" data-size-menu :title="t('textSize')" :aria-label="t('displaySettings')" aria-haspopup="menu" :aria-expanded="sizeMenuOpen ? 'true' : 'false'">
-            <span class="ps-size-glyph" aria-hidden="true"><span>A</span>A</span>
+          <button @click.stop="sizeMenuOpen = !sizeMenuOpen; userMenuOpen = false" class="ps-hbtn" data-size-menu :title="t('displaySettings')" :aria-label="t('displaySettings')" aria-haspopup="menu" :aria-expanded="sizeMenuOpen ? 'true' : 'false'">
+            <!-- phones: the theme icon (moon / sun) beside an "A"; wider screens keep the theme button, so plain "AA" -->
+            <span class="sm:hidden inline-flex items-center gap-1" aria-hidden="true">
+              <svg v-if="darkMode" class="w-4 h-4 text-amber-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+              <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              <span class="ps-size-glyph">A</span>
+            </span>
+            <span class="ps-size-glyph max-sm:hidden" aria-hidden="true"><span>A</span>A</span>
           </button>
           <div v-if="sizeMenuOpen" role="menu" :aria-label="t('textSize')" @click.stop class="absolute right-0 top-full mt-1.5 ps-card shadow-xl p-2.5 z-40 w-max text-slate-800 dark:text-slate-100">
+            <button role="menuitem" @click="toggleTheme" class="sm:hidden ps-btn w-full mb-2.5 !justify-start">
+              <svg v-if="darkMode" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+              <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+              <span>{{ darkMode ? t('light') : t('dark') }}</span>
+            </button>
             <div class="ps-eyebrow pb-1.5">{{ t('textSize') }}</div>
             <div class="flex items-stretch gap-1.5">
               <button v-for="o in textSizes" :key="o.id" role="menuitemradio" :aria-checked="textSize === o.id ? 'true' : 'false'" @click="setTextSize(o.id)"
                       class="ps-size-opt" :class="textSize === o.id ? 'is-active' : ''" :title="t(o.label)" :aria-label="t(o.label)"><span :style="{ fontSize: o.px + 'px' }" aria-hidden="true">A</span></button>
             </div>
-            <button role="menuitem" @click="toggleTheme" class="sm:hidden ps-btn w-full mt-2.5 !justify-start">
-              <svg v-if="darkMode" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="5"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
-              <svg v-else class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
-              <span>{{ darkMode ? t('light') : t('dark') }}</span>
-            </button>
           </div>
         </div>
 
@@ -303,22 +309,27 @@
           </button>
         </div>
 
+        <div class="ps-tabs !mt-2" role="tablist">
+          <button v-for="tab in cfgTabs" :key="tab" type="button" role="tab" :aria-selected="cfgTab === tab" @click="cfgTab = tab"
+                  :class="cfgTab === tab ? 'ps-tab is-active' : 'ps-tab'" class="whitespace-nowrap">{{ t('cfg_' + tab) }}<span v-if="tab === 'books' && cfgBookCount" class="ps-count">{{ fmtNum(cfgBookCount) }}</span></button>
+        </div>
+
         <div v-if="view === 'edit_config' && active && active.contest.hub_slug" class="text-xs p-3 rounded-lg bg-ws-nature/10 border border-ws-nature/25 text-ws-dark dark:text-ws-nature">
           {{ t('childRulesNotice') }} <a :href="'/central/' + active.contest.hub_slug" @click.prevent="openCentral(active.contest.hub_slug)" class="font-semibold underline">{{ active.contest.hub_title }}</a>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div class="sm:col-span-2">
+        <div v-show="cfgTab !== 'backup'" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <div v-show="cfgTab === 'general'" class="sm:col-span-2">
             <label class="ps-label">{{ t('contestName') }}</label>
             <input v-model="form.title" type="text" class="ps-input" />
           </div>
 
-          <div>
+          <div v-show="cfgTab === 'general'">
             <label class="ps-label">{{ t('wikisourceProject') }}</label>
             <wiki-picker v-model="form.wiki_domain" :wikis="wikiProjects" :disabled="isLocked('wiki_domain')"
-                         :other-label="t('otherWikisource')" :hint="t('wikiDomainHint')"></wiki-picker>
+                         :other-label="t('otherWikisource')" :hint="t('wikiDomainHint')" :search-label="t('wikiSearchPh')" :back-label="t('wikiBackToList')" :use-label="t('wikiUseCode')"></wiki-picker>
           </div>
 
-          <div>
+          <div v-show="cfgTab === 'general'">
             <label class="ps-label">{{ t('customSlugLabel') }}</label>
             <div class="flex items-center border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-950 overflow-hidden">
               <span class="px-2.5 py-2 text-xs font-mono text-slate-500 border-r border-slate-300 dark:border-slate-800 shrink-0">/contest/{{ formLangPreview }}/</span>
@@ -326,28 +337,28 @@
             </div>
           </div>
 
-          <div class="sm:col-span-2">
+          <div v-show="cfgTab === 'general'" class="sm:col-span-2">
             <label class="ps-label">{{ t('description') }}</label>
             <textarea v-model="form.description" rows="2" class="ps-input"></textarea>
           </div>
 
-          <div class="sm:col-span-2">
+          <div v-show="cfgTab === 'general'" class="sm:col-span-2">
             <label class="ps-label">{{ t('contestPageLink') }}</label>
             <input v-model="form.link" type="url" inputmode="url" placeholder="https://bn.wikisource.org/wiki/..." class="ps-input" />
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ t('contestPageLinkHelp') }}</p>
           </div>
 
-          <div>
+          <div v-show="cfgTab === 'general'">
             <label class="ps-label">{{ t('startTime') }} (UTC)</label>
             <input v-model="form.start_time" :disabled="isLocked('start_time')" type="datetime-local" class="ps-input" />
           </div>
 
-          <div>
+          <div v-show="cfgTab === 'general'">
             <label class="ps-label">{{ t('endTime') }} (UTC)</label>
             <input v-model="form.end_time" :disabled="isLocked('end_time')" type="datetime-local" class="ps-input" />
           </div>
 
-          <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+          <div v-show="cfgTab === 'rules'" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
             <div>
               <label class="ps-label">{{ t('proofreadPoints') }}</label>
               <input v-model.number="form.proofread_points" :disabled="isLocked('proofread_points')" type="number" min="0" class="ps-input tabular-nums" />
@@ -362,22 +373,22 @@
             </div>
           </div>
 
-          <div>
+          <div v-show="cfgTab === 'general'">
             <label class="ps-label">{{ t('admins') }}</label>
             <input v-model="form.admins" type="text" placeholder="User1, User2" class="ps-input" />
           </div>
 
-          <div v-if="form.review_enabled">
+          <div v-if="form.review_enabled" v-show="cfgTab === 'review'" class="sm:col-span-2">
             <label class="ps-label">{{ t('juries') }}</label>
             <input v-model="form.juries" type="text" placeholder="Jury1, Jury2" class="ps-input" />
           </div>
 
-          <div class="sm:col-span-2">
+          <div v-show="cfgTab === 'rules'" class="sm:col-span-2">
             <label class="ps-label">{{ t('excludedUsersLabel') }}</label>
             <input v-model="form.excluded_users" type="text" :placeholder="t('excludedUsersPlaceholder')" class="ps-input" />
           </div>
 
-          <div class="sm:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div v-show="cfgTab === 'review'" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="space-y-2">
               <label class="ps-label">{{ t('contestReviewType') }}</label>
               <label class="flex items-start gap-2 text-xs cursor-pointer" :class="isLocked('review_enabled') ? 'opacity-60 pointer-events-none' : ''">
@@ -412,7 +423,7 @@
             </div>
           </div>
 
-          <div class="sm:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-4 space-y-2">
+          <div v-show="cfgTab === 'rules'" class="sm:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-4 space-y-2">
             <label class="ps-label">{{ t('submissionMode') }}</label>
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
               <label v-for="m in ['auto', 'enroll', 'manual']" :key="m" class="flex items-start gap-2 text-xs p-3 rounded-lg border cursor-pointer transition"
@@ -423,7 +434,7 @@
             </div>
           </div>
 
-          <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div v-show="cfgTab === 'general'" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label class="ps-label">{{ t('announcementEn') }}</label>
               <textarea v-model="form.announcement_en" rows="2" :placeholder="t('announcementHint')" class="ps-input text-xs"></textarea>
@@ -434,7 +445,7 @@
             </div>
           </div>
 
-          <div v-if="form.review_enabled" class="sm:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div v-if="form.review_enabled" v-show="cfgTab === 'review'" class="sm:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div class="space-y-2">
               <label class="ps-label">{{ t('juryReviewMode') }}</label>
               <label class="flex items-start gap-2 text-xs cursor-pointer">
@@ -464,49 +475,115 @@
             </div>
           </div>
 
-          <div v-if="view === 'edit_config' && active && active.books.length > 0" class="sm:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-4 space-y-2">
-            <label class="ps-label">{{ t('existingIndexBooks') }}</label>
-            <div class="divide-y divide-slate-200 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded-lg">
-              <div v-for="b in active.books" :key="b.id" class="p-3 space-y-2 text-xs">
-                <div class="flex items-baseline gap-2 min-w-0">
-                  <a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(b.title)" target="_blank" rel="noopener" class="font-semibold text-ws-cerulean dark:text-ws-nature hover:underline truncate min-w-0" :title="b.title">{{ b.title }}</a>
-                  <span class="text-slate-400 whitespace-nowrap shrink-0">({{ fmtNum(b.listed) }} / {{ fmtNum(b.effective_pages) }})</span>
-                </div>
-                <div class="flex flex-wrap items-center gap-x-3 gap-y-2">
-                  <div class="flex items-center gap-1">
-                    <span class="text-slate-500">{{ t('pointsPerPage') }}:</span>
-                    <input v-model.number="b.points" :disabled="!active.contest.allow_custom_points" :title="active.contest.allow_custom_points ? '' : t('customPointsOff')" type="number" min="0" class="disabled:opacity-50 w-14 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-xs tabular-nums" />
+          <div v-show="cfgTab === 'books'" class="sm:col-span-2 space-y-5">
+            <!-- books already in the contest: one row each, opened to edit -->
+            <div v-if="view === 'edit_config' && active && active.books.length > 0" class="space-y-2">
+              <label class="ps-label">{{ t('booksInContest') }}</label>
+              <div class="divide-y divide-slate-200 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded">
+                <div v-for="b in active.books" :key="b.id" :class="b.is_active ? '' : 'opacity-60'">
+                  <div class="flex items-center gap-2.5 px-3 py-2.5">
+                    <div class="min-w-0 flex-1">
+                      <a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(b.title)" target="_blank" rel="noopener" class="font-semibold text-ws-cerulean dark:text-ws-nature hover:underline truncate block" :title="b.title">{{ b.title }}</a>
+                      <div class="text-xs text-slate-600 dark:text-slate-400 flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                        <span class="tabular-nums">{{ fmtNum(b.listed) }} / {{ fmtNum(b.effective_pages) }} {{ t('pages') }}</span>
+                        <span class="tabular-nums">{{ fmtNum(b.points) }} {{ t('pts') }}</span>
+                        <span v-if="b.start_iso || b.end_iso">{{ formatDateRange(b.effective_start_iso, b.effective_end_iso, true) }}</span>
+                        <span v-if="b.excluded_pages" class="truncate max-w-[12rem]">{{ t('excludedPages') }}: {{ b.excluded_pages }}</span>
+                        <span v-if="!b.is_active" class="font-semibold">{{ t('bookRemovedTag') }}</span>
+                      </div>
+                    </div>
+                    <button type="button" @click="bookOpen = bookOpen === b.id ? null : b.id" class="ps-btn shrink-0" :aria-expanded="bookOpen === b.id ? 'true' : 'false'">{{ bookOpen === b.id ? t('close') : t('editWord') }}</button>
                   </div>
-                  <div class="flex items-center gap-1">
-                    <span class="text-slate-500">{{ t('excludedPages') }}:</span>
-                    <input v-model="b.excluded_pages" type="text" placeholder="1-5, 12" class="w-28 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-2 py-1 text-xs font-mono" />
+                  <div v-if="bookOpen === b.id" class="px-3 pb-3 pt-3 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label class="ps-label">{{ t('pointsPerPage') }}</label>
+                      <input v-model.number="b.points" :disabled="!active.contest.allow_custom_points" type="number" min="0" class="ps-input tabular-nums" />
+                      <p v-if="!active.contest.allow_custom_points" class="text-xs text-slate-500 mt-1">{{ t('customPointsOff') }}</p>
+                    </div>
+                    <div>
+                      <label class="ps-label">{{ t('excludedPages') }}</label>
+                      <input v-model="b.excluded_pages" type="text" placeholder="1-5, 12" class="ps-input font-mono" />
+                    </div>
+                    <div>
+                      <label class="ps-label">{{ t('bookStart') }} (UTC)</label>
+                      <input v-model="b.start_local" type="datetime-local" class="ps-input" />
+                    </div>
+                    <div>
+                      <label class="ps-label">{{ t('bookEnd') }} (UTC)</label>
+                      <input v-model="b.end_local" type="datetime-local" class="ps-input" />
+                    </div>
+                    <p class="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">{{ t('bookWindowHint') }}</p>
+                    <div class="sm:col-span-2 flex items-center justify-between gap-2">
+                      <button type="button" @click="bookToRemove = b" class="ps-btn ps-btn-quiet-danger">{{ t('remove') }}</button>
+                      <button type="button" @click="saveBookSettings(b)" :disabled="busy" class="ps-btn ps-btn-primary">{{ t('saveBook') }}</button>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-1 flex-wrap" :title="t('bookWindowHint')">
-                    <span class="text-slate-500">{{ t('bookWindow') }} (UTC):</span>
-                    <input v-model="b.start_local" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 text-[0.6875rem]" />
-                    <span>–</span>
-                    <input v-model="b.end_local" type="datetime-local" class="w-40 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-700 rounded px-1.5 py-1 text-[0.6875rem]" />
-                  </div>
-                  <button @click="saveBookSettings(b)" class="px-2.5 py-1 bg-ws-cerulean text-white rounded font-medium">
-                    {{ t('update') }}
-                  </button>
-                  <button @click="bookToRemove = b" class="px-2 py-1 text-rose-600 dark:text-rose-400 hover:underline font-medium">
-                    {{ t('remove') }}
-                  </button>
                 </div>
               </div>
             </div>
-          </div>
 
-          <div class="sm:col-span-2 border-t border-slate-200 dark:border-slate-800 pt-4">
-            <label class="ps-label">
-              {{ view === 'create' ? t('indexBooksOnePerLine') : t('addMoreIndexBooks') }}
-            </label>
-            <textarea v-model="form.books" rows="3" placeholder="নির্ঘণ্ট:বই.djvu&#10;Index:Book.pdf" class="ps-input text-xs font-mono"></textarea>
+            <!-- adding books: search the wiki, check each book, set points and dates for all at once -->
+            <div class="space-y-2.5">
+              <label class="ps-label" for="ps-book-add">{{ t('addBooks') }}</label>
+              <div class="relative" @keydown.esc="bookAdd.suggestions = []">
+                <div class="flex gap-2">
+                  <input id="ps-book-add" v-model="bookAdd.query" @input="suggestBooks" @keydown.enter.prevent="queueTypedBooks" @paste="onBookPaste" type="text" autocomplete="off"
+                         :placeholder="t('bookSearchPh')" class="ps-input flex-1 min-w-0" role="combobox" aria-autocomplete="list" :aria-expanded="bookAdd.suggestions.length ? 'true' : 'false'" />
+                  <button type="button" @click="queueTypedBooks" :disabled="!bookAdd.query.trim()" class="ps-btn shrink-0">{{ t('addToList') }}</button>
+                </div>
+                <ul v-if="bookAdd.suggestions.length" role="listbox" class="absolute z-20 left-0 right-0 mt-1 ps-card shadow-xl max-h-60 overflow-y-auto py-1">
+                  <li v-for="sg in bookAdd.suggestions" :key="sg" role="option">
+                    <button type="button" @click="queueBook(sg)" class="w-full text-left px-3 py-2 text-sm hover:bg-ws-nature/15 break-words">{{ sg }}</button>
+                  </li>
+                </ul>
+              </div>
+              <p class="text-xs text-slate-500 dark:text-slate-400">{{ t('bookSearchHelp') }}</p>
+
+              <div v-if="bookAdd.pending.length" class="divide-y divide-slate-200 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded">
+                <div v-for="(pb, i) in bookAdd.pending" :key="pb.key" class="flex items-center gap-2 px-3 py-2">
+                  <div class="min-w-0 flex-1">
+                    <div class="font-medium truncate" :title="pb.title">{{ pb.title }}</div>
+                    <div class="text-xs" :class="pb.error || pb.exists === false ? 'text-rose-600 dark:text-rose-400' : 'text-slate-600 dark:text-slate-400'">
+                      <template v-if="pb.error">{{ pb.error }}</template>
+                      <template v-else-if="pb.loading">{{ t('bookChecking') }}</template>
+                      <template v-else-if="pb.exists === false">{{ t('bookNotFound') }}</template>
+                      <template v-else-if="pb.exists && pb.total">{{ t('bookFoundPages').replace('{n}', fmtNum(pb.total)) }}</template>
+                      <template v-else-if="pb.exists">{{ t('bookFoundNoCount') }}</template>
+                      <template v-else>{{ t('bookUnchecked') }}</template>
+                    </div>
+                  </div>
+                  <button type="button" @click="bookAdd.pending.splice(i, 1)" class="ps-btn ps-btn-quiet ps-btn-icon" :aria-label="t('remove')" :title="t('remove')">✕</button>
+                </div>
+              </div>
+
+              <div v-if="bookAdd.pending.length" class="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label class="ps-label">{{ t('pointsPerPage') }}</label>
+                  <input v-model.number="bookAdd.points" :disabled="view === 'edit_config' && active && !active.contest.allow_custom_points" type="number" min="0" :placeholder="String(form.proofread_points)" class="ps-input tabular-nums" />
+                </div>
+                <div>
+                  <label class="ps-label">{{ t('bookStart') }} (UTC)</label>
+                  <input v-model="bookAdd.start" type="datetime-local" class="ps-input" />
+                </div>
+                <div>
+                  <label class="ps-label">{{ t('bookEnd') }} (UTC)</label>
+                  <input v-model="bookAdd.end" type="datetime-local" class="ps-input" />
+                </div>
+                <p class="sm:col-span-3 text-xs text-slate-500 dark:text-slate-400">{{ t('bookSharedHelp') }}</p>
+              </div>
+
+              <div v-if="bookAdd.pending.length && view === 'edit_config'" class="flex justify-end">
+                <button type="button" @click="addPendingBooks()" :disabled="busy || bookAdd.pending.some(x => x.loading)" class="ps-btn ps-btn-primary">
+                  {{ busy ? t('saving') : t('addNBooks').replace('{n}', fmtNum(bookAdd.pending.length)) }}
+                </button>
+              </div>
+              <p v-if="bookAdd.pending.length && view === 'create'" class="text-xs text-slate-600 dark:text-slate-400">{{ t('booksAddedOnSave') }}</p>
+            </div>
           </div>
         </div>
 
-        <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
+        <p v-show="view === 'edit_config' && cfgTab === 'books'" class="text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-slate-200 dark:border-slate-800">{{ t('booksSaveNote') }}</p>
+        <div v-show="cfgTab !== 'backup' && !(view === 'edit_config' && cfgTab === 'books')" class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
           <button @click="openConfigPreview" :disabled="busy"
                   class="ps-btn ps-btn-primary">
             {{ busy ? t('saving') : t('saveConfiguration') }}
@@ -514,7 +591,7 @@
         </div>
       </div>
 
-      <div v-if="view === 'edit_config' && active && active.contest.is_admin" class="mt-5 ps-card p-4 sm:p-6 space-y-4">
+      <div v-if="view === 'edit_config' && active && active.contest.is_admin" v-show="cfgTab === 'backup'" class="mt-3 ps-card p-4 sm:p-6 space-y-4">
         <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 dark:border-slate-800 pb-3">
           <h2 class="ps-serif text-xl text-slate-900 dark:text-slate-50">{{ t('backupTitle') }}</h2>
           <span class="text-xs text-slate-500">{{ t('lastBackup') }}: {{ active.contest.last_backup_iso ? formatDateTime(active.contest.last_backup_iso) : t('never') }}</span>
@@ -629,7 +706,7 @@
                 <!-- label hidden on the narrowest phones, where the row has no room for it -->
                 <span class="max-[379px]:hidden" aria-hidden="true">{{ t('syncShort') }}</span>
               </button>
-              <button v-if="active.contest.is_admin" @click="openEditConfig" class="ps-btn ps-btn-icon" :title="t('configure')" :aria-label="t('configure')">
+              <button v-if="active.contest.is_admin" @click="startEditConfig" class="ps-btn ps-btn-icon" :title="t('configure')" :aria-label="t('configure')">
                 <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
               </button>
               <button v-if="active.contest.is_jury && active.contest.review_enabled" @click="openJuryWorkspace(null)" class="ps-btn ps-btn-primary max-md:order-first max-md:flex-1">
@@ -659,27 +736,28 @@
           </div>
 
           <div class="pt-2.5 border-t border-slate-200 dark:border-slate-800 flex flex-col lg:flex-row lg:items-center justify-between gap-2 lg:gap-4 text-xs">
-            <!-- dates at the left edge, countdown at the right edge; both on one line, phones included -->
-            <div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 lg:justify-start lg:shrink-0">
+            <!-- One line: dates at the left edge, countdown at the right edge. fitDateRow() measures it: the full
+                 countdown if it fits, else without minutes; if even that needs a second line, both sit at the left. -->
+            <div ref="dateRow" class="flex flex-wrap items-center gap-x-2 gap-y-1.5 lg:justify-start lg:shrink-0" :class="dateRowMode === 'stack' ? 'justify-start' : 'justify-between'">
               <span class="ps-chip !font-semibold !text-slate-700 dark:!text-slate-300 !rounded max-sm:!text-[0.6875rem] max-sm:!px-1.5 max-sm:!gap-1">
                 <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="3" y="4" width="18" height="18" rx="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
                 <span class="sm:hidden">{{ formatDateRange(active.contest.start_iso, active.contest.end_iso, true) }}</span>
                 <span class="hidden sm:inline">{{ formatDateRange(active.contest.start_iso, active.contest.end_iso, false) }} (UTC)</span>
               </span>
-              <span v-if="countdownText" class="ps-chip ml-auto lg:ml-0 !font-bold !rounded !text-slate-900 dark:!text-slate-100 max-sm:!text-[0.6875rem] max-sm:!px-1.5 max-sm:!gap-1" :title="countdownText">
+              <span v-if="countdownText" class="ps-chip !font-bold !rounded !text-slate-900 dark:!text-slate-100 max-sm:!text-[0.6875rem] max-sm:!px-1.5 max-sm:!gap-1" :class="dateRowMode === 'stack' ? '' : 'ml-auto lg:ml-0'" :title="countdownText">
                 <span class="ps-dot" :class="countdownState === 'running' ? 'bg-emerald-500 animate-pulse' : countdownState === 'upcoming' ? 'bg-ws-cerulean' : 'bg-slate-400'"></span>
-                <span class="sm:hidden">{{ countdownShort }}</span><span class="hidden sm:inline">{{ countdownText }}</span>
+                <span>{{ dateRowMode === 'full' ? countdownText : countdownShort }}</span>
               </span>
             </div>
             <!-- reviewers: as many as fit on one line beside the dates (desktop) or on two lines (phones), then "+N" -->
-            <div v-if="active.contest.review_enabled && active.contest.juries_list.length" ref="juryBox" class="flex items-center gap-1.5 flex-wrap lg:flex-1 lg:min-w-0 lg:justify-end">
-              <span class="text-slate-600 dark:text-slate-400 font-semibold mr-0.5">{{ t('juryLabel') }}:</span>
+            <div v-if="active.contest.review_enabled && active.contest.juries_list.length" ref="juryBox" class="flex items-center gap-1.5 flex-wrap lg:flex-1 lg:min-w-0 lg:justify-end max-sm:grid max-sm:grid-cols-2">
+              <span class="text-slate-600 dark:text-slate-400 font-semibold mr-0.5 max-sm:col-span-2">{{ t('juryLabel') }}<span class="sm:hidden font-normal tabular-nums"> ({{ fmtNum(active.contest.juries_list.length) }})</span>:</span>
               <a v-for="j in (showAllJuries || juryMeasuring ? active.contest.juries_list : active.contest.juries_list.slice(0, juryFit))" :key="j" data-jury-chip
                  :href="'https://' + active.contest.wiki_domain + '/wiki/User_talk:' + encodeURIComponent(j)" target="_blank" rel="noopener" :title="t('openTalkPage') + ': ' + j"
-                 class="ps-chip no-underline hover:!border-ws-cerulean hover:!text-ws-cerulean dark:hover:!text-ws-nature">
-                <svg class="w-3 h-3 opacity-70" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>{{ j }}
+                 class="ps-chip no-underline hover:!border-ws-cerulean hover:!text-ws-cerulean dark:hover:!text-ws-nature max-sm:w-full max-sm:min-w-0 max-sm:!py-1">
+                <svg class="w-3 h-3 opacity-70 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg><span class="min-w-0 truncate">{{ j }}</span>
               </a>
-              <button v-if="juryMeasuring || showAllJuries || active.contest.juries_list.length > juryFit" ref="juryMore" @click="showAllJuries = !showAllJuries" class="ps-chip !border-dashed hover:!border-ws-cerulean">
+              <button v-if="juryMeasuring || showAllJuries || active.contest.juries_list.length > juryFit" ref="juryMore" @click="showAllJuries = !showAllJuries" class="ps-chip !border-dashed hover:!border-ws-cerulean max-sm:w-full max-sm:justify-center max-sm:!py-1">
                 {{ showAllJuries ? t('showLess') : '+' + fmtNum(juryMeasuring ? active.contest.juries_list.length : active.contest.juries_list.length - juryFit) }}
               </button>
             </div>
@@ -1252,7 +1330,7 @@
           </div>
           <div v-for="(p, i) in cform.projects" :key="i" class="flex flex-col sm:flex-row gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
             <wiki-picker v-model="p.wiki_domain" :wikis="wikiProjects" allow-empty :empty-label="t('selectProject')" class="sm:w-64 shrink-0"
-                         :other-label="t('otherWikisource')" :hint="t('wikiDomainHint')"></wiki-picker>
+                         :other-label="t('otherWikisource')" :hint="t('wikiDomainHint')" :search-label="t('wikiSearchPh')" :back-label="t('wikiBackToList')" :use-label="t('wikiUseCode')"></wiki-picker>
             <input v-model="p.admins" type="text" :placeholder="t('projectAdminsPh')" class="ps-input flex-1 min-w-0 self-start" />
             <button type="button" @click="cform.projects.splice(i, 1)" class="text-xs text-rose-600 dark:text-rose-400 hover:underline px-2 self-start sm:mt-2">{{ t('remove') }}</button>
           </div>
@@ -1628,7 +1706,7 @@
 
   <footer class="ps-footer mt-5">
     <div class="h-[3px] bg-gradient-to-r from-ws-dark via-ws-cerulean to-ws-nature" aria-hidden="true"></div>
-    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 sm:py-2.5 grid gap-1.5 sm:gap-4 sm:grid-cols-[1fr_auto] items-center text-xs leading-normal">
+    <div class="max-w-7xl mx-auto px-3 sm:px-6 py-2 sm:py-2.5 grid gap-0.5 sm:gap-4 sm:grid-cols-[1fr_auto] items-center text-xs leading-normal">
       <div class="flex flex-wrap items-baseline gap-x-2">
         <span class="ps-wordmark !text-base !font-bold">ProofSource</span>
         <span class="text-slate-400 dark:text-slate-600" aria-hidden="true">·</span>
@@ -1637,8 +1715,9 @@
       <nav class="flex flex-wrap gap-x-4 gap-y-1 sm:justify-end" :aria-label="t('footerLinks')">
         <a href="https://github.com/MSSakib03/ProofSource" target="_blank" rel="noopener">{{ t('sourceCode') }}</a>
         <a href="https://github.com/MSSakib03/ProofSource/issues" target="_blank" rel="noopener">{{ t('reportIssue') }}</a>
-        <a href="https://toolforge.org/" target="_blank" rel="noopener">{{ t('hostedOnToolforge') }}</a>
-        <a href="https://wikitech.wikimedia.org/wiki/Wikitech:Cloud_Services_Terms_of_use" target="_blank" rel="noopener">{{ t('termsOfUse') }}</a>
+        <!-- phones: the two links about the host are left out, so the footer is two short lines -->
+        <a href="https://toolforge.org/" target="_blank" rel="noopener" class="max-sm:hidden">{{ t('hostedOnToolforge') }}</a>
+        <a href="https://wikitech.wikimedia.org/wiki/Wikitech:Cloud_Services_Terms_of_use" target="_blank" rel="noopener" class="max-sm:hidden">{{ t('termsOfUse') }}</a>
       </nav>
     </div>
   </footer>
@@ -1681,9 +1760,9 @@
         <dl class="ps-pv border-t border-slate-200 dark:border-slate-800 pt-3">
           <dt>{{ t('pv_notice') }}</dt><dd>EN {{ form.announcement_en ? '✓' : '—' }} · বাংলা {{ form.announcement_bn ? '✓' : '—' }}</dd>
           <dt>{{ view === 'create' ? t('books') : t('pv_newBooks') }}</dt>
-          <dd><span v-if="!pvLines(form.books).length" class="ps-zero">—</span>
-            <template v-else><b class="tabular-nums">{{ fmtNum(pvLines(form.books).length) }}</b>
-              <span class="block font-mono text-[0.6875rem] text-slate-600 dark:text-slate-400 break-all">{{ pvLines(form.books).slice(0, 3).join(', ') }}<template v-if="pvLines(form.books).length > 3"> +{{ fmtNum(pvLines(form.books).length - 3) }}</template></span></template></dd>
+          <dd><span v-if="!bookAdd.pending.length" class="ps-zero">—</span>
+            <template v-else><b class="tabular-nums">{{ fmtNum(bookAdd.pending.length) }}</b>
+              <span class="block font-mono text-[0.6875rem] text-slate-600 dark:text-slate-400 break-all">{{ bookAdd.pending.slice(0, 3).map(x => x.title).join(', ') }}<template v-if="bookAdd.pending.length > 3"> +{{ fmtNum(bookAdd.pending.length - 3) }}</template></span></template></dd>
         </dl>
       </div>
       <div class="px-4 sm:px-5 py-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2 shrink-0 bg-slate-50 dark:bg-slate-900/60">
@@ -1789,13 +1868,6 @@ const WIKI_PROJECTS = [
   { domain: 'wikisource.org', label: 'Multilingual Wikisource' }
 ];
 const WIKI_DOMAIN_RE = /^(?:[a-z0-9-]{1,30}\.)?wikisource\.org$/;
-/* "bn", "BN.wikisource.org", "https://bn.wikisource.org/wiki/…" -> "bn.wikisource.org" */
-function cleanWikiDomain(raw) {
-  let d = String(raw || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/[/?#].*$/, '');
-  if (d === 'mul') return 'wikisource.org';
-  if (d && !d.includes('.')) d += '.wikisource.org';
-  return d;
-}
 function loadCachedWikis() {
   try {
     const list = JSON.parse(localStorage.getItem('ps_wikis') || 'null');
@@ -1804,49 +1876,95 @@ function loadCachedWikis() {
   return WIKI_PROJECTS;
 }
 
-/* Wikisource chooser: the full list, plus "Other" to type a domain that is not listed (yet). */
+/* Wikisource chooser. A button opens the whole list with a search box on top: type a language
+ * code ("bn", "as") or a name and press Enter, or scroll and pick. "Other Wikisource" turns it into
+ * a box for the language code alone, with ".wikisource.org" fixed beside it, for a wiki that is not
+ * in the list (yet). */
 const WikiPicker = {
   props: { modelValue: { type: String, default: '' }, wikis: { type: Array, default: () => [] }, disabled: Boolean,
            allowEmpty: Boolean, emptyLabel: { type: String, default: '' }, otherLabel: { type: String, default: 'Other' },
-           hint: { type: String, default: '' } },
+           hint: { type: String, default: '' }, searchLabel: { type: String, default: '' }, backLabel: { type: String, default: '' },
+           useLabel: { type: String, default: '{d}' } },
   emits: ['update:modelValue'],
-  data() { return { custom: false, typed: '' }; },
+  data() { return { open: false, q: '', hi: 0, custom: false, code: '' }; },
   computed: {
-    known() { return this.wikis.some(w => w.domain === this.modelValue); },
-    isCustom() { return this.custom || (!!this.modelValue && !this.known); },
-    selected() { return this.isCustom ? '__other__' : (this.modelValue || ''); },
-    valid() { return WIKI_DOMAIN_RE.test(this.modelValue || ''); }
+    current() { return this.wikis.find(w => w.domain === this.modelValue) || null; },
+    isCustom() { return this.custom || (!!this.modelValue && !this.current); },
+    typedCode() { return this.cleanCode(this.q); },
+    filtered() {
+      const q = this.q.trim().toLowerCase();
+      if (!q) return this.wikis;
+      const rank = w => {
+        const code = (w.code || '').toLowerCase();
+        if (code === q || w.domain === q) return 0;                    // "bn" puts Bangla first
+        if (code.startsWith(q)) return 1;
+        return [w.label, w.name_en, w.domain].some(x => (x || '').toLowerCase().includes(q)) ? 2 : 9;
+      };
+      return this.wikis.map((w, i) => ({ w, r: rank(w), i })).filter(x => x.r < 9).sort((x, y) => x.r - y.r || x.i - y.i).map(x => x.w);
+    },
+    /* a code that is not in the list can be used as typed */
+    offerTyped() { return !!this.typedCode && !this.wikis.some(w => w.code === this.typedCode); }
   },
   watch: {
     modelValue: { immediate: true, handler(v) {
-      if (v && !this.known && cleanWikiDomain(this.typed) !== v) this.typed = v;
-      if (this.custom && v !== cleanWikiDomain(this.typed)) this.custom = false;   // the form was reset from outside
+      if (v && !this.current) this.code = v === 'wikisource.org' ? '' : v.split('.')[0];
+      if (this.custom && v && this.current && v !== this.code + '.wikisource.org') this.custom = false;   // the form was reset from outside
     } }
   },
+  mounted() { this._away = (e) => { if (this.open && e.target.isConnected && !this.$el.contains(e.target)) this.open = false; };   /* a detached target is our own button, already re-rendered */ document.addEventListener('click', this._away); },
+  unmounted() { document.removeEventListener('click', this._away); },
   methods: {
-    optionText(w) {
-      const en = w.name_en && !w.label.toLowerCase().startsWith(w.name_en.toLowerCase()) ? ` (${w.name_en})` : '';
-      return `${w.code || w.domain.split('.')[0]} · ${w.label}${en}`;
+    cleanCode(raw) { return String(raw || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\.wikisource\.org.*$/, '').replace(/[^a-z0-9-]/g, '').slice(0, 30); },
+    toggle() {
+      if (this.disabled) return;
+      this.open = !this.open; this.q = ''; this.hi = Math.max(0, this.wikis.findIndex(w => w.domain === this.modelValue));
+      if (this.open) this.$nextTick(() => { if (this.$refs.search) this.$refs.search.focus(); this.reveal(); });
     },
-    pick(v) {
-      if (v === '__other__') { this.custom = true; this.typed = ''; this.$emit('update:modelValue', ''); this.$nextTick(() => this.$refs.box && this.$refs.box.focus()); }
-      else { this.custom = false; this.$emit('update:modelValue', v); }
-    },
-    type(v) { this.custom = true; this.typed = v; this.$emit('update:modelValue', cleanWikiDomain(v)); }
+    reveal() { const el = this.$refs.list && this.$refs.list.querySelector('[data-hi]'); if (el) el.scrollIntoView({ block: 'nearest' }); },
+    move(step) { const n = this.filtered.length; if (!n) return; this.hi = (this.hi + step + n) % n; this.$nextTick(this.reveal); },
+    enter() { if (this.filtered.length) this.choose(this.filtered[Math.min(this.hi, this.filtered.length - 1)]); else if (this.offerTyped) this.useTyped(); },
+    choose(w) { this.custom = false; this.open = false; this.$emit('update:modelValue', w ? w.domain : ''); this.$nextTick(() => this.$refs.btn && this.$refs.btn.focus()); },
+    useTyped() { this.code = this.typedCode; this.custom = true; this.open = false; this.$emit('update:modelValue', this.code + '.wikisource.org'); },
+    startCustom() { this.custom = true; this.open = false; this.code = ''; this.$emit('update:modelValue', ''); this.$nextTick(() => this.$refs.box && this.$refs.box.focus()); },
+    typeCode(v) { this.custom = true; this.code = this.cleanCode(v); if (this.$refs.box && this.$refs.box.value !== this.code) this.$refs.box.value = this.code; this.$emit('update:modelValue', this.code ? this.code + '.wikisource.org' : ''); },
+    backToList() { this.custom = false; this.code = ''; this.$emit('update:modelValue', this.allowEmpty || !this.wikis.length ? '' : this.wikis[0].domain); this.$nextTick(() => { this.open = false; this.toggle(); }); }
   },
   template: `
-    <div class="min-w-0">
-      <select :value="selected" @change="pick($event.target.value)" :disabled="disabled" class="ps-input">
-        <option v-if="allowEmpty" value="">{{ emptyLabel }}</option>
-        <option v-for="w in wikis" :key="w.domain" :value="w.domain">{{ optionText(w) }}</option>
-        <option value="__other__">{{ otherLabel }}</option>
-      </select>
-      <template v-if="isCustom">
-        <input ref="box" :value="typed" @input="type($event.target.value)" :disabled="disabled" type="text" inputmode="url"
-               autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="xx.wikisource.org" dir="ltr"
-               :aria-label="otherLabel" :aria-invalid="valid ? 'false' : 'true'" class="ps-input font-mono mt-1.5" />
-        <p class="text-xs mt-1" :class="valid || !typed ? 'text-slate-500 dark:text-slate-400' : 'text-rose-600 dark:text-rose-400'">
-          <span v-if="valid" class="font-mono font-semibold" dir="ltr">{{ modelValue }} · </span>{{ hint }}
+    <div class="relative min-w-0" @keydown.esc="open = false">
+      <template v-if="!isCustom">
+        <button ref="btn" type="button" @click="toggle" :disabled="disabled" class="ps-input !flex items-center justify-between gap-2 text-left disabled:opacity-60"
+                aria-haspopup="listbox" :aria-expanded="open ? 'true' : 'false'">
+          <span class="min-w-0 truncate"><template v-if="current"><span class="font-mono text-slate-500 dark:text-slate-400" dir="ltr">{{ current.code }}</span> · {{ current.label }}</template><template v-else>{{ emptyLabel }}</template></span>
+          <svg class="w-3.5 h-3.5 shrink-0 transition-transform" :class="open ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </button>
+        <div v-if="open" class="absolute z-30 left-0 right-0 mt-1 ps-card shadow-xl overflow-hidden">
+          <div class="p-2 border-b border-slate-200 dark:border-slate-800">
+            <input ref="search" v-model="q" @input="hi = 0" @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)" @keydown.enter.prevent="enter"
+                   type="text" inputmode="search" autocapitalize="off" autocomplete="off" spellcheck="false" :placeholder="searchLabel" :aria-label="searchLabel" class="ps-input" />
+          </div>
+          <ul ref="list" role="listbox" class="max-h-60 overflow-y-auto py-1 text-sm">
+            <li v-if="allowEmpty && !q"><button type="button" @click="choose(null)" class="w-full text-left px-3 py-1.5 text-slate-500 hover:bg-ws-nature/15">{{ emptyLabel }}</button></li>
+            <li v-for="(w, i) in filtered" :key="w.domain" role="option" :aria-selected="w.domain === modelValue ? 'true' : 'false'">
+              <button type="button" @click="choose(w)" @mousemove="hi = i" :data-hi="i === hi ? 1 : null" class="w-full text-left px-3 py-1.5 flex items-baseline gap-2"
+                      :class="[i === hi ? 'bg-ws-nature/20' : '', w.domain === modelValue ? 'font-semibold' : '']">
+                <span class="font-mono text-xs w-14 shrink-0 text-slate-500 dark:text-slate-400" dir="ltr">{{ w.code }}</span>
+                <span class="min-w-0 break-words">{{ w.label }}<span v-if="w.name_en && !w.label.toLowerCase().startsWith(w.name_en.toLowerCase())" class="text-slate-500 dark:text-slate-400"> · {{ w.name_en }}</span></span>
+              </button>
+            </li>
+            <li v-if="offerTyped"><button type="button" @click="useTyped" class="w-full text-left px-3 py-1.5 font-semibold text-ws-cerulean dark:text-ws-nature hover:bg-ws-nature/15">{{ useLabel.replace('{d}', typedCode + '.wikisource.org') }}</button></li>
+            <li class="border-t border-slate-200 dark:border-slate-800 mt-1 pt-1"><button type="button" @click="startCustom" class="w-full text-left px-3 py-1.5 hover:bg-ws-nature/15">{{ otherLabel }}</button></li>
+          </ul>
+        </div>
+      </template>
+      <template v-else>
+        <div class="flex items-stretch" dir="ltr">
+          <input ref="box" :value="code" @input="typeCode($event.target.value)" :disabled="disabled" type="text" maxlength="40" placeholder="bn"
+                 autocapitalize="off" autocomplete="off" spellcheck="false" :aria-label="otherLabel" class="ps-input font-mono flex-1 min-w-0 !rounded-r-none" />
+          <span class="inline-flex items-center px-2.5 border border-l-0 border-slate-300 dark:border-slate-700 rounded-r-sm bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-mono text-sm whitespace-nowrap select-none">.wikisource.org</span>
+        </div>
+        <p class="text-xs mt-1 text-slate-500 dark:text-slate-400 flex flex-wrap justify-between gap-x-3 gap-y-1">
+          <span>{{ hint }}</span>
+          <button v-if="!disabled && wikis.length" type="button" @click="backToList" class="font-semibold underline text-ws-cerulean dark:text-ws-nature">{{ backLabel }}</button>
         </p>
       </template>
     </div>`
@@ -2011,8 +2129,19 @@ const I18N = {
     err_invalid_link: 'The link must start with https://', bk_signature_invalid: 'not a backup made by this server (only the tool admin can restore it)',
     bk_bad_page_row: 'a page record is damaged', bk_bad_book_row: 'a book record is damaged', bk_not_json_object: 'not a backup file',
     skipToContent: 'Skip to content', switchLanguage: 'Switch language', close: 'Close',
+    cfg_general: 'General', cfg_rules: 'Rules & points', cfg_review: 'Review', cfg_books: 'Books', cfg_backup: 'Backup',
+    booksInContest: 'Books in this contest', editWord: 'Edit', saveBook: 'Save book', bookRemovedTag: 'removed (points kept)',
+    bookStart: 'Own start (optional)', bookEnd: 'Own end (optional)',
+    addBooks: 'Add books', bookSearchPh: 'Start typing the index name…', addToList: 'Add to list',
+    bookSearchHelp: 'Pick a suggestion, or type the full index name and press Enter. A pasted list (one book per line) is added in one go.',
+    bookChecking: 'Checking on the wiki…', bookNotFound: 'No such index on this wiki — check the name', bookFoundPages: 'Found · {n} pages',
+    bookFoundNoCount: 'Found · page count unknown', bookUnchecked: 'Could not be checked now; it will be checked when added',
+    bookSharedHelp: 'These apply to every book in the list. Leave them empty to use the contest’s points and dates; each book can be changed later.',
+    addNBooks: 'Add {n} book(s) to the contest', booksAddedN: '{n} book(s) added', booksAddedOnSave: 'These books are added when you save the contest.',
+    booksSaveNote: 'Books are saved one by one with their own buttons; the other tabs are saved with “Save configuration”.',
     textSize: 'Text size', displaySettings: 'Text size and theme', sizeS: 'Small', sizeM: 'Default', sizeL: 'Large', sizeXL: 'Extra large',
-    otherWikisource: 'Other Wikisource (type the domain)…', wikiDomainHint: 'Type the language code or the domain, e.g. “bn” or “bn.wikisource.org”.',
+    otherWikisource: 'Other Wikisource (not in the list)…', wikiDomainHint: 'Type only the language code, e.g. “bn”.',
+    wikiSearchPh: 'Language code or name: bn, as, Tamil…', wikiBackToList: 'Choose from the list', wikiUseCode: 'Use {d}',
     err_wiki_has_data: 'This contest already has recorded pages, so its Wikisource project cannot be changed',
     startsInShort: 'Starts in {t}', endsInShort: 'Ends in {t}', popupBlocked: 'Your browser blocked the new tab — the page opens here instead.',
     heroEyebrow: 'Proofreading contests · every Wikisource',
@@ -2194,8 +2323,19 @@ const I18N = {
     err_invalid_link: 'লিংকটি https:// দিয়ে শুরু হতে হবে', bk_signature_invalid: 'এই সার্ভারে তৈরি ব্যাকআপ নয় (শুধু টুল অ্যাডমিন এটি পুনরুদ্ধার করতে পারেন)',
     bk_bad_page_row: 'একটি পাতার তথ্য ক্ষতিগ্রস্ত', bk_bad_book_row: 'একটি বইয়ের তথ্য ক্ষতিগ্রস্ত', bk_not_json_object: 'এটি ব্যাকআপ ফাইল নয়',
     skipToContent: 'মূল বিষয়বস্তুতে যান', switchLanguage: 'ভাষা বদলান', close: 'বন্ধ করুন',
+    cfg_general: 'সাধারণ', cfg_rules: 'নিয়ম ও পয়েন্ট', cfg_review: 'পর্যালোচনা', cfg_books: 'বই', cfg_backup: 'ব্যাকআপ',
+    booksInContest: 'এই প্রতিযোগিতার বই', editWord: 'সম্পাদনা', saveBook: 'বই সংরক্ষণ', bookRemovedTag: 'বাদ দেওয়া (পয়েন্ট বহাল)',
+    bookStart: 'নিজস্ব শুরু (ঐচ্ছিক)', bookEnd: 'নিজস্ব শেষ (ঐচ্ছিক)',
+    addBooks: 'বই যোগ করুন', bookSearchPh: 'নির্ঘণ্টের নাম লিখতে শুরু করুন…', addToList: 'তালিকায় নিন',
+    bookSearchHelp: 'সাজেশন থেকে বেছে নিন, অথবা পুরো নাম লিখে Enter চাপুন। একাধিক বইয়ের তালিকা (প্রতি লাইনে একটি) পেস্ট করলে সব একসঙ্গে তালিকায় আসে।',
+    bookChecking: 'উইকিতে যাচাই হচ্ছে…', bookNotFound: 'এই উইকিতে এমন নির্ঘণ্ট নেই — নামটি দেখে নিন', bookFoundPages: 'পাওয়া গেছে · {n} পাতা',
+    bookFoundNoCount: 'পাওয়া গেছে · পাতার সংখ্যা জানা যায়নি', bookUnchecked: 'এখন যাচাই করা যায়নি; যোগ করার সময় যাচাই হবে',
+    bookSharedHelp: 'এগুলো তালিকার সব বইয়ে বসবে। ফাঁকা রাখলে প্রতিযোগিতার পয়েন্ট ও তারিখই থাকবে; পরে প্রতিটি বই আলাদা করে বদলানো যায়।',
+    addNBooks: '{n}টি বই প্রতিযোগিতায় যোগ করুন', booksAddedN: '{n}টি বই যোগ হয়েছে', booksAddedOnSave: 'প্রতিযোগিতা সংরক্ষণ করলে এই বইগুলো যোগ হবে।',
+    booksSaveNote: 'বইগুলো নিজ নিজ বাটন দিয়ে আলাদাভাবে সংরক্ষিত হয়; অন্য ট্যাবগুলো “সংরক্ষণ” বাটনে সংরক্ষিত হয়।',
     textSize: 'লেখার আকার', displaySettings: 'লেখার আকার ও থিম', sizeS: 'ছোট', sizeM: 'স্বাভাবিক', sizeL: 'বড়', sizeXL: 'আরও বড়',
-    otherWikisource: 'অন্য উইকিসংকলন (ডোমেইন লিখুন)…', wikiDomainHint: 'ভাষা কোড বা ডোমেইন লিখুন, যেমন “bn” বা “bn.wikisource.org”।',
+    otherWikisource: 'অন্য উইকিসংকলন (তালিকায় নেই)…', wikiDomainHint: 'শুধু ভাষা কোড লিখুন, যেমন “bn”।',
+    wikiSearchPh: 'ভাষা কোড বা নাম: bn, as, Tamil…', wikiBackToList: 'তালিকা থেকে বাছুন', wikiUseCode: '{d} ব্যবহার করুন',
     err_wiki_has_data: 'এই প্রতিযোগিতায় ইতিমধ্যে পাতা জমা পড়েছে, তাই উইকিসংকলন প্রকল্প বদলানো যাবে না',
     startsInShort: 'শুরু {t} পর', endsInShort: '{t} বাকি', popupBlocked: 'ব্রাউজার নতুন ট্যাব আটকে দিয়েছে — পাতাটি এখানেই খুলছে।',
     heroEyebrow: 'মুদ্রণ সংশোধন প্রতিযোগিতা · সব উইকিসংকলনে',
@@ -2281,14 +2421,15 @@ createApp({
       notice: '', noticeType: 'info', noticeTimer: null,
       loggedIn: false, currentUser: null, wikiProjects: loadCachedWikis(), userMenuCompact: false, userMenuOpen: false,
       textSize: document.documentElement.getAttribute('data-ps-size') || 'm', textSizes: TEXT_SIZES, sizeMenuOpen: false,
-      contests: [], centrals: [], deleteRequests: [], showAllJuries: false, cfgPreview: { open: false }, juryFit: 99, juryMeasuring: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
+      contests: [], centrals: [], deleteRequests: [], showAllJuries: false, cfgPreview: { open: false }, dateRowMode: 'full', juryFit: 99, juryMeasuring: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
       expanded: {}, central: null, centralTab: 'leaderboard', cform: {}, upages: null, loadingBar: 0,
       juryStats: null, juryScope: null, selectMode: false, selectedIds: [], lastSelIdx: null, prefetchedAt: {},
       active: null, nowTick: Date.now(),
       contestSubTab: 'leaderboard', leaderboardLimit: 200,
       reserveBookId: '', newBookTitle: '', newBookPoints: 3, newBookExcluded: '', newBookStart: '', newBookEnd: '',
       bookToRemove: null, wikiTableCode: '',
-      form: {},
+      form: {}, cfgTab: 'general', bookOpen: null,
+      bookAdd: { query: '', suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 },
       juryBookId: null, juryStatusFilter: 'pending_review', juryContributor: '',
       juryPage: null, juryQueue: [], juryQueueTotal: 0, juryPrefetch: null,
       juryPaneTab: safeLoad('ws_jury_pane') || 'preview', zoom: 100, juryNote: '', juryBonus: 0,
@@ -2325,6 +2466,12 @@ createApp({
       });
       return rows.sort((a, b) => (b.sort > a.sort ? 1 : -1));
     },
+    cfgTabs() {
+      const tabs = ['general', 'rules', 'review', 'books'];
+      if (this.view === 'edit_config' && this.active && this.active.contest.is_admin) tabs.push('backup');
+      return tabs;
+    },
+    cfgBookCount() { return (this.view === 'edit_config' && this.active ? this.active.books.length : 0) + this.bookAdd.pending.length; },
     hasReverted() { return !!(this.active && this.active.leaderboard.some(r => r.reverted)); },
     submitAllSelected() { return this.submitDlg.pages.length > 0 && this.submitDlg.selected.length === this.submitDlg.pages.length; },
     homeTotals() {
@@ -2421,6 +2568,19 @@ createApp({
       if (!crowded && mark && mark.offsetParent) crowded = mark.getBoundingClientRect().right + 4 > right.getBoundingClientRect().left;
       this.userMenuCompact = crowded;
     },
+    /* Dates + countdown: 'full' (everything, on one line), 'compact' (countdown without its smallest
+     * unit), 'stack' (two lines, both at the left edge). Measured, so it holds for any language,
+     * text size and screen width. */
+    async fitDateRow() {
+      for (const mode of ['full', 'compact', 'stack']) {
+        this.dateRowMode = mode;
+        await this.$nextTick();
+        const row = this.$refs.dateRow;
+        if (!row || !row.offsetParent || row.children.length < 2 || mode === 'stack') return;
+        const a = row.firstElementChild.getBoundingClientRect(), b = row.lastElementChild.getBoundingClientRect();
+        if (Math.abs((a.top + a.bottom) - (b.top + b.bottom)) < 16) return;      // same line
+      }
+    },
     // How many reviewer chips fit: one line beside the dates on wide screens, two lines on phones.
     // Everything is rendered once (with the "+N" chip at its widest) and measured, then the line
     // packing is simulated so the visible chips plus "+N" never need an extra line.
@@ -2428,8 +2588,13 @@ createApp({
       if (this.juryMeasuring) return;
       this.juryMeasuring = true;
       await this.$nextTick();
+      await this.fitDateRow();
       const box = this.$refs.juryBox;
       if (!box || !box.offsetParent) { this.juryMeasuring = false; return; }
+      if (window.innerWidth < 640) {     // phones: a two-column grid of equal chips, two rows, the last cell is "+N"
+        const n = this.active.contest.juries_list.length;
+        this.juryFit = n <= 4 ? n : 3; this.juryMeasuring = false; return;
+      }
       const W = box.clientWidth, cs = getComputedStyle(box);
       const gap = parseFloat(cs.columnGap) || 0;
       const label = box.firstElementChild, more = this.$refs.juryMore;
@@ -2817,9 +2982,71 @@ createApp({
     },
     openCreateContest() {
       if (!this.loggedIn) { window.location.href = '/login'; return; }
-      this.form = this.blankForm(); this.view = 'create';
+      this.form = this.blankForm(); this.resetConfigUi(); this.view = 'create';
     },
-    formPayload() { return Object.assign({}, this.form); },
+    resetConfigUi() {
+      this.cfgTab = 'general'; this.bookOpen = null;
+      this.bookAdd = { query: '', suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 };
+    },
+    startEditConfig() { this.resetConfigUi(); this.openEditConfig(); },
+    formPayload() { const body = Object.assign({}, this.form); delete body.books; return body; },   // books go through addPendingBooks
+
+    // ---------- adding books: suggestions from the wiki, a checked list, shared points and dates ----------
+    suggestBooks() {
+      clearTimeout(this._bookTimer);
+      const q = this.bookAdd.query.trim();
+      if (q.length < 2 || q.includes('\n') || !this.wikiDomainOk(this.form.wiki_domain)) { this.bookAdd.suggestions = []; return; }
+      this._bookTimer = setTimeout(async () => {
+        const r = await this.api(`/api/wiki/index-search?wiki=${encodeURIComponent(this.form.wiki_domain)}&q=${encodeURIComponent(q)}`);
+        if (this.bookAdd.query.trim() !== q) return;          // an older answer arriving late
+        const have = new Set(this.bookAdd.pending.map(x => x.title.toLowerCase()));
+        this.bookAdd.suggestions = (r.data.titles || []).filter(tl => !have.has(tl.toLowerCase()));
+      }, 250);
+    },
+    async queueBook(raw) {
+      const title = String(raw || '').trim();
+      this.bookAdd.query = ''; this.bookAdd.suggestions = [];
+      if (!title || this.bookAdd.pending.length >= 100) return;
+      if (this.bookAdd.pending.some(x => x.title.toLowerCase() === title.toLowerCase() || x.typed === title.toLowerCase())) return;
+      this.bookAdd.pending.push({ key: ++this.bookAdd.seq, title, typed: title.toLowerCase(), loading: true, exists: null, total: 0, error: '' });
+      const item = this.bookAdd.pending[this.bookAdd.pending.length - 1];
+      if (!this.wikiDomainOk(this.form.wiki_domain)) { item.loading = false; return; }
+      const r = await this.api(`/api/wiki/index-info?wiki=${encodeURIComponent(this.form.wiki_domain)}&title=${encodeURIComponent(title)}`);
+      item.loading = false;
+      if (!r.ok) return;
+      item.exists = r.data.exists; item.total = r.data.total_pages || 0;
+      if (r.data.title && !this.bookAdd.pending.some(x => x !== item && x.title.toLowerCase() === r.data.title.toLowerCase())) item.title = r.data.title;
+    },
+    queueTypedBooks() { this.bookAdd.query.split(/\r?\n/).forEach(line => this.queueBook(line)); },
+    onBookPaste(ev) {      // a pasted list (one book per line) goes straight into the list
+      const text = (ev.clipboardData || window.clipboardData).getData('text') || '';
+      if (!/\n/.test(text.trim())) return;
+      ev.preventDefault();
+      text.split(/\r?\n/).forEach(line => this.queueBook(line));
+    },
+    /* Adds the listed books one by one; a book that fails stays in the list with its reason. */
+    async addPendingBooks(cid) {
+      const contestId = cid || (this.active && this.active.contest.id);
+      if (!contestId || !this.bookAdd.pending.length) return 0;
+      this.busy = true;
+      let added = 0;
+      const pts = this.bookAdd.points === null || this.bookAdd.points === '' ? null : this.bookAdd.points;
+      for (const pb of this.bookAdd.pending.slice()) {
+        if (pb.exists === false) { pb.error = this.t('bookNotFound'); continue; }
+        const r = await this.api(`/api/contests/${contestId}/books`, {
+          method: 'POST', json: { title: pb.title, points: pts, start_time: this.bookAdd.start || '', end_time: this.bookAdd.end || '' }
+        });
+        if (r.ok) { added++; this.bookAdd.pending = this.bookAdd.pending.filter(x => x !== pb); }
+        else pb.error = this.errText(r.data);
+      }
+      this.busy = false;
+      if (!cid) {
+        await this.openContest(contestId, false, true); this.openEditConfig();
+        this.notify(this.t('booksAddedN').replace('{n}', this.fmtNum(added)), this.bookAdd.pending.length ? 'error' : 'success');
+        if (!this.bookAdd.pending.length) { this.bookAdd.points = null; this.bookAdd.start = ''; this.bookAdd.end = ''; }
+      }
+      return added;
+    },
     pvList(v) { return String(v || '').split(',').map(x => x.trim()).filter(Boolean); },
     pvLines(v) { return String(v || '').split('\n').map(x => x.trim()).filter(Boolean); },
     pvDate(v) { return v ? this.digits(String(v).replace('T', ' ')) : '—'; },
@@ -2837,8 +3064,14 @@ createApp({
       this.busy = true;
       const r = await this.api('/api/contests', { method: 'POST', json: this.formPayload() });
       this.busy = false;
-      if (r.ok) await this.openContest(r.data.contest_id, false);
-      else this.notify(this.errText(r.data), 'error');
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+      const wanted = this.bookAdd.pending.length;
+      const added = await this.addPendingBooks(r.data.contest_id);
+      await this.openContest(r.data.contest_id, false);
+      if (added < wanted) {      // the contest exists; the books that failed wait in the Books tab with their reason
+        this.openEditConfig(); this.cfgTab = 'books';
+        this.notify(this.t('booksAddedN').replace('{n}', this.fmtNum(added)), 'error');
+      } else this.resetConfigUi();
     },
     async approveContest(decision) {
       if (!this.active) return;
@@ -2885,7 +3118,14 @@ createApp({
       if (this.syncing) return;
       this.syncing = true;
       if (force) this.notify(this.t('syncStarted'));
-      const r = await this.api(`/api/contests/${cid}/sync`, { method: 'POST', json: { force: !!force } });
+      // A large contest is synced in slices (the server stops after ~25 s and says "partial"):
+      // keep asking until it is done, showing the pages found so far after every slice.
+      let r;
+      for (let round = 0; round < 40; round++) {
+        r = await this.api(`/api/contests/${cid}/sync`, { method: 'POST', json: { force: !!force && round === 0 } });
+        if (!r.ok || !r.data.partial || !(this.active && this.active.contest.id === cid)) break;
+        await this.openContest(cid, false, true);
+      }
       this.syncing = false;
       if (!r.ok) { this.notify(this.t('syncFailed'), 'error'); return; }
       if (r.data.skipped) { if (force && r.data.reason === 'sync_in_progress') this.notify(this.t('syncStarted')); return; }
@@ -2913,8 +3153,9 @@ createApp({
       this.busy = true;
       const r = await this.api(`/api/contests/${this.active.contest.id}/config`, { method: 'POST', json: this.formPayload() });
       this.busy = false;
-      if (r.ok) { await this.openContest(this.active.contest.id, false); this.notify(this.t('configUpdated'), 'success'); }
-      else this.notify(this.errText(r.data), 'error');
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+      if (this.bookAdd.pending.length) { await this.addPendingBooks(); this.cfgTab = 'books'; return; }   // books waiting in the list are added too
+      await this.openContest(this.active.contest.id, false); this.notify(this.t('configUpdated'), 'success');
     },
     async saveBookSettings(b) {
       this.busy = true;
@@ -2922,7 +3163,7 @@ createApp({
         method: 'POST', json: { points: b.points, excluded_pages: b.excluded_pages, start_time: b.start_local || '', end_time: b.end_local || '' }
       });
       this.busy = false;
-      if (r.ok) { await this.openContest(this.active.contest.id, false, true); this.openEditConfig(); this.notify(this.t('bookUpdated'), 'success'); }
+      if (r.ok) { await this.openContest(this.active.contest.id, false, true); this.openEditConfig(); this.bookOpen = null; this.notify(this.t('bookUpdated'), 'success'); }
       else this.notify(this.errText(r.data), 'error');
     },
     async addBookToContest() {

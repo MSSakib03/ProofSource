@@ -281,8 +281,12 @@ def restore_contest(db, contest, payload, models, username: str) -> dict:
             db.session.flush()
             id_map[bd["_id"]] = b.id
 
-        batch = []
+        batch, seen_pages = [], set()
         for pd in data["pages"]:
+            key = (pd["book_id"], pd.get("page_number"))
+            if key in seen_pages:      # older backups may hold a page twice; the table allows one row
+                continue
+            seen_pages.add(key)
             row = {f: pd.get(f) for f in PAGE_FIELDS}
             row.update({f: _parse_dt(pd.get(f)) for f in PAGE_DT_FIELDS})
             row["contest_id"] = contest.id

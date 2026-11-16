@@ -15,6 +15,7 @@ from urllib.parse import urlencode, quote, urlsplit
 import requests
 from flask import Flask, g, render_template, request, jsonify, session, redirect, url_for, Response, stream_with_context
 from sqlalchemy import func, case, and_, or_
+from sqlalchemy.exc import IntegrityError
 from models import (db, Contest, IndexBook, ContestPage, OAuthLogin, AuditLog, SlugAlias, Hub, Enrollment,
                     ToolAdmin, migrate_schema)
 import db_config
@@ -78,6 +79,9 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["PERMANENT_SESSION_LIFETIME"] = timedelta(days=30)
 app.config["FORCED_SYNC_MIN_SECONDS"] = int(os.environ.get("PROOFSOURCE_FORCED_SYNC_SECONDS", "30"))
+# A sync inside a web request stops after this many seconds and is continued by the next request,
+# so a big book can never run into the web server's time limit. 0 = no limit.
+app.config["SYNC_BUDGET_SECONDS"] = float(os.environ.get("PROOFSOURCE_SYNC_SECONDS", "25"))
 LOGIN_LIFETIME = app.config["PERMANENT_SESSION_LIFETIME"]
 log = logging.getLogger("proofsource")
 
@@ -565,7 +569,13 @@ def _drop_page(contest: Contest, p_obj, reason: str, level=None):
         p_obj.wiki_level = level
 
 
-def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = False) -> bool:
+def sync_deadline():
+    """time.monotonic() value at which a sync started now must stop (None = no limit)."""
+    budget = app.config["SYNC_BUDGET_SECONDS"]
+    return time.monotonic() + budget if budget > 0 else None
+
+
+def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = False, deadline: float = None) -> bool:
     """Returns True if the wiki data was complete. All changes are committed at once."""
     if not book.is_active:
         return True
@@ -575,7 +585,8 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
     known_revs = {} if full else {n: p.last_rev_id for n, p in existing_pages.items() if p.last_rev_id}
 
     live_map, complete = fetch_live_book_pages_from_wiki(
-        contest.wiki_domain, book.base_name, start_t, end_t, known_revs=known_revs)
+        contest.wiki_domain, book.base_name, start_t, end_t, known_revs=known_revs, deadline=deadline)
+    timed_out = deadline is not None and not complete and time.monotonic() > deadline
 
     if book.total_pages == 0:
         cnt = fetch_index_page_count(contest.wiki_domain, book.base_name)
@@ -663,12 +674,19 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
                 _drop_page(contest, p_obj, "excluded" if page_num in excluded_page_nums else "ineligible")
                 p_obj.last_rev_id = None
 
+    if timed_out:
+        contest.last_synced_at = None       # unfinished: the next request carries on from here
+    else:
+        book.last_synced_at = datetime.utcnow()
     db.session.commit()
     return complete
 
 
-def sync_contest_books(contest: Contest, full: bool = False) -> dict:
-    """Guarded so two workers never sync the same contest at the same time."""
+def sync_contest_books(contest: Contest, full: bool = False, deadline: float = None) -> dict:
+    """Guarded so two workers never sync the same contest at the same time.
+    With a deadline the sync stops when time is up and reports partial=True; books are taken
+    oldest-synced first and pages already read are skipped next time, so repeated calls finish
+    the job however large the contest is."""
     now = datetime.utcnow()
     # Taken with one conditional UPDATE: two workers that start at the same moment cannot both
     # get the lock (a check followed by a write could, and both would then insert the same pages).
@@ -680,16 +698,20 @@ def sync_contest_books(contest: Contest, full: bool = False) -> dict:
     db.session.refresh(contest)
     if not got:
         return {"skipped": True, "reason": "sync_in_progress"}
-    complete = True
+    complete, partial = True, False
     try:
-        for book in list(contest.books):
-            if book.is_active:
-                try:
-                    complete = sync_book_with_wikisource(contest, book, full=full) and complete
-                except Exception:
-                    db.session.rollback()
-                    complete = False
-        contest.last_synced_at = datetime.utcnow()
+        books = sorted((b for b in contest.books if b.is_active), key=lambda b: (b.last_synced_at or datetime.min, b.id))
+        for book in books:
+            if deadline is not None and time.monotonic() > deadline:
+                partial = True
+                break
+            try:
+                complete = sync_book_with_wikisource(contest, book, full=full, deadline=deadline) and complete
+            except Exception:
+                db.session.rollback()
+                complete = False
+        partial = partial or (deadline is not None and not complete and time.monotonic() > deadline)
+        contest.last_synced_at = None if partial else datetime.utcnow()
     finally:
         contest.sync_started_at = None
         db.session.commit()
@@ -697,7 +719,7 @@ def sync_contest_books(contest: Contest, full: bool = False) -> dict:
         assign_pending(contest)
     except Exception:
         db.session.rollback()
-    return {"skipped": False, "complete": complete}
+    return {"skipped": False, "complete": complete and not partial, "partial": partial}
 
 
 # =====================================================================
@@ -1100,6 +1122,44 @@ def api_wikis():
     return jsonify(wiki_engine.list_wikisources())
 
 
+def _wiki_lookup_guard():
+    """Shared checks of the two book-lookup endpoints: (domain, error response)."""
+    if not get_current_user():
+        return None, err("auth_required", 401)
+    domain = normalize_wiki_domain(request.args.get("wiki"))
+    if not domain:
+        return None, err("invalid_project")
+    return domain, rate_limit("lookup", 240, 600)
+
+
+@app.route("/api/wiki/index-search", methods=["GET"])
+def api_index_search():
+    """Suggestions while an admin types a book name: index pages starting with ?q= on ?wiki=."""
+    domain, bad = _wiki_lookup_guard()
+    if bad:
+        return bad
+    q = clip(request.args.get("q"), 200)
+    if len(q) < 2:
+        return jsonify({"success": True, "titles": []})
+    try:
+        titles = wiki_engine.search_index_titles(domain, q)
+    except Exception:
+        titles = []
+    return jsonify({"success": True, "titles": titles})
+
+
+@app.route("/api/wiki/index-info", methods=["GET"])
+def api_index_info():
+    """Checks a book before it is added: does the index exist, how many pages does it have?"""
+    domain, bad = _wiki_lookup_guard()
+    if bad:
+        return bad
+    title = clip(request.args.get("title"), 300)
+    if not title:
+        return err("book_title_required")
+    return jsonify({"success": True, **wiki_engine.index_info(domain, title)})
+
+
 # =====================================================================
 #  Contests
 # =====================================================================
@@ -1174,6 +1234,7 @@ MAX_BOOKS_PER_REQUEST = 100
 def add_books_from_multiline(contest: Contest, raw_books: str):
     lines = [b.strip() for b in str(raw_books or "").replace("\r", "\n").split("\n") if b.strip()]
     added = []
+    deadline = sync_deadline()      # shared by all the books of this request
     for raw_b in lines[:MAX_BOOKS_PER_REQUEST]:   # every book costs wiki API calls
         base_name = extract_base_book_name(contest.wiki_domain, raw_b)
         norm_title = normalize_index_title(contest.wiki_domain, raw_b)
@@ -1193,7 +1254,7 @@ def add_books_from_multiline(contest: Contest, raw_books: str):
         added.append(norm_title)
         log_action(contest.id, "book_add", norm_title)
         try:
-            sync_book_with_wikisource(contest, b_obj)
+            sync_book_with_wikisource(contest, b_obj, deadline=deadline)
         except Exception:
             db.session.rollback()
     return added
@@ -1414,7 +1475,7 @@ def api_get_contest(cid):
     user = get_current_user()
     if request.args.get("sync") == "1" and c.approval_status == "approved" and user \
             and not _sync_too_soon(c, True) and rate_limit("sync", 10, 600, user) is None:
-        sync_contest_books(c)
+        sync_contest_books(c, deadline=sync_deadline())
     return jsonify(contest_payload(c, user))
 
 
@@ -1439,7 +1500,7 @@ def api_sync_contest(cid):
     limited = rate_limit("sync", 10, 600, user) if force else None
     if limited:
         return limited
-    res = sync_contest_books(c)
+    res = sync_contest_books(c, deadline=sync_deadline())
     return jsonify({"success": True, **res})
 
 
@@ -1631,10 +1692,10 @@ def api_add_contest_book(cid):
                                                  "start": iso(vals["start_time"]), "end": iso(vals["end_time"])})
     db.session.commit()
     try:
-        sync_book_with_wikisource(c, b_obj, full=True)
+        sync_book_with_wikisource(c, b_obj, full=True, deadline=sync_deadline())
     except Exception:
         db.session.rollback()
-    return jsonify({"success": True, "book_id": b_obj.id})
+    return jsonify({"success": True, "book_id": b_obj.id, "total_pages": b_obj.total_pages})
 
 
 @app.route("/api/contests/<int:cid>/books/<int:bid>/update", methods=["POST"])
@@ -1665,7 +1726,7 @@ def api_update_contest_book(cid, bid):
         log_action(cid, "points_change" if old["points"] != new["points"] else "book_edit", book.title, old=old, new=new)
     db.session.commit()
     try:
-        sync_book_with_wikisource(c, book, full=window_changed)
+        sync_book_with_wikisource(c, book, full=window_changed, deadline=sync_deadline())
     except Exception:
         db.session.rollback()
     return jsonify({"success": True})
@@ -1774,7 +1835,16 @@ def api_reserve_contest_page(cid):
         db.session.add(p_rec)
     p_rec.reserved_by_user = current_user
     p_rec.user_lock_expires = now + timedelta(minutes=20)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:          # a sync recorded this very page a moment ago: reserve that row
+        db.session.rollback()
+        p_rec = ContestPage.query.filter_by(book_id=book.id, page_number=chosen_num).first()
+        if not p_rec:
+            return err("no_unproofread_pages", 404)
+        p_rec.reserved_by_user = current_user
+        p_rec.user_lock_expires = now + timedelta(minutes=20)
+        db.session.commit()
     edit_url = f"https://{c.wiki_domain}/w/index.php?" + urlencode({"title": page_title, "action": "edit"})
     return jsonify({"success": True, "page_title": page_title, "edit_url": edit_url})
 
