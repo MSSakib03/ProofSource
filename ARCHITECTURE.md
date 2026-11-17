@@ -10,7 +10,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-236798)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-006699)
 ![Vue](https://img.shields.io/badge/Vue-3-4D8AC0)
-![Tests](https://img.shields.io/badge/tests-122%20passing-2e7d32)
+![Tests](https://img.shields.io/badge/tests-133%20passing-2e7d32)
 
 </div>
 
@@ -80,7 +80,9 @@ This repository maps directly to `~/www/python/src` on Toolforge:
     ├── requirements.txt      # Python dependencies
     ├── deploy/
     │   └── uwsgi.ini         # Toolforge uWSGI config (copied to ~/www/python/uwsgi.ini)
-    ├── templates/index.html  # Whole frontend: Vue 3 app + i18n table
+    ├── templates/index.html  # Whole frontend: Vue 3 app (the strings are injected from translations/)
+    ├── translations/         # en.json (fallback/reference) and bn.json: every UI string
+    ├── i18n_tools.py         # Loads translations and checks them (python3 manage.py check-i18n)
     ├── static/css/app.css    # Built stylesheet (committed; rebuild with `npm run build:css`)
     ├── static/src/app.css    # Stylesheet source: Codex tokens + components
     ├── static/vendor/        # Self-hosted Vue 3 and DOMPurify (see static/vendor/README.md)
@@ -290,7 +292,7 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 ## 7. Frontend (`templates/index.html`)
 
 - Single Vue 3 app (no JavaScript build step; Vue and DOMPurify are vendored in `static/vendor`). Views: `home` (status tabs, search, language/project filter, central contests as a collapsible tree), `contest`, `edit_config` / `create`, `jury` (review panel), `userpages`, `central`, `central_form`.
-- **i18n**: the `I18N = { en: {...}, bn: {...} }` table. No hard-coded UI text; English is the fallback. To add a language, copy `en`.
+- **i18n**: the strings live in `translations/<code>.json` (`en.json` is the fallback and the reference). `app.py` reads them once (`TRANSLATIONS`) and `render_spa` injects them as `window.PS_I18N`, so the browser needs no extra request; the template only does `const I18N = window.PS_I18N`. No hard-coded UI text. To add a language, copy `en.json` to `<code>.json` and translate. `python3 manage.py check-i18n` (and `tests/test_i18n.py`) verify that every language has the same keys and `{placeholders}`, that every key the page uses exists, and that every error code the server can send has a message.
 - Theme: **light by default**, whatever the browser or OS prefers; dark mode only when the visitor chooses it (`ws_theme` in localStorage, applied before first paint). Dark mode uses the same tokens as light mode (`static/src/app.css`), and the template's `dark:slate-*` utilities are mapped onto them.
 - The configuration page is split into tabs (`cfgTab`): General, Rules & points, Review, Books, Backup. The first three are one form saved with one button; in the Books tab each book is a row that opens to edit and is saved on its own, and new books go through a checked list (`bookAdd`: suggestions from `index-search`, existence and page count from `index-info`, shared points and dates) and are added one by one with `POST …/books`.
 - Saving a contest configuration (create or edit) first opens a compact summary to confirm.

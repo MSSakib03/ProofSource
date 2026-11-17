@@ -19,6 +19,10 @@ ProofSource maintenance commands (run from the repository root, inside the tool'
       Write a whole-database snapshot to the backup folder now (suitable for a scheduled job:
       toolforge jobs run --schedule "17 */12 * * *" --command "..." snapshot).
 
+  python3 manage.py check-i18n
+      Check translations/*.json: same keys in every language, same {placeholders}, every key the page
+      uses exists, every error code the server can send has a message. Needs no database.
+
   python3 manage.py sync [--stale-minutes N] [--all]
       Sync every approved, running contest with its wiki, with no time limit (the web pages only
       sync in short slices). Run it from a scheduled job so the leaderboards stay fresh even when
@@ -184,7 +188,16 @@ def main(argv=None):
     sy = sub.add_parser("sync")
     sy.add_argument("--stale-minutes", type=int, default=10)
     sy.add_argument("--all", action="store_true")
+    sub.add_parser("check-i18n")
     args = ap.parse_args(argv)
+
+    if args.cmd == "check-i18n":            # needs no database
+        import i18n_tools
+        found = i18n_tools.problems()
+        for line in found:
+            print(" ", line)
+        print(f"{len(found)} problem(s) in translations/*.json" if found else "translations are consistent")
+        return 1 if found else 0
 
     url = db_config.resolve_database_url()
     if args.cmd == "check-db":
