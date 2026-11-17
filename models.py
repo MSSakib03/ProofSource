@@ -179,6 +179,8 @@ class ContestPage(db.Model):
     reverted_from = db.Column(db.String(30), nullable=True)     # status it had before
     revert_reason = db.Column(db.String(30), nullable=True)     # not_proofread | ineligible | excluded
     reverted_at = db.Column(db.DateTime, nullable=True)
+    # --- v10: the proofreader was told on their talk page that this page needs a fix / was not accepted ---
+    notified_at = db.Column(db.DateTime, nullable=True)
 
     def counts_as_accepted(self, contest):
         if self.review_status == 'accepted':

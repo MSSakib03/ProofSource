@@ -42,6 +42,7 @@ from wiki_engine import (
     fetch_page_content_and_image,
     render_wikitext_preview,
     edit_wikisource_live,
+    post_talk_message,
     USER_AGENT
 )
 import backup_engine
@@ -2086,6 +2087,113 @@ def api_contest_user_pages(cid, username):
     return jsonify({"username": username, "wiki_domain": c.wiki_domain, "total": total, "page": page_no, "per": per,
                     "summary": summary, "by_book": by_book, "show_validation": show_val,
                     "review_enabled": c.is_review_enabled, "pages": [row(p) for p in pages]})
+
+
+# =====================================================================
+#  Messages to proofreaders (talk page): pages that need a fix / were not accepted
+# =====================================================================
+
+_BN_DIGITS = str.maketrans("0123456789", "০১২৩৪৫৬৭৮৯")
+
+NOTICE_TEXT = {
+    "bn": {"subject": "আপনার মুদ্রণ সংশোধন সম্পর্কে ({title})",
+           "needs_fix": "আপনার মুদ্রণ সংশোধন করা নিচের পাতাগুলোর সংশোধন প্রয়োজন।",
+           "rejected": "আপনার মুদ্রণ সংশোধন করা নিচের পাতাগুলো গৃহীত হয়নি।"},
+    "en": {"subject": "About your proofreading ({title})",
+           "needs_fix": "The following pages you proofread need to be fixed.",
+           "rejected": "The following pages you proofread were not accepted."},
+}
+
+
+def _short_page_label(page_title: str, lang: str) -> str:
+    label = page_title.split(":", 1)[1] if ":" in page_title else page_title
+    return label.translate(_BN_DIGITS) if lang == "bn" else label
+
+
+def pending_notice_pages(c: Contest, username: str) -> dict:
+    """Pages of this proofreader that still wait for a message: needs a fix / not accepted, and not
+    mentioned in a message since their latest review."""
+    rows = (ContestPage.query.filter(ContestPage.contest_id == c.id, ContestPage.proofreader == username,
+                                     ContestPage.review_status.in_(("needs_fix", "rejected")),
+                                     or_(ContestPage.notified_at.is_(None),
+                                         ContestPage.notified_at < ContestPage.reviewed_at))
+            .order_by(ContestPage.book_id.asc(), ContestPage.page_number.asc()).all())
+    out = {"needs_fix": [], "rejected": []}
+    for p in rows:
+        out[p.review_status].append(p)
+    return out
+
+
+def build_notice(c: Contest, groups: dict) -> dict:
+    lang = "bn" if c.lang_code == "bn" else "en"
+    tx = NOTICE_TEXT[lang]
+    blocks = []
+    for status in ("needs_fix", "rejected"):
+        if not groups[status]:
+            continue
+        lines = [tx[status]]
+        for p in groups[status]:
+            reason = " ".join((p.jury_note or "").split())
+            line = f"# [[{p.page_title}|{_short_page_label(p.page_title, lang)}]]"
+            lines.append(f"{line}; {reason}" if reason else line)
+        blocks.append("\n".join(lines))
+    return {"subject": tx["subject"].format(title=c.title), "text": "\n\n".join(blocks)}
+
+
+def _notice_access(c: Contest):
+    user = get_current_user()
+    if not user:
+        return None, err("login_required", 401)
+    if not (is_reviewer(c, user) or is_contest_admin(c, user)):
+        return None, err("unauthorized", 403)
+    return user, None
+
+
+@app.route("/api/contests/<int:cid>/user/<path:username>/notice", methods=["GET"])
+def api_user_notice_draft(cid, username):
+    c = live_contest(cid)
+    user, e = _notice_access(c)
+    if e:
+        return e
+    username = canonical_username(username)
+    groups = pending_notice_pages(c, username)
+    draft = build_notice(c, groups)
+    return jsonify({"username": username, "count": len(groups["needs_fix"]) + len(groups["rejected"]),
+                    "page_ids": [p.id for g in groups.values() for p in g],
+                    "talk_title": "User talk:" + username, **draft})
+
+
+@app.route("/api/contests/<int:cid>/user/<path:username>/notice", methods=["POST"])
+def api_user_notice_send(cid, username):
+    c = live_contest(cid)
+    user, e = _notice_access(c)
+    if e:
+        return e
+    limited = rate_limit("notice", 30, 3600, user)
+    if limited:
+        return limited
+    username = canonical_username(username)
+    data = json_body()
+    subject = " ".join(clip(data.get("subject"), 200).split())
+    text = clip(data.get("text"), LEN_TEXT).strip()
+    if not subject or not text:
+        return err("notice_empty")
+    groups = pending_notice_pages(c, username)
+    wanted = {to_int(i, 0) for i in (data.get("page_ids") or []) if isinstance(i, (int, str))}
+    pages = [p for g in groups.values() for p in g if p.id in wanted]
+    if not pages:
+        return err("notice_no_pages")
+    if "~~~~" not in text:
+        text += "\n\n~~~~"
+    res = post_talk_message(c.wiki_domain, username, subject, text, get_oauth_creds())
+    if not res.get("saved_on_wiki"):
+        return err("notice_failed", 502, detail=res.get("error") or "")
+    now = utcnow()
+    for p in pages:
+        p.notified_at = now
+    log_action(c.id, "user_notified", username, details={"pages": [p.page_title for p in pages], "revid": res.get("revid")})
+    db.session.commit()
+    return jsonify({"success": True, "sent": len(pages)})
 
 
 # =====================================================================

@@ -140,3 +140,60 @@ class BookDateTests(Base):
         bid = r.json["book_id"]
         r = self.c.post(f"/api/contests/{cid}/books/{bid}/update", json={"end_time": _fmt(now + timedelta(days=30))})
         self.assertEqual(r.json["error_code"], "book_dates_outside_contest")
+
+
+class NoticeTests(Base):
+    def setUp(self):
+        super().setUp()
+        self.cid = self.make_contest(entries={1: ("Alice", 3, 1), 2: ("Alice", 3, 2), 3: ("Alice", 3, 3), 4: ("Bob", 3, 4)})
+        self.sent = []
+        A.post_talk_message = lambda domain, target, subject, text, creds=None: (
+            self.sent.append((domain, target, subject, text)) or {"saved_on_wiki": True, "revid": 7})
+        with A.app.app_context():
+            pages = {p.page_number: p for p in ContestPage.query.filter_by(contest_id=self.cid).all()}
+            for n, (st, note) in {1: ("needs_fix", "ফুটনোট বাদ"), 2: ("rejected", ""), 3: ("accepted", ""), 4: ("needs_fix", "x")}.items():
+                pages[n].review_status, pages[n].jury_note, pages[n].reviewed_at = st, note, utcnow() - timedelta(hours=1)
+            db.session.commit()
+            self.ids = {n: p.id for n, p in pages.items()}
+
+    def test_draft_lists_only_alices_problem_pages_in_bangla_wikitext(self):
+        d = self.c.get(f"/api/contests/{self.cid}/user/Alice/notice").json
+        self.assertEqual(d["count"], 2)
+        self.assertEqual(set(d["page_ids"]), {self.ids[1], self.ids[2]})
+        self.assertIn("সংশোধন প্রয়োজন", d["text"])
+        self.assertIn("গৃহীত হয়নি", d["text"])
+        self.assertIn("# [[Page:Book.pdf/1|Book.pdf/১]]; ফুটনোট বাদ", d["text"].replace("\n", "\n"))
+        self.assertNotIn("Bob", d["text"])
+
+    def test_only_reviewers_and_admins_can_use_it(self):
+        other = A.app.test_client(); self.login("Stranger", other)
+        self.assertEqual(other.get(f"/api/contests/{self.cid}/user/Alice/notice").status_code, 403)
+        self.assertEqual(A.app.test_client().get(f"/api/contests/{self.cid}/user/Alice/notice").status_code, 401)
+
+    def test_sending_posts_to_the_talk_page_and_never_repeats_a_page(self):
+        d = self.c.get(f"/api/contests/{self.cid}/user/Alice/notice").json
+        r = self.c.post(f"/api/contests/{self.cid}/user/Alice/notice",
+                        json={"subject": d["subject"], "text": d["text"] + "\nধন্যবাদ", "page_ids": d["page_ids"]})
+        self.assertEqual(r.json["sent"], 2)
+        domain, target, subject, text = self.sent[0]
+        self.assertEqual((domain, target), ("bn.wikisource.org", "Alice"))
+        self.assertTrue(text.rstrip().endswith("~~~~"))          # signed
+        self.assertIn("ধন্যবাদ", text)                            # the reviewer's edit went through
+        again = self.c.get(f"/api/contests/{self.cid}/user/Alice/notice").json
+        self.assertEqual(again["count"], 0)
+        self.assertEqual(self.c.post(f"/api/contests/{self.cid}/user/Alice/notice",
+                                     json={"subject": "s", "text": "t", "page_ids": d["page_ids"]}).json["error_code"],
+                         "notice_no_pages")
+        # a new decision on a page makes it eligible again; other pages stay quiet
+        with A.app.app_context():
+            p = db.session.get(ContestPage, self.ids[1]); p.reviewed_at = utcnow() + timedelta(minutes=1)
+            db.session.commit()
+        self.assertEqual(self.c.get(f"/api/contests/{self.cid}/user/Alice/notice").json["page_ids"], [self.ids[1]])
+
+    def test_failed_post_marks_nothing(self):
+        A.post_talk_message = lambda *a, **k: {"saved_on_wiki": False, "error": "badtoken"}
+        d = self.c.get(f"/api/contests/{self.cid}/user/Alice/notice").json
+        r = self.c.post(f"/api/contests/{self.cid}/user/Alice/notice",
+                        json={"subject": "s", "text": "t", "page_ids": d["page_ids"]})
+        self.assertEqual(r.json["error_code"], "notice_failed")
+        self.assertEqual(self.c.get(f"/api/contests/{self.cid}/user/Alice/notice").json["count"], 2)
