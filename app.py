@@ -2912,7 +2912,6 @@ def api_central_delete(slug):
 # ---------- trash (tool admin only) ----------
 
 def _trash_entries():
-    now = utcnow()
     out = []
     for h in Hub.query.filter(Hub.deleted_at.isnot(None)).all():
         out.append({"type": "central", "slug": h.slug, "title": h.title, "deleted_by": h.deleted_by,
