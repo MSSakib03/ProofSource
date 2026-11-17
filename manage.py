@@ -38,7 +38,7 @@ from datetime import datetime
 from sqlalchemy import Boolean, DateTime, create_engine, func, inspect, select
 
 import db_config
-from models import db
+from models import db, utcnow
 
 SKIP_TABLES = {"oauth_logins"}
 
@@ -153,7 +153,7 @@ def cmd_sync(stale_minutes: int = 10, include_ended: bool = False) -> int:
     failed = 0
     with web.app.app_context():
         migrate_schema()
-        now = datetime.utcnow()
+        now = utcnow()
         grace = timedelta(days=2) if include_ended else timedelta(0)
         contests = Contest.query.filter(Contest.approval_status == "approved", Contest.start_time <= now,
                                         Contest.end_time >= now - grace).order_by(Contest.id).all()
