@@ -1204,24 +1204,24 @@
       </div>
 
       <div v-if="centralTab === 'leaderboard'" class="ps-card overflow-hidden">
-        <div class="overflow-x-auto"><table :class="lbCards ? 'ps-stack ps-lb ps-ranked' : ''" class="w-full min-w-[560px] text-left text-sm">
+        <table class="ps-ctable w-full text-left text-sm">
           <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
-            <th class="py-3 px-4 font-medium w-14">#</th><th class="py-3 px-4 font-medium">{{ t('user') }}</th>
-            <th class="py-3 px-4 font-medium">{{ t('perProject') }}</th><th class="py-3 px-4 font-medium text-right">{{ t('proofread') }}</th>
-            <th class="py-3 px-4 font-medium text-right">{{ t('accepted') }}</th><th class="py-3 px-4 font-medium text-right">{{ t('points') }}</th>
+            <th class="w-10 sm:w-14">#</th><th>{{ t('user') }}</th>
+            <th class="text-right">{{ t('proofread') }}</th>
+            <th class="text-right">{{ t('accepted') }}</th>
+            <th class="text-right">{{ t('points') }}</th>
           </tr></thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-            <tr v-if="central.leaderboard.length === 0"><td colspan="6" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
+            <tr v-if="central.leaderboard.length === 0"><td colspan="5" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td data-label="" class="ps-c-rank py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(i)">{{ fmtNum(i + 1) }}</span></td>
-              <td data-label="" class="ps-c-name py-2.5 px-4 font-semibold">{{ r.username }}<span v-if="Object.keys(r.projects || {}).length === 1" class="ps-proj-tag">{{ projectShort(Object.keys(r.projects)[0]) }}</span></td>
-              <td data-label="" class="ps-c-wide py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="ps-proj mr-2 whitespace-nowrap" :class="{ 'ps-proj-single': Object.keys(r.projects).length === 1 }"><span class="ps-proj-k">{{ projectShort(dom) }}<span class="ps-colon">:</span></span> <span class="ps-proj-v">{{ fmtNum(pts) }}</span></span></td>
-              <td :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
-              <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
-              <td data-label="" class="ps-c-points py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
+              <td><span class="ps-serif tabular-nums inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[0.8125rem] sm:text-sm" :class="rankClass(i)">{{ fmtNum(i + 1) }}</span></td>
+              <td><span class="font-semibold">{{ r.username }}</span><span v-for="dom in Object.keys(r.projects || {})" :key="dom" class="ps-code-tag">{{ projectShort(dom) }}</span></td>
+              <td class="text-right tabular-nums">{{ fmtNum(r.submitted) }}</td>
+              <td class="text-right tabular-nums" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'">{{ fmtNum(r.accepted) }}</td>
+              <td class="text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
             </tr>
           </tbody>
-        </table></div>
+        </table>
         <div v-if="central.leaderboard.length > leaderboardLimit" class="p-3 text-center border-t border-slate-200 dark:border-slate-800">
           <button @click="leaderboardLimit += 200" class="text-xs font-semibold text-ws-cerulean hover:underline">{{ t('showMore') }}</button>
         </div>
@@ -2153,6 +2153,7 @@ createApp({
     };
   },
   computed: {
+    navKey() { return JSON.stringify(this.navSnap()); },
     homeProjectOptions() {
       return [...new Set(this.contests.map(c => c.wiki_domain))].sort((a, b) => this.projectLabel(a).localeCompare(this.projectLabel(b)));
     },
@@ -2299,6 +2300,7 @@ createApp({
     centralStarted() { return !!(this.cform.editing && this.central && this.central.central.start_iso && Date.parse(this.central.central.start_iso) <= Date.now()); }
   },
   watch: {
+    navKey() { this.navRecord(); },
     view(v) { window.scrollTo(0, 0); this.selectMode = false; this.selectedIds = []; if (v === 'contest') this.fitJuries(); this.fitLb(); },
     homeProject(v) {
       if (!v) { this.homeProjectPinned = false; safeDrop('ps_home_project'); }
@@ -2327,7 +2329,7 @@ createApp({
       if (this.view === 'contest' && this.active && !this.busy && !this.syncing) this.backgroundSync(this.active.contest.id, false);
     }, 600000);
     window.addEventListener('keydown', this.handleKeyShortcuts);
-    window.addEventListener('popstate', this.handleRoutePop);
+    window.addEventListener('popstate', this.navPop);
     let fitTimer = null;
     window.addEventListener('resize', () => { this.isPhone = window.innerWidth < 640; clearTimeout(fitTimer); fitTimer = setTimeout(() => { this.fitUserMenu(); this.fitJuries(); this.fitLb(); }, 120); });
     document.addEventListener('click', () => { this.userMenuOpen = false; this.sizeMenuOpen = false; });
@@ -2342,25 +2344,20 @@ createApp({
   methods: {
     /* The name and Logout sit side by side while they fit; when a long name would crowd the
      * ProofSource wordmark (or overflow the bar), Logout moves into a menu under the name. */
-    /* Phone leaderboard cards. A row is rank + name (+ points) on the first line and its counts as chips on the second,
-     * the chips starting under the name (never under the rank). A row with at most 3 counts (per-project points count
-     * too) moves its chips up next to the name, on ONE line (class ps-one), when they fit; each row decides for itself,
-     * so a long name only sends its own row back to two lines -
-     * unless that leaves a two-line row between one-line rows: then all rows use two lines. In one-line rows the chips sit right next to the points
-     * and every chip column (counted from the right) and the points get the width of the widest one in the list, so a
-     * two-digit number never pushes its neighbours out of line. Measured, so a larger text size simply means fewer
-     * one-line rows. */
+    /* Phone leaderboard cards: rank + name + points, chips below starting under the name. A row with at most 3 chips
+     * goes on ONE line (ps-one) when it fits, per row, unless that leaves a two-line row between one-line rows (then
+     * all use two). One-line chip columns (from the right) and points share the widest width. Measured. */
     fitLb() {
       if (!this.lbCards) return;
       this.$nextTick(() => {
         const phone = window.innerWidth < 640;
-        const itemsOf = tr => [...tr.querySelectorAll('td.ps-c-stat:not(.ps-zero), .ps-proj:not(.ps-proj-single)')];
+        const itemsOf = tr => [...tr.querySelectorAll('td.ps-c-stat:not(.ps-zero)')];
         const w = el => Math.ceil(el.getBoundingClientRect().width);
         document.querySelectorAll('table.ps-lb').forEach(table => {
           const rows = [...table.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('td.ps-c-name'));
           const reset = trs => trs.forEach(tr => {
             tr.classList.remove('ps-one');
-            tr.querySelectorAll('td.ps-c-stat, td.ps-c-points, .ps-proj').forEach(el => { el.style.minWidth = ''; el.style.justifyContent = ''; });
+            tr.querySelectorAll('td.ps-c-stat, td.ps-c-points').forEach(el => { el.style.minWidth = ''; el.style.justifyContent = ''; });
           });
           reset(rows);
           if (!phone) return;
@@ -2368,7 +2365,7 @@ createApp({
           // a row fits when nothing in it ends past the card's padding edge
           const fits = tr => {
             const edge = tr.getBoundingClientRect().right - (parseFloat(getComputedStyle(tr).paddingRight) || 0) + 1;
-            return [...tr.querySelectorAll('td, .ps-proj')].every(el => el.getBoundingClientRect().right <= edge);
+            return [...tr.querySelectorAll('td')].every(el => el.getBoundingClientRect().right <= edge);
           };
           for (let pass = 0; pass < 4 && one.length; pass++) {
             reset(one);
@@ -2600,6 +2597,12 @@ createApp({
 
     // ---------- boot & routing ----------
     async initApp() {
+      this._navIdx = (history.state && history.state.ps && history.state.ps.idx) || 0;
+      this._navKeys = [];
+      this._navRestoring = true;
+      try { await this.initRoute(); } finally { await this.$nextTick(); this._navRestoring = false; this.navRecord(); }
+    },
+    async initRoute() {
       const init = window.PS_INITIAL || {};
       this.loadWikis();
       await this.loadSession();
@@ -2634,8 +2637,80 @@ createApp({
       }
     },
     handleRoutePop() {
-      if (window.location.pathname === '/' || window.location.pathname === '') { this.view = 'home'; this.active = null; this.loadContests(); }
-      else this.checkUrlRoute();
+      if (window.location.pathname === '/' || window.location.pathname === '') { this.view = 'home'; this.active = null; this.central = null; this.loadContests(); }
+      else return this.checkUrlRoute();
+    },
+
+    // ---------- in-app history: every step (view, tab, user page, review panel) is one Back step ----------
+    /* what the screen shows (kept in history.state); url null = keep the current address */
+    navSnap() {
+      const v = this.view, s = { v, url: null };
+      const c = this.active && this.active.contest;
+      if (['contest', 'jury', 'edit_config', 'userpages'].includes(v) && c) { s.cid = c.id; s.url = `/contest/${c.lang_code}/${c.slug}`; }
+      if (v === 'contest') s.sub = this.contestSubTab;
+      if (v === 'userpages' && this.upages && s.url) { s.user = this.upages.username; s.url += this.upages.isMe ? '/me' : '/user/' + encodeURIComponent(this.upages.username); }
+      if ((v === 'central' || v === 'central_form') && this.central) { s.hub = this.central.central.slug; s.url = '/central/' + s.hub; }
+      if (v === 'central') s.sub = this.centralTab;
+      if (v === 'central_form') s.editing = !!(this.cform && this.cform.editing);
+      if (v === 'home') s.url = '/';
+      return s;
+    },
+    /* on every navKey change: push a step; returning to the previous step (in-app Back/Cancel) goes back in history
+     * instead; while restoring (Back/Forward, first load) only the current entry is updated */
+    navRecord() {
+      if (!this._navKeys) return;   // before initApp
+      const snap = this.navSnap(), key = JSON.stringify(snap), url = snap.url || window.location.pathname;
+      const cur = history.state && history.state.ps;
+      if (this._navRestoring || (cur && cur.key === key)) {
+        this._navKeys[this._navIdx] = key;
+        history.replaceState({ ps: { key, snap, idx: this._navIdx, y: cur && cur.key === key ? cur.y : 0 } }, '', url);
+        return;
+      }
+      if (this._navIdx > 0 && this._navKeys[this._navIdx - 1] === key) { this._navSkipPop = true; history.back(); return; }
+      if (cur) history.replaceState({ ps: { ...cur, y: window.scrollY } }, '', window.location.pathname);   // remember where we were
+      this._navIdx += 1;
+      this._navKeys.length = this._navIdx;
+      this._navKeys[this._navIdx] = key;
+      history.pushState({ ps: { key, snap, idx: this._navIdx, y: 0 } }, '', url);
+    },
+    async navPop(e) {
+      const ps = e.state && e.state.ps;
+      if (this._navSkipPop) { this._navSkipPop = false; if (ps) this._navIdx = ps.idx; return; }
+      this._navRestoring = true;
+      try {
+        if (ps) { this._navIdx = ps.idx; this._navKeys[ps.idx] = ps.key; await this.navRestore(ps.snap); }
+        else await this.handleRoutePop();
+      } finally {
+        await this.$nextTick();
+        this._navRestoring = false;
+        this.navRecord();
+        if (ps && ps.y) setTimeout(() => window.scrollTo(0, ps.y), 0);
+      }
+    },
+    async navRestore(s) {
+      const contest = async () => {
+        if (!(this.active && this.active.contest.id === s.cid)) await this.openContest(s.cid, false, false, false);
+        return this.active && this.active.contest.id === s.cid;
+      };
+      const hub = async () => {
+        if (!(this.central && this.central.central.slug === s.hub)) await this.openCentral(s.hub, false);
+        return this.central && this.central.central.slug === s.hub;
+      };
+      if (s.v === 'home') { this.view = 'home'; this.active = null; this.central = null; this.loadContests(); return; }
+      if (s.v === 'contest' && s.cid) { if (await contest()) { this.view = 'contest'; this.contestSubTab = s.sub || 'leaderboard'; } return; }
+      if (s.v === 'userpages' && s.cid) {
+        if (!(await contest())) return;
+        if (this.upages && this.upages.username === s.user) this.view = 'userpages'; else await this.openUserPages(s.user, false);
+        return;
+      }
+      if (s.v === 'jury' && s.cid) { if (await contest()) { if (this.view !== 'jury') await this.openJuryWorkspace(); } return; }
+      if (s.v === 'edit_config' && s.cid) { if (await contest()) this.openEditConfig(); return; }
+      if (s.v === 'central' && s.hub) { if (await hub()) { this.view = 'central'; this.centralTab = s.sub || 'leaderboard'; } return; }
+      if (s.v === 'central_form') { if (s.editing && s.hub) { if (await hub()) this.openCentralEdit(); } else this.openCreateCentral(); return; }
+      if (s.v === 'create') { this.openCreateContest(); return; }
+      if (s.v === 'trash') { await this.openTrash(); return; }
+      if (s.v === 'tooladmins') { await this.openToolAdmins(); return; }
+      await this.handleRoutePop();
     },
 
     // ---------- keyboard (layout independent: works with Bangla / Avro) ----------
@@ -2725,7 +2800,6 @@ createApp({
     },
     goHome() {
       this.view = 'home'; this.active = null; this.central = null;
-      if (window.location.pathname !== '/') window.history.pushState({}, '', '/');
       this.loadContests();
     },
 
@@ -2737,7 +2811,7 @@ createApp({
       const r = await this.api(`/api/central/${encodeURIComponent(slug)}`);
       if (r.data.central) safeStore(this.centralKey(slug), JSON.stringify(r.data));
     },
-    async openCentral(slug, push = true) {
+    async openCentral(slug) {
       const cached = safeLoad(this.centralKey(slug));
       if (cached) { try { this.central = JSON.parse(cached); this.view = 'central'; } catch (e) { /* ignore */ } }
       if (!cached) this.startLoad();
@@ -2747,8 +2821,6 @@ createApp({
       if (!this.central || this.central.central.slug !== slug) { this.centralTab = 'leaderboard'; this.leaderboardLimit = 200; this.centralWikiCode = ''; }
       this.central = r.data; this.view = 'central';
       safeStore(this.centralKey(slug), JSON.stringify(r.data));
-      const target = '/central/' + slug;
-      if (window.location.pathname !== target) { if (push) window.history.pushState({}, '', target); else window.history.replaceState({}, '', target); }
     },
     blankCentral() {
       const now = new Date(), next = new Date(now.getTime() + 30 * 86400000);
@@ -3026,7 +3098,7 @@ createApp({
       this.newBookPoints = data.contest.proofread_points;
       safeStore(this.cacheKey(data.contest.id), JSON.stringify(data));
     },
-    async openContest(cid, sync = false, silent = false, push = true) {
+    async openContest(cid, sync = false, silent = false) {
       const cached = safeLoad(this.cacheKey(cid));
       if (cached && !silent) {
         try { this.active = JSON.parse(cached); this.view = 'contest'; } catch (e) { /* ignore */ }
@@ -3038,10 +3110,6 @@ createApp({
       if (!silent) { this.showAllJuries = false; this.descOpen = false; this.contestSubTab = this.contestSubTab === 'audit' && !r.data.contest.is_admin ? 'leaderboard' : this.contestSubTab; this.leaderboardLimit = 200; }
       this.applyContestData(r.data);
       if (!silent) this.view = 'contest';
-      const target = `/contest/${r.data.contest.lang_code}/${r.data.contest.slug}`;
-      if (window.location.pathname !== target) {
-        if (push) window.history.pushState({}, '', target); else window.history.replaceState({}, '', target);
-      }
       if ((sync || r.data.contest.needs_sync) && !r.data.contest.sync_running) this.backgroundSync(cid, false);
     },
     async prefetchContest(cid) {
@@ -3260,7 +3328,7 @@ createApp({
       this.notify(this.t('noticeSent').replace('{n}', this.fmtNum(r.data.sent)), 'success');
       await this.loadNotice();
     },
-    async openUserPages(username, push = true) {
+    async openUserPages(username) {
       if (!username || !this.active) return;
       const isMe = this.currentUser && username.toLowerCase() === this.currentUser.toLowerCase();
       this.upages = { username, isMe, status: 'all', pages: [], total: 0, page: 1, summary: {}, by_book: {}, show_validation: false, review_enabled: true };
@@ -3269,9 +3337,6 @@ createApp({
       this.endLoad();
       this.view = 'userpages';
       this.loadNotice();
-      const c = this.active.contest;
-      const target = `/contest/${c.lang_code}/${c.slug}/` + (isMe ? 'me' : 'user/' + encodeURIComponent(username));
-      if (window.location.pathname !== target) { if (push) window.history.pushState({}, '', target); else window.history.replaceState({}, '', target); }
     },
     async loadUserPages(page, append = false) {
       const u = this.upages;
