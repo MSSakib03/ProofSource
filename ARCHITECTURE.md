@@ -10,7 +10,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-236798)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-006699)
 ![Vue](https://img.shields.io/badge/Vue-3-4D8AC0)
-![Tests](https://img.shields.io/badge/tests-99%20passing-2e7d32)
+![Tests](https://img.shields.io/badge/tests-117%20passing-2e7d32)
 
 </div>
 
@@ -116,7 +116,8 @@ Set with `toolforge envvars create NAME VALUE`. Secrets are never stored in code
 | `PROOFSOURCE_JSON_BACKUPS_KEEP` | Server-side JSON copies kept per contest | `10` |
 | `PROOFSOURCE_FORCED_SYNC_SECONDS` | Minimum gap between two forced syncs of a contest | `30` |
 | `PROOFSOURCE_SYNC_SECONDS` | Longest a sync may run inside one web request; the next request carries on (`0` = no limit) | `25` |
-| `PROOFSOURCE_MAX_UPLOAD_MB` | Largest accepted request (backup restore) | `200` |
+| `PROOFSOURCE_MAX_UPLOAD_MB` | Largest accepted request (backup restore; the file is parsed in memory, so keep it modest) | `32` |
+| `PROOFSOURCE_PROXY_HOPS` | Proxies in front of the tool whose `X-Forwarded-For/Proto` are trusted (Toolforge ingress = 1); `0` = trust none | `1` |
 | `PROOFSOURCE_INSECURE_COOKIES` | `1` only for local http development | — |
 
 ---
@@ -139,10 +140,10 @@ Toolforge requirement: `~/www/python/uwsgi.ini` with `buffer-size = 65535`; othe
 
 | Table | Model | Key fields |
 |---|---|---|
-| `contests` | `Contest` | slug, title, wiki_domain, start/end (UTC), proofread/validate/max_bonus points, jury_mode (`in_app_validate` / `accept_reject`), reject_action (`hold_batch` / `instant_revert`), admins, juries, excluded_users, approval_status, **review_enabled**, **bulk_review_enabled**, **review_assignment** (`open`/`equal`), **submission_mode** (`auto`/`enroll`/`manual`), **allow_custom_points**, announcement_en/bn, last_backup_at, sync_started_at, hub_id, delete_requested_by/at/reason |
+| `contests` | `Contest` | slug, title, wiki_domain, start/end (UTC), proofread/validate/max_bonus points, jury_mode (`in_app_validate` / `accept_reject`), reject_action (`hold_batch` / `instant_revert`), admins, juries, excluded_users, approval_status, **review_enabled**, **bulk_review_enabled**, **review_assignment** (`open`/`equal`), **submission_mode** (`auto`/`enroll`/`manual`), **allow_custom_points**, announcement_en/bn, last_backup_at, sync_started_at, hub_id, delete_requested_by/at/reason, **deleted_at/by** (trash) |
 | `index_books` | `IndexBook` | contest_id, title, base_name, total_pages, custom_points, excluded_pages, is_active, optional own start/end window |
 | `contest_pages` | `ContestPage` | contest_id, book_id, page_number, page_title, wiki_level, proofreader, validator, proofread_rev_id/time, review_status (`unproofread`/`eligible`/`pending_review`/`accepted`/`needs_fix`/`rejected`/`reverted`), **reverted_from / revert_reason / reverted_at**, reviewed_by/at, base/bonus points, jury_note, jury & user locks, **last_rev_id** (incremental sync), **assigned_to** (equal review) |
-| `hubs` | `Hub` = **Central contest** | slug, title, description, link, start/end, approval_status, proofread/validate points, custom_points_policy / bonus_policy / review_policy (`yes`/`no`/`project`), **submission_policy** (`auto`/`enroll`/`manual`/`project`), admins, delete request fields |
+| `hubs` | `Hub` = **Central contest** | slug, title, description, link, start/end, approval_status, proofread/validate points, custom_points_policy / bonus_policy / review_policy (`yes`/`no`/`project`), **submission_policy** (`auto`/`enroll`/`manual`/`project`), admins, announcement_en/bn, delete request fields, **deleted_at/by** (trash) |
 | `enrollments` | `Enrollment` | contest_id, username — participants who enrolled (semi-automatic submission) |
 | `tool_admins` | `ToolAdmin` | username, added_by — tool admins added from the UI (on top of `PROOFSOURCE_SUPER_ADMINS`) |
 | `audit_logs` | `AuditLog` | append-only (ORM blocks update/delete); contest_id (no FK, survives deletion), username, action, target, old/new value, details |
@@ -273,7 +274,11 @@ Review: `GET …/jury/next-page` (filters: book_id, status, contributor, scope, 
 
 Data: `GET …/export-csv`, `GET …/backup.json`, `GET …/backup-pages.csv`, `POST …/restore/validate`, `POST …/restore`, `GET …/audit`, `GET/POST /api/admin/snapshots`.
 
-Deletion: `POST/DELETE …/delete-request`, `POST …/delete` (contest and central).
+Deletion: `POST/DELETE …/delete-request`, `POST …/delete` (contest and central) — these move the contest to the **trash**.
+
+Trash (tool admin only): `GET /api/admin/trash`, `POST /api/admin/trash/restore`, `POST /api/admin/trash/purge` (one item, or `{"all": true}`). Items older than 7 days are removed for good by a throttled sweep on incoming requests.
+
+Messages to proofreaders (reviewers/admins): `GET …/user/<name>/notice` (pages that need a fix / were not accepted, as editable wikitext) and `POST …/user/<name>/notice` (posts a new section on `User talk:<name>` and marks the pages, so they are not offered again until they get a new decision).
 
 Central: `GET/POST /api/central`, `GET /api/central/<slug>`, `POST /api/central/<slug>/config|approve`.
 

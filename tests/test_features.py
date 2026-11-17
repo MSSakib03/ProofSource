@@ -8,7 +8,7 @@ import unittest
 from datetime import datetime, timedelta
 
 from test_app import A, Base, db, live, Contest, ContestPage, AuditLog  # noqa: F401
-from models import Enrollment, ToolAdmin
+from models import Enrollment, ToolAdmin, utcnow
 
 
 def statuses(cid):
@@ -85,7 +85,7 @@ class SubmissionModeTests(Base):
         cid = self.make_contest(entries={1: ("Alice", 3, 1)}, submission_mode="manual")
         with A.app.app_context():
             c = db.session.get(Contest, cid)
-            c.end_time = datetime.utcnow() - timedelta(days=2)
+            c.end_time = utcnow() - timedelta(days=2)
             db.session.commit()
             pid = ContestPage.query.filter_by(contest_id=cid).first().id
         alice = A.app.test_client(); self.login("Alice", alice)
@@ -222,7 +222,7 @@ class ToolAdminTests(Base):
 class CentralPolicyTests(Base):
     def test_central_submission_policy_is_forced_on_projects(self):
         self.login("MS Sakib")
-        now = datetime.utcnow()
+        now = utcnow()
         r = self.c.post("/api/central", json={
             "title": "Indic", "slug": "indic", "submission_policy": "manual",
             "start_time": (now - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),
@@ -350,7 +350,7 @@ class DeepCheckTests(Base):
     def test_wiki_cannot_change_once_pages_are_recorded(self):
         cid = self.make_contest(entries={1: ("Alice", 3, 1)})
         r = self.c.post(f"/api/contests/{cid}/config", json={"wiki_domain": "en.wikisource.org"})
-        self.assertEqual(r.json["error_code"], "wiki_has_data")
+        self.assertEqual(r.json["error_code"], "project_locked")      # started: the project is fixed
         with A.app.app_context():
             self.assertEqual(db.session.get(Contest, cid).wiki_domain, "bn.wikisource.org")
 
@@ -358,10 +358,10 @@ class DeepCheckTests(Base):
         cid = self.make_contest(entries={1: ("Alice", 3, 1)})
         with A.app.app_context():
             c = db.session.get(Contest, cid)
-            c.sync_started_at = datetime.utcnow()            # another worker holds the lock
+            c.sync_started_at = utcnow()            # another worker holds the lock
             db.session.commit()
             self.assertEqual(A.sync_contest_books(c), {"skipped": True, "reason": "sync_in_progress"})
-            c.sync_started_at = datetime.utcnow() - timedelta(seconds=A.SYNC_LOCK_SECONDS + 5)   # a dead worker's lock
+            c.sync_started_at = utcnow() - timedelta(seconds=A.SYNC_LOCK_SECONDS + 5)   # a dead worker's lock
             db.session.commit()
             self.assertFalse(A.sync_contest_books(c)["skipped"])
             self.assertIsNone(db.session.get(Contest, cid).sync_started_at)

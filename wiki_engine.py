@@ -201,7 +201,7 @@ def get_api_url(wiki_domain: str) -> str:
 
 def parse_wiki_timestamp(ts_str: str) -> datetime:
     if not ts_str:
-        return datetime.utcfromtimestamp(0)
+        return datetime(1970, 1, 1)
     return datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%SZ")
 
 MAX_PAGE_NUMBER = 100000
@@ -1029,4 +1029,28 @@ def edit_wikisource_live(
         return {"saved_on_wiki": False, "error": err_info}
     except Exception:
         logging.getLogger("proofsource").exception("wiki edit failed on %s", wiki_domain)
+        return {"saved_on_wiki": False, "error": "Could not reach the wiki. Please try again in a moment."}
+
+
+def post_talk_message(wiki_domain: str, target_user: str, subject: str, text: str, oauth_creds: dict = None) -> dict:
+    """Adds a new section to 'User talk:<target_user>' on the contest's wiki, as the logged-in reviewer."""
+    if not oauth_creds or not oauth_creds.get("access_token"):
+        return {"saved_on_wiki": False, "error": "Please log in with MediaWiki Login first."}
+    api_url = get_api_url(wiki_domain)
+    s = requests.Session()
+    s.headers.update({"User-Agent": USER_AGENT, "Authorization": "Bearer " + oauth_creds["access_token"]})
+    try:
+        r = s.get(api_url, params={"action": "query", "meta": "tokens", "format": "json"}, timeout=10).json()
+        token = r.get("query", {}).get("tokens", {}).get("csrftoken")
+        if not token or token == "+\\":
+            return {"saved_on_wiki": False, "error": "Could not obtain MediaWiki edit token. Please log in again."}
+        res = s.post(api_url, data={
+            "action": "edit", "title": "User talk:" + target_user.strip().replace("_", " "),
+            "section": "new", "sectiontitle": subject, "text": text,
+            "summary": "/* " + subject + " */ via ProofSource", "token": token, "format": "json"}, timeout=15).json()
+        if res.get("edit", {}).get("result") == "Success":
+            return {"saved_on_wiki": True, "revid": res["edit"].get("newrevid")}
+        return {"saved_on_wiki": False, "error": res.get("error", {}).get("info") or str(res.get("error") or res)}
+    except Exception:
+        logging.getLogger("proofsource").exception("talk message failed on %s", wiki_domain)
         return {"saved_on_wiki": False, "error": "Could not reach the wiki. Please try again in a moment."}
