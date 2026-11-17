@@ -238,8 +238,8 @@
   /* header & footer */
   .ps-wordmark { font-family: theme('fontFamily.serif'); font-size: 1.35rem; line-height: 1; color: var(--ps-text); letter-spacing: -.01em; }
   @media (max-width: 479px) { header .ps-wordmark { font-size: 1.05rem; } }
-  /* larger text on a phone: the bar keeps its buttons, the wordmark steps aside (the logo stays) */
-  @media (max-width: 479px) { html[data-ps-size="l"] header .ps-wordmark, html[data-ps-size="xl"] header .ps-wordmark { display: none; } }
+  header .ps-wordmark.is-small { font-size: .75rem; }
+  header:has(.ps-wordmark.is-small) .ps-hbtn { padding: .3rem .45rem; gap: .25rem; }
   .ps-title-link { color: inherit; text-decoration: none; }
   .ps-title-link:hover { color: inherit; text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: .15em; }
   .ps-nav-link { position: relative; padding: 1.05rem .15rem; font-size: .875rem; font-weight: 600; color: rgba(255, 255, 255, .8); }
@@ -374,22 +374,24 @@
   .ps-stack.ps-up td.ps-c-note { flex-basis: 100%; }
   .ps-stack td[colspan] { display: block; text-align: center !important; }
 
-  .ps-stack.ps-lb tr { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; }
+  .ps-stack.ps-lb tr { display: flex; flex-wrap: wrap; align-items: center; gap: .2rem .5rem; padding: .45rem .75rem; }
   .ps-stack.ps-lb td { padding: 0 !important; }
   .ps-stack.ps-lb td.ps-c-rank { order: 0; flex: none; display: block; }
-  .ps-stack.ps-lb td.ps-c-name { order: 1; flex: 1 1 0; min-width: 0; display: block; text-align: left !important; font-size: .9375rem; }
-  .ps-stack.ps-lb td.ps-c-points { order: 2; flex: none; display: block; font-size: 1.125rem; }
+  .ps-stack.ps-lb td.ps-c-rank span { width: 1.5rem !important; height: 1.5rem !important; font-size: .8125rem !important; }
+  .ps-stack.ps-lb td.ps-c-name { order: 1; flex: 1 1 0; min-width: 0; display: block; text-align: left !important; font-size: .9375rem; line-height: 1.25; }
+  .ps-stack.ps-lb td.ps-c-points { order: 2; flex: none; display: block; font-size: 1.0625rem; line-height: 1.2; }
   .ps-stack.ps-lb td.ps-c-points::before { display: none; }
   .ps-stack.ps-lb tr::after { content: ""; order: 3; flex-basis: 100%; height: 0; }
-  .ps-stack.ps-lb td.ps-c-stat { order: 4; display: inline-flex; gap: .3rem; font-size: .75rem; padding: .125rem .55rem !important;
+  .ps-stack.ps-lb td.ps-c-stat { order: 4; display: inline-flex; gap: .25rem; font-size: .6875rem; line-height: 1.4; padding: .05rem .5rem !important;
     border-radius: 999px; background: var(--ps-surface-2); }
   .ps-stack.ps-lb td.ps-c-stat.ps-zero { display: none; }
   /* one-line card (set by fitLb when everything fits): rank, name, counts, points */
-  .ps-stack.ps-lb tr.ps-one { flex-wrap: nowrap; }
+  .ps-stack.ps-lb tr.ps-one { flex-wrap: nowrap; gap: .2rem .3rem; padding-left: .6rem; padding-right: .6rem; }
+  .ps-stack.ps-lb tr.ps-one td.ps-c-stat { padding: .05rem .35rem !important; gap: .2rem; }
   .ps-stack.ps-lb tr.ps-one::after { display: none; }
-  .ps-stack.ps-lb tr.ps-one td.ps-c-name { flex: 1 1 auto; min-width: max-content; white-space: nowrap; }
+  .ps-stack.ps-lb tr.ps-one td.ps-c-name { flex: 0 0 var(--ps-name-w, auto); min-width: max-content; white-space: nowrap; padding-right: .2rem !important; box-sizing: border-box; }
   .ps-stack.ps-lb tr.ps-one td.ps-c-stat { order: 2; flex: none; white-space: nowrap; }
-  .ps-stack.ps-lb tr.ps-one td.ps-c-points { order: 3; }
-  .ps-stack.ps-lb td.ps-c-wide { order: 5; flex-basis: 100%; display: block; text-align: left !important; }
+  .ps-stack.ps-lb tr.ps-one td.ps-c-points { order: 3; margin-left: auto; }
+  .ps-stack.ps-lb td.ps-c-wide { order: 5; flex-basis: 100%; display: block; text-align: left !important; line-height: 1.3; }
   .ps-stack.ps-lb td.ps-c-wide:empty { display: none; }
 }

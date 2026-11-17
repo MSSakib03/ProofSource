@@ -56,7 +56,7 @@
   <circle cx="51" cy="44.5" r="8.6" fill="#4D8AC0" style="stroke:var(--ps-logo-ring,#2f4f8c)" stroke-width="3.2"/>
   <path d="M47.2 44.7l2.8 2.8 5.1-5.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg></span>
-          <span ref="wordmark" v-show="!wordmarkHidden" class="ps-wordmark !text-white leading-none whitespace-nowrap">ProofSource</span>
+          <span ref="wordmark" v-show="!wordmarkHidden" class="ps-wordmark !text-white leading-none whitespace-nowrap" :class="wordmarkSmall ? 'is-small' : ''">ProofSource</span>
         </a>
         <nav class="hidden md:flex items-stretch gap-5 self-stretch" :aria-label="t('contests')">
           <a href="/" @click.prevent="goHome" class="ps-nav-link flex items-center" :class="view === 'home' ? 'is-active' : ''">{{ t('contests') }}</a>
@@ -1213,7 +1213,7 @@
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
             <tr v-if="central.leaderboard.length === 0"><td colspan="6" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td data-label="" class="ps-c-rank py-2.5 px-4 text-xs text-slate-500 tabular-nums">{{ fmtNum(i + 1) }}</td>
+              <td data-label="" class="ps-c-rank py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(i)">{{ fmtNum(i + 1) }}</span></td>
               <td data-label="" class="ps-c-name py-2.5 px-4 font-semibold">{{ r.username }}</td>
               <td data-label="" class="ps-c-wide py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="mr-2 whitespace-nowrap">{{ projectShort(dom) }}: {{ fmtNum(pts) }}</span></td>
               <td :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
@@ -2574,7 +2574,7 @@ createApp({
       darkMode: document.documentElement.classList.contains('dark'), csrfToken: (window.PS_INITIAL || {}).csrf_token || '',
       view: 'home', homeFilter: 'running', busy: false, syncing: false,
       notice: '', noticeType: 'info', noticeTimer: null,
-      loggedIn: false, currentUser: null, wikiProjects: loadCachedWikis(), userMenuCompact: false, userMenuIcon: false, wordmarkHidden: false, userMenuOpen: false,
+      loggedIn: false, currentUser: null, wikiProjects: loadCachedWikis(), userMenuCompact: false, userMenuIcon: false, wordmarkHidden: false, wordmarkSmall: false, userMenuOpen: false,
       textSize: document.documentElement.getAttribute('data-ps-size') || 'm', textSizes: TEXT_SIZES, sizeMenuOpen: false,
       contests: [], centrals: [], deleteRequests: [], showAllJuries: false, cfgPreview: { open: false }, dateRowMode: 'full', juryFit: 99, juryMeasuring: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
       expanded: {}, central: null, centralTab: 'leaderboard', cform: {}, upages: null, loadingBar: 0,
@@ -2786,9 +2786,10 @@ createApp({
   methods: {
     /* The name and Logout sit side by side while they fit; when a long name would crowd the
      * ProofSource wordmark (or overflow the bar), Logout moves into a menu under the name. */
-    /* Phone leaderboard cards: rank, name, the few counts and the points share ONE line (class ps-one) only when
-     * that works for EVERY row of the list; if even one row does not fit, all rows keep the counts under the name,
-     * so the list never looks half and half. Only tables with ranks are touched. */
+    /* Phone leaderboard cards. Rows with many counts (4+) are two lines by nature and stay that way. The "short" rows
+     * (at most 3 counts, no per-project line) decide together: if every one of them fits rank, name, counts and points
+     * on ONE line (class ps-one) they all use one line, otherwise they all use two. Measured, so a smaller text size
+     * can bring them back to one line and a larger one sends them to two. */
     fitLb() {
       if (!this.lbCards) return;
       this.$nextTick(() => {
@@ -2796,14 +2797,21 @@ createApp({
         document.querySelectorAll('table.ps-lb').forEach(table => {
           const rows = [...table.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('td.ps-c-rank'));
           rows.forEach(tr => tr.classList.remove('ps-one'));
-          if (!phone || !rows.length) return;
-          const fits = rows.every(tr => {
+          table.style.removeProperty('--ps-name-w');
+          if (!phone) return;
+          const short = rows.filter(tr => {
             const wide = tr.querySelector('td.ps-c-wide');
-            if (wide && wide.textContent.trim()) return false;           // per-project points need their own line
-            tr.classList.add('ps-one');
-            return tr.scrollWidth <= tr.clientWidth + 1;
+            return !(wide && wide.textContent.trim()) && tr.querySelectorAll('td.ps-c-stat:not(.ps-zero)').length <= 3;
           });
-          if (!fits) rows.forEach(tr => tr.classList.remove('ps-one'));
+          short.forEach(tr => tr.classList.add('ps-one'));
+          // every name gets the width of the longest one, so the counts start at the same left edge in every row
+          const textWidth = td => { const r = document.createRange(); r.selectNodeContents(td); return Math.ceil(r.getBoundingClientRect().width + (parseFloat(getComputedStyle(td).paddingRight) || 0)); };
+          const nameW = Math.max(0, ...short.map(tr => textWidth(tr.querySelector('td.ps-c-name'))));
+          if (nameW) table.style.setProperty('--ps-name-w', nameW + 'px');
+          // a row fits when its last item (the points) ends inside the card's padding box edge, not in the padding
+          const fits = tr => { const cs = getComputedStyle(tr), last = tr.querySelector('td.ps-c-points');
+            return last.getBoundingClientRect().right <= tr.getBoundingClientRect().right - (parseFloat(cs.paddingRight) || 0) + 1; };
+          if (!short.every(fits)) { short.forEach(tr => tr.classList.remove('ps-one')); table.style.removeProperty('--ps-name-w'); }
         });
       });
     },
@@ -2815,7 +2823,7 @@ createApp({
       const seq = this._fitSeq = (this._fitSeq || 0) + 1;
       const stale = () => seq !== this._fitSeq;
       this.userMenuOpen = false;
-      this.wordmarkHidden = false;
+      this.wordmarkHidden = false; this.wordmarkSmall = false;
       if (!this.loggedIn) { this.userMenuCompact = false; this.userMenuIcon = false; }
       else if (window.innerWidth < 640) { this.userMenuCompact = true; this.userMenuIcon = true; }
       else { this.userMenuCompact = false; this.userMenuIcon = false; }
@@ -2836,6 +2844,7 @@ createApp({
         this.userMenuCompact = true; await this.$nextTick(); if (stale()) return;
         if (crowded()) { this.userMenuIcon = true; await this.$nextTick(); if (stale()) return; }
       }
+      if (crowded()) { this.wordmarkSmall = true; await this.$nextTick(); if (stale()) return; }   // very large text: smaller name and buttons
       if (crowded()) this.wordmarkHidden = true;                            // last resort on extremely narrow screens
     },
     /* Dates + countdown: 'full' (everything, on one line), 'compact' (countdown without its smallest
