@@ -289,6 +289,9 @@ Tool admins can approve any contest, delete contests when their admins ask for i
 
 ---
 
+## Translating the interface
+Every text of the interface is in `translations/en.json` (English, the reference) and `translations/bn.json` (Bangla). To fix a wording, edit the JSON file; to add a language, copy `en.json` to `<code>.json` and translate it. Keep placeholders such as `{n}` unchanged. Check your work with `python3 manage.py check-i18n` (same keys in every language, same placeholders, nothing missing).
+
 ## FAQ
 
 <details>

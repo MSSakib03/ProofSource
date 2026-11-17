@@ -47,6 +47,7 @@ from wiki_engine import (
     USER_AGENT
 )
 import backup_engine
+import i18n_tools
 
 def _read_key_file(path: str) -> str:
     try:
@@ -99,6 +100,7 @@ def _load_secret_key() -> str:
     return k
 
 app = Flask(__name__)
+app.json.ensure_ascii = False   # Bangla stays Bangla in JSON (3 bytes per letter instead of a 6-byte escape)
 # Toolforge puts a proxy in front of the tool: trust exactly that many hops so request.remote_addr is
 # the visitor, not the ingress (rate limits, logs). 0 turns it off (e.g. when running without a proxy).
 _PROXY_HOPS = int(os.environ.get("PROOFSOURCE_PROXY_HOPS", "1"))
@@ -1017,12 +1019,16 @@ def template_helpers():
     return {"csp_nonce": security.csp_nonce, "asset_url": asset_url}
 
 
+# UI strings (translations/<code>.json), read once and handed to the page; the browser needs no extra request
+TRANSLATIONS = i18n_tools.load_translations()
+
+
 def render_spa(init: dict):
     init = dict(init)
     init["csrf_token"] = security.csrf_token()
     # phone leaderboard as cards (default) or the old scrolling table: PROOFSOURCE_PHONE_LEADERBOARD=table
     init["phone_leaderboard"] = os.environ.get("PROOFSOURCE_PHONE_LEADERBOARD", "cards").strip().lower() != "table"
-    return render_template("index.html", initial=init)
+    return render_template("index.html", initial=init, i18n=TRANSLATIONS)
 
 
 def initial_route_data(lang=None, slug=None, hub_slug=None):
