@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, quote, urlsplit
 import requests
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, abort, g, render_template, request, jsonify, session, redirect, url_for, Response, stream_with_context
 from sqlalchemy import func, case, and_, or_
@@ -963,6 +964,15 @@ def handle_server_error(e):
                   "happening, tell the tool maintainers (details are in the server log).", 500)
 
 
+def _too_large():
+    return err("upload_too_large", 413, max_mb=app.config["MAX_CONTENT_LENGTH"] // (1024 * 1024))
+
+
+@app.errorhandler(413)
+def handle_too_large(e):
+    return _too_large() if request.path.startswith("/api/") else _plain("The upload is too large.", 413)
+
+
 @app.errorhandler(ValueError)
 def handle_value_error(e):
     """Bad user input (non-numeric numbers, invalid domain...) is a 400, never a 500 with a trace."""
@@ -1619,6 +1629,10 @@ def api_update_contest_config(cid):
         new_start = c.start_time
 
     new_slug = re.sub(r'[^a-zA-Z0-9_-]', '', str(data.get("slug") or "").strip()).lower()[:60]
+    if started and new_slug and new_slug != c.slug:
+        return err("slug_locked")             # shared links must keep pointing at the same address
+    if started and _minute(new_end) != _minute(c.end_time) and new_end <= utcnow():
+        return err("end_in_past")             # a running contest cannot be ended retroactively by a typo
     if new_slug and new_slug != c.slug:
         clash = (Contest.query.filter(Contest.slug == new_slug, Contest.id != c.id).first()
                  or SlugAlias.query.filter(SlugAlias.old_slug == new_slug, SlugAlias.contest_id != c.id).first())
@@ -2664,6 +2678,8 @@ def api_restore_validate(cid):
         return err("admin_only", 403)
     try:
         payload = _read_backup_upload()
+    except RequestEntityTooLarge:
+        return _too_large()
     except Exception:
         return err("invalid_backup", problems=["not_json"])
     problems = _backup_problems(payload, c, get_current_user())
@@ -2679,6 +2695,8 @@ def api_restore(cid):
         return err("admin_only", 403)
     try:
         payload = _read_backup_upload()
+    except RequestEntityTooLarge:
+        return _too_large()
     except Exception:
         return err("invalid_backup", problems=["not_json"])
     problems = _backup_problems(payload, c, user)

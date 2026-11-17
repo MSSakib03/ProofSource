@@ -196,7 +196,8 @@ If you are an administrator of that Wikisource, the contest is active immediatel
 ### Configuration (⚙)
 - **New contest:** the tabs are walked through with **Next**; only the last tab (**Books**) has **Save configuration**.
 - **Existing contest:** edits made on one tab are kept when you switch tabs or save a book; a dot marks tabs with unsaved edits, and the confirmation lists only what changed.
-- **Once the contest has started** its start time and Wikisource project are fixed; the end time can still move. A book's own dates must stay inside the contest's dates.
+- **Required fields** are marked with a red `*`: contest name, Wikisource project, start and end time (central: also at least one project).
+- **Once the contest has started** its start time, link slug and Wikisource project are fixed; the end time can still move (but not into the past). Risky changes to a running contest (points, excluded users, review mode, submission mode) show a ⚠ explanation in the confirmation. A book's own dates must stay inside the contest's dates.
 - Every setting can be changed later, and each change is recorded in the **Activity Log**.
 - The configuration page has tabs: **General**, **Rules & points**, **Review**, **Books** and **Backup**. The first three are saved together with **Save configuration**.
 - **Books:** every book is one row; **Edit** opens it to set custom points, excluded pages and a book-specific time window, then press **Save book**. Books are saved one at a time, not with **Save configuration**.

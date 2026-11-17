@@ -287,7 +287,9 @@ class ConfigTests(Base):
         self.assertEqual(bad, [])
 
     def test_slug_change_keeps_old_link(self):
-        cid = self.make_contest(slug="oldname")
+        now = utcnow()    # the slug can only change before the contest starts
+        cid = self.make_contest(slug="oldname", start_time=(now + timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
+                                end_time=(now + timedelta(days=9)).strftime("%Y-%m-%dT%H:%M"))
         self.c.post(f"/api/contests/{cid}/config", json={"slug": "newname"})
         r = self.c.get("/contest/bn/oldname")
         self.assertEqual(r.status_code, 301)

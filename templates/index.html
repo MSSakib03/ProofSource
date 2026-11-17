@@ -320,14 +320,16 @@
           {{ t('childRulesNotice') }} <a :href="'/central/' + active.contest.hub_slug" @click.prevent="openCentral(active.contest.hub_slug)" class="font-semibold underline">{{ active.contest.hub_title }}</a>
         </div>
         <div v-show="cfgTab !== 'backup'" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <p v-if="cfgTab === 'general'" class="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400"><span class="text-rose-600 dark:text-rose-400" aria-hidden="true">*</span> {{ t('requiredLegend') }}</p>
           <p v-if="cfgTab === 'general' && startedLockNote" class="sm:col-span-2 text-xs p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-200">{{ t('startedLockNote') }}</p>
           <div v-show="cfgTab === 'general'" class="sm:col-span-2">
-            <label class="ps-label">{{ t('contestName') }}</label>
-            <input v-model="form.title" type="text" class="ps-input" />
+            <label class="ps-label" for="ps-f-title">{{ t('contestName') }}<span class="text-rose-600 dark:text-rose-400" aria-hidden="true"> *</span></label>
+            <input id="ps-f-title" v-model="form.title" type="text" required aria-required="true" @input="fieldErr.title = ''" :class="fieldErr.title ? '!border-rose-500' : ''" class="ps-input" />
+            <p v-if="fieldErr.title" class="text-xs text-rose-600 dark:text-rose-400 mt-1" role="alert">{{ t(fieldErr.title) }}</p>
           </div>
 
           <div v-show="cfgTab === 'general'">
-            <label class="ps-label">{{ t('wikisourceProject') }}</label>
+            <label class="ps-label">{{ t('wikisourceProject') }}<span class="text-rose-600 dark:text-rose-400" aria-hidden="true"> *</span></label>
             <wiki-picker v-model="form.wiki_domain" :wikis="wikiProjects" :disabled="isLocked('wiki_domain')"
                          :other-label="t('otherWikisource')" :hint="t('wikiDomainHint')" :search-label="t('wikiSearchPh')" :back-label="t('wikiBackToList')" :use-label="t('wikiUseCode')"></wiki-picker>
           </div>
@@ -336,7 +338,7 @@
             <label class="ps-label">{{ t('customSlugLabel') }}</label>
             <div class="flex items-center border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-950 overflow-hidden">
               <span class="px-2.5 py-2 text-xs font-mono text-slate-500 border-r border-slate-300 dark:border-slate-800 shrink-0">/contest/{{ formLangPreview }}/</span>
-              <input v-model="form.slug" type="text" :placeholder="t('customSlugPlaceholder')" class="w-full min-w-0 bg-white dark:bg-slate-950 px-2.5 py-2 text-xs font-mono focus:outline-none" />
+              <input v-model="form.slug" :disabled="isLocked('slug')" type="text" :placeholder="t('customSlugPlaceholder')" class="w-full min-w-0 bg-white dark:bg-slate-950 px-2.5 py-2 text-xs font-mono focus:outline-none disabled:opacity-60" />
             </div>
           </div>
 
@@ -352,13 +354,15 @@
           </div>
 
           <div v-show="cfgTab === 'general'">
-            <label class="ps-label">{{ t('startTime') }} (UTC)</label>
-            <input v-model="form.start_time" :disabled="isLocked('start_time')" type="datetime-local" class="ps-input" />
+            <label class="ps-label">{{ t('startTime') }} (UTC)<span class="text-rose-600 dark:text-rose-400" aria-hidden="true"> *</span></label>
+            <input v-model="form.start_time" :disabled="isLocked('start_time')" type="datetime-local" required aria-required="true" @input="fieldErr.start_time = ''" :class="fieldErr.start_time ? '!border-rose-500' : ''" class="ps-input" />
+            <p v-if="fieldErr.start_time" class="text-xs text-rose-600 dark:text-rose-400 mt-1" role="alert">{{ t(fieldErr.start_time) }}</p>
           </div>
 
           <div v-show="cfgTab === 'general'">
-            <label class="ps-label">{{ t('endTime') }} (UTC)</label>
-            <input v-model="form.end_time" :disabled="isLocked('end_time')" type="datetime-local" class="ps-input" />
+            <label class="ps-label">{{ t('endTime') }} (UTC)<span class="text-rose-600 dark:text-rose-400" aria-hidden="true"> *</span></label>
+            <input v-model="form.end_time" :disabled="isLocked('end_time')" type="datetime-local" required aria-required="true" @input="fieldErr.end_time = ''" :class="fieldErr.end_time ? '!border-rose-500' : ''" class="ps-input" />
+            <p v-if="fieldErr.end_time" class="text-xs text-rose-600 dark:text-rose-400 mt-1" role="alert">{{ t(fieldErr.end_time) }}</p>
           </div>
 
           <div v-show="cfgTab === 'rules'" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
@@ -1301,15 +1305,19 @@
           <button @click="cform.editing ? openCentral(cform.slug) : goHome()" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">{{ t('cancel') }}</button>
         </div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div class="sm:col-span-2"><label class="ps-label">{{ t('contestName') }}</label><input v-model="cform.title" type="text" class="ps-input" /></div>
+          <p class="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400"><span class="text-rose-600 dark:text-rose-400" aria-hidden="true">*</span> {{ t('requiredLegend') }}</p>
+          <div class="sm:col-span-2"><label class="ps-label" for="ps-c-title">{{ t('contestName') }}<span class="text-rose-600 dark:text-rose-400" aria-hidden="true"> *</span></label><input id="ps-c-title" v-model="cform.title" type="text" required aria-required="true" @input="fieldErr.title = ''" :class="fieldErr.title ? '!border-rose-500' : ''" class="ps-input" />
+            <p v-if="fieldErr.title" class="text-xs text-rose-600 dark:text-rose-400 mt-1" role="alert">{{ t(fieldErr.title) }}</p></div>
           <div><label class="ps-label">{{ t('customSlugLabel') }}</label>
             <div class="flex items-center border border-slate-300 dark:border-slate-700 rounded-lg overflow-hidden"><span class="px-2.5 py-2 text-xs font-mono text-slate-500 bg-slate-50 dark:bg-slate-950 border-r border-slate-300 dark:border-slate-800 shrink-0">/central/</span>
               <input v-model="cform.slug" :disabled="cform.editing" type="text" :placeholder="t('customSlugPlaceholder')" class="w-full min-w-0 bg-white dark:bg-slate-950 px-2.5 py-2 text-xs font-mono focus:outline-none disabled:opacity-60" /></div></div>
           <div><label class="ps-label">{{ t('eventPageLink') }}</label><input v-model="cform.link" type="url" placeholder="https://meta.wikimedia.org/wiki/..." class="ps-input" /></div>
           <div class="sm:col-span-2"><label class="ps-label">{{ t('description') }}</label><textarea v-model="cform.description" rows="2" class="ps-input"></textarea></div>
           <p v-if="centralStarted" class="sm:col-span-2 text-xs p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-200">{{ t('centralStartedNote') }}</p>
-          <div><label class="ps-label">{{ t('startTime') }} (UTC)</label><input v-model="cform.start_time" :disabled="centralStarted" type="datetime-local" class="ps-input" /></div>
-          <div><label class="ps-label">{{ t('endTime') }} (UTC)</label><input v-model="cform.end_time" type="datetime-local" class="ps-input" /></div>
+          <div><label class="ps-label">{{ t('startTime') }} (UTC)<span class="text-rose-600 dark:text-rose-400" aria-hidden="true"> *</span></label><input v-model="cform.start_time" :disabled="centralStarted" type="datetime-local" required aria-required="true" @input="fieldErr.start_time = ''" :class="fieldErr.start_time ? '!border-rose-500' : ''" class="ps-input" />
+            <p v-if="fieldErr.start_time" class="text-xs text-rose-600 dark:text-rose-400 mt-1" role="alert">{{ t(fieldErr.start_time) }}</p></div>
+          <div><label class="ps-label">{{ t('endTime') }} (UTC)<span class="text-rose-600 dark:text-rose-400" aria-hidden="true"> *</span></label><input v-model="cform.end_time" type="datetime-local" required aria-required="true" @input="fieldErr.end_time = ''" :class="fieldErr.end_time ? '!border-rose-500' : ''" class="ps-input" />
+            <p v-if="fieldErr.end_time" class="text-xs text-rose-600 dark:text-rose-400 mt-1" role="alert">{{ t(fieldErr.end_time) }}</p></div>
           <div><label class="ps-label">{{ t('pointsPerPage') }}</label><input v-model.number="cform.proofread_points" type="number" min="0" class="ps-input tabular-nums" /></div>
           <div><label class="ps-label">{{ t('validatePoints') }}</label><input v-model.number="cform.validate_points" type="number" min="0" class="ps-input tabular-nums" /></div>
           <div class="sm:col-span-2"><label class="ps-label">{{ t('centralAdmins') }}</label><input v-model="cform.admins" type="text" placeholder="User1, User2" class="ps-input" /></div>
@@ -1346,9 +1354,10 @@
 
         <div class="border-t border-slate-200 dark:border-slate-800 pt-4 space-y-2">
           <div class="flex items-center justify-between">
-            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ t('includedProjects') }}</span>
+            <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ t('includedProjects') }}<span class="text-rose-600 dark:text-rose-400" aria-hidden="true"> *</span></span>
             <button type="button" @click="cform.projects.push({ wiki_domain: '', admins: '' })" class="text-xs font-semibold text-ws-chambray dark:text-ws-nature hover:underline">+ {{ t('addProject') }}</button>
           </div>
+          <p v-if="fieldErr.projects" class="text-xs text-rose-600 dark:text-rose-400 mt-1" role="alert">{{ t(fieldErr.projects) }}</p>
           <div v-for="(p, i) in cform.projects" :key="i" class="flex flex-col sm:flex-row gap-2 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
             <wiki-picker v-model="p.wiki_domain" :wikis="wikiProjects" allow-empty :empty-label="t('selectProject')" class="sm:w-64 shrink-0" :disabled="centralStarted && (cform.lockedDomains || []).includes(p.wiki_domain)"
                          :other-label="t('otherWikisource')" :hint="t('wikiDomainHint')" :search-label="t('wikiSearchPh')" :back-label="t('wikiBackToList')" :use-label="t('wikiUseCode')"></wiki-picker>
@@ -1807,6 +1816,7 @@
             <div class="ps-label !mb-0.5">{{ ch.label }}</div>
             <div class="text-slate-500 line-through break-words" v-if="ch.from !== '—'">{{ ch.from }}</div>
             <div class="font-medium break-words">{{ ch.to }}</div>
+            <div v-if="ch.warn" class="text-amber-700 dark:text-amber-400 mt-0.5">⚠ {{ ch.warn }}</div>
           </li>
         </ul>
       </div>
@@ -2194,7 +2204,14 @@ const I18N = {
     trashEmptyAll: 'Empty trash', trashEmptyMsg: 'Everything in the trash will be removed for good.', trashPurged: 'Removed', centralWord: 'Central',
     cfgNext: 'Next', cfgBack: 'Back', unsavedChanges: 'Unsaved changes', pv_changes: 'These changes will be saved:', noChanges: 'No changes to save',
     discardTitle: 'Discard your changes?', discardMsg: 'Some changes are not saved yet. Leaving now will throw them away.',
-    startedLockNote: 'This contest has started: the start time and the Wikisource project can no longer be changed. The end time can.',
+    startedLockNote: 'This contest has started: the start time, the link slug and the Wikisource project can no longer be changed. The end time can (but not into the past).',
+    requiredLegend: 'required', err_slug_locked: 'The link slug cannot change once the contest has started', err_end_in_past: 'A running contest’s end time cannot be moved into the past',
+    err_upload_too_large: 'The file is too large (limit: {max} MB)',
+    warn_excluded_users: 'Takes effect for pages already counted: those users’ points disappear from the leaderboard at once.',
+    warn_points: 'Points of pages already accepted are recalculated, so the leaderboard changes.',
+    warn_submission_mode: 'Changes how new pages enter the contest; pages already listed stay.',
+    warn_review_enabled: 'Changes what “accepted” means for pages already reviewed.', warn_assignment: 'Pending pages are shared out again between the reviewers.',
+    warn_juries: 'Pending pages are shared out again if the share is equal.', warn_end_earlier: 'Shortening a running contest: pages after the new end will no longer count.',
     err_start_locked: 'The start time cannot change once the contest has started', err_project_locked: 'The Wikisource project cannot change once the contest has started',
     err_book_dates_outside_contest: 'A book’s dates must be inside the contest’s time frame',
     act_contest_create: 'Contest created', act_contest_approval: 'Approval', act_config_change: 'Configuration changed',
@@ -2407,7 +2424,14 @@ const I18N = {
     trashEmptyAll: 'ট্র্যাশ খালি করুন', trashEmptyMsg: 'ট্র্যাশের সবকিছু স্থায়ীভাবে মুছে যাবে।', trashPurged: 'মুছে ফেলা হয়েছে', centralWord: 'কেন্দ্রীয়',
     cfgNext: 'পরবর্তী', cfgBack: 'পিছনে', unsavedChanges: 'অসংরক্ষিত পরিবর্তন', pv_changes: 'এই পরিবর্তনগুলো সংরক্ষিত হবে:', noChanges: 'সংরক্ষণ করার মতো কোনো পরিবর্তন নেই',
     discardTitle: 'পরিবর্তনগুলো বাদ দেবেন?', discardMsg: 'কিছু পরিবর্তন এখনো সংরক্ষিত হয়নি। এখন বের হলে সেগুলো হারিয়ে যাবে।',
-    startedLockNote: 'প্রতিযোগিতা শুরু হয়ে গেছে: এখন আর শুরুর সময় ও উইকিসংকলন প্রকল্প বদলানো যাবে না। শেষের সময় বদলানো যাবে।',
+    startedLockNote: 'প্রতিযোগিতা শুরু হয়ে গেছে: এখন আর শুরুর সময়, লিংক কোড ও উইকিসংকলন প্রকল্প বদলানো যাবে না। শেষের সময় বদলানো যাবে (অতীতে নেওয়া যাবে না)।',
+    requiredLegend: 'আবশ্যক', err_slug_locked: 'প্রতিযোগিতা শুরু হওয়ার পর লিংক কোড বদলানো যায় না', err_end_in_past: 'চলমান প্রতিযোগিতার শেষের সময় অতীতে নেওয়া যায় না',
+    err_upload_too_large: 'ফাইলটি অনেক বড় (সীমা: {max} MB)',
+    warn_excluded_users: 'ইতিমধ্যে গণনা হওয়া পাতার ক্ষেত্রেও কার্যকর হবে: এই ব্যবহারকারীদের পয়েন্ট সাথে সাথে লিডারবোর্ড থেকে সরে যাবে।',
+    warn_points: 'ইতিমধ্যে গৃহীত পাতার পয়েন্ট নতুন করে হিসাব হবে, তাই লিডারবোর্ড বদলাবে।',
+    warn_submission_mode: 'নতুন পাতা কীভাবে প্রতিযোগিতায় আসবে তা বদলাবে; আগে তালিকাভুক্ত পাতা থাকবে।',
+    warn_review_enabled: 'আগে পর্যালোচিত পাতার “গৃহীত” মানে বদলে যাবে।', warn_assignment: 'অপেক্ষমাণ পাতা পর্যালোচকদের মধ্যে আবার ভাগ হবে।',
+    warn_juries: 'সমান ভাগ হলে অপেক্ষমাণ পাতা আবার ভাগ হবে।', warn_end_earlier: 'চলমান প্রতিযোগিতা ছোট করা হচ্ছে: নতুন শেষের পরের পাতা আর গণনায় থাকবে না।',
     err_start_locked: 'প্রতিযোগিতা শুরু হওয়ার পর শুরুর সময় বদলানো যায় না', err_project_locked: 'প্রতিযোগিতা শুরু হওয়ার পর উইকিসংকলন প্রকল্প বদলানো যায় না',
     err_book_dates_outside_contest: 'বইয়ের তারিখ প্রতিযোগিতার সময়সীমার ভেতরে হতে হবে',
     act_contest_create: 'প্রতিযোগিতা তৈরি', act_contest_approval: 'অনুমোদন', act_config_change: 'কনফিগারেশন পরিবর্তন',
@@ -2562,7 +2586,7 @@ createApp({
       contestSubTab: 'leaderboard', leaderboardLimit: 200,
       reserveBookId: '', newBookTitle: '', newBookPoints: 3, newBookExcluded: '', newBookStart: '', newBookEnd: '',
       bookToRemove: null, wikiTableCode: '',
-      form: {}, formBase: {}, cfgTab: 'general', bookOpen: null, isPhone: window.innerWidth < 640, showAllProjects: false, notice_: { open: false, count: 0, subject: '', text: '', page_ids: [] }, trash: { items: [], days: 7 },
+      form: {}, formBase: {}, cfgTab: 'general', bookOpen: null, isPhone: window.innerWidth < 640, showAllProjects: false, notice_: { open: false, count: 0, subject: '', text: '', page_ids: [] }, trash: { items: [], days: 7 }, fieldErr: {},
       bookAdd: { query: 'নির্ঘণ্ট:', suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 },
       juryBookId: null, juryStatusFilter: 'pending_review', juryContributor: '',
       juryPage: null, juryQueue: [], juryQueueTotal: 0, juryPrefetch: null,
@@ -2659,7 +2683,16 @@ createApp({
         ['allow_custom_points', t('allowCustomBookPoints'), yes]
       ];
       const out = [];
-      for (const [k, label, fmt] of rows) if (f[k] !== b[k]) out.push({ key: k, label, from: fmt(b[k]), to: fmt(f[k]) });
+      const RISK = { excluded_users: 'warn_excluded_users', proofread_points: 'warn_points', validate_points: 'warn_points', max_bonus_points: 'warn_points',
+                     submission_mode: 'warn_submission_mode', review_enabled: 'warn_review_enabled', review_assignment: 'warn_assignment', juries: 'warn_juries' };
+      for (const [k, label, fmt] of rows) if (f[k] !== b[k]) {
+        let warn = '';
+        if (this.contestStarted) {
+          if (RISK[k]) warn = t(RISK[k]);
+          else if (k === 'end_time' && f.end_time < b.end_time) warn = t('warn_end_earlier');
+        }
+        out.push({ key: k, label, from: fmt(b[k]), to: fmt(f[k]), warn });
+      }
       if (this.bookAdd.pending.length) out.push({ key: 'books', label: t('pv_newBooks'), from: '—', to: this.bookAdd.pending.map(x => x.title).join(', ') });
       return out;
     },
@@ -2869,7 +2902,7 @@ createApp({
     toggleTree(slug) { const h = this.centrals.find(x => x.slug === slug); this.expanded = { ...this.expanded, [slug]: !this.isExpanded(h) }; },
     isLocked(f) {
       if (this.view !== 'edit_config' || !this.active) return false;
-      if (this.contestStarted && (f === 'start_time' || f === 'wiki_domain')) return true;
+      if (this.contestStarted && (f === 'start_time' || f === 'wiki_domain' || f === 'slug')) return true;
       return (this.active.contest.locked_fields || []).includes(f);
     },
     projectShort(dom) { return (dom || '').split('.')[0]; },
@@ -2917,6 +2950,7 @@ createApp({
       const code = data.error_code;
       let msg = code && (I18N[this.lang][`err_${code}`] || I18N.en[`err_${code}`]);
       if (!msg) msg = data.error || this.t('err_generic');
+      if (data.max_mb) msg = msg.replace('{max}', data.max_mb);
       if (data.invalid && data.invalid.length) msg += ': ' + data.invalid.join(', ');
       return msg;
     },
@@ -3103,7 +3137,7 @@ createApp({
     },
     openCreateCentral() {
       if (!this.loggedIn) { window.location.href = '/login'; return; }
-      this.cform = this.blankCentral(); this.view = 'central_form';
+      this.cform = this.blankCentral(); this.fieldErr = {}; this.view = 'central_form';
     },
     openCentralEdit() {
       const c = this.central.central;
@@ -3117,7 +3151,7 @@ createApp({
       this.view = 'central_form';
     },
     async submitCentral() {
-      if (!this.cform.title) { this.notify(this.t('err_title_required'), 'error'); return; }
+      if (!this.validateCentral()) return;
       const body = Object.assign({}, this.cform); delete body.editing; delete body.lockedDomains;
       if (!this.centralHasBn) body.announcement_bn = '';
       if (this.centralStarted) delete body.start_time;
@@ -3196,13 +3230,40 @@ createApp({
     },
     openCreateContest() {
       if (!this.loggedIn) { window.location.href = '/login'; return; }
-      this.form = this.blankForm(); this.formBase = JSON.parse(JSON.stringify(this.form)); this.resetConfigUi(); this.view = 'create';
+      this.form = this.blankForm(); this.formBase = JSON.parse(JSON.stringify(this.form)); this.fieldErr = {}; this.resetConfigUi(); this.view = 'create';
     },
     resetConfigUi() {
       this.cfgTab = 'general'; this.bookOpen = null;
       this.bookAdd = { query: this.bookPrefix, suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 };
     },
     startEditConfig() { this.resetConfigUi(); this.openEditConfig(); },
+    /* the required fields: name, project, start and end (end after start); errors are shown on the fields */
+    validateConfig() {
+      const f = this.form, e = {};
+      if (!String(f.title || '').trim()) e.title = 'err_title_required';
+      if (!this.wikiDomainOk(f.wiki_domain)) e.wiki_domain = 'err_invalid_project';
+      if (!f.start_time) e.start_time = 'err_invalid_dates';
+      if (!f.end_time) e.end_time = 'err_invalid_dates';
+      else if (f.start_time && f.end_time <= f.start_time) e.end_time = 'err_end_before_start';
+      this.fieldErr = e;
+      const first = Object.keys(e)[0];
+      if (!first) return true;
+      this.cfgTab = 'general'; this.notify(this.t(e[first]), 'error');
+      this.$nextTick(() => { const el = document.querySelector('.ps-input[aria-required="true"][class*="rose"]'); if (el) el.focus(); });
+      return false;
+    },
+    validateCentral() {
+      const f = this.cform, e = {};
+      if (!String(f.title || '').trim()) e.title = 'err_title_required';
+      if (!f.start_time) e.start_time = 'err_invalid_dates';
+      if (!f.end_time) e.end_time = 'err_invalid_dates';
+      else if (f.start_time && f.end_time <= f.start_time) e.end_time = 'err_end_before_start';
+      if (!(f.projects || []).some(p => p.wiki_domain)) e.projects = 'err_invalid_project';
+      this.fieldErr = e;
+      const first = Object.keys(e)[0];
+      if (first) this.notify(this.t(e[first]), 'error');
+      return !first;
+    },
     cancelConfig() {
       const leave = () => { if (this.view === 'create') this.goHome(); else this.view = 'contest'; };
       if (!(this.formDirty || this.bookAdd.pending.length)) { leave(); return; }
@@ -3210,10 +3271,7 @@ createApp({
     },
     /* Next / Back on a new contest; leaving "General" needs a name and a valid project */
     cfgStep(d) {
-      if (d > 0 && this.cfgTab === 'general') {
-        if (!this.form.title) { this.notify(this.t('err_title_required'), 'error'); return; }
-        if (!this.wikiDomainOk(this.form.wiki_domain)) { this.notify(this.t('err_invalid_project'), 'error'); return; }
-      }
+      if (d > 0 && this.cfgTab === 'general' && !this.validateConfig()) return;
       const i = this.cfgTabIndex + d;
       if (i >= 0 && i < this.cfgTabs.length) { this.cfgTab = this.cfgTabs[i]; window.scrollTo(0, 0); }
     },
@@ -3293,8 +3351,7 @@ createApp({
     pvLines(v) { return String(v || '').split('\n').map(x => x.trim()).filter(Boolean); },
     pvDate(v) { return v ? this.digits(String(v).replace('T', ' ')) : '—'; },
     openConfigPreview() {
-      if (!this.form.title) { this.notify(this.t('err_title_required'), 'error'); return; }
-      if (!this.wikiDomainOk(this.form.wiki_domain)) { this.notify(this.t('err_invalid_project'), 'error'); return; }
+      if (!this.validateConfig()) return;
       if (this.view === 'edit_config' && !this.cfgChanges.length) { this.notify(this.t('noChanges'), 'info'); return; }
       this.cfgPreview.open = true;
     },
