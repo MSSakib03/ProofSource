@@ -31,3 +31,6 @@ Thumbs.db
 
 # Node (CSS build tooling only)
 node_modules/
+
+# Personal notes for AI assistants (kept on the owner's own device, never committed)
+CONTEXT.md
