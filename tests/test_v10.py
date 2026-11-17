@@ -241,3 +241,12 @@ class StartedGuardTests(Base):
         big = b"{" + b" " * (A.app.config["MAX_CONTENT_LENGTH"] + 10) + b"}"
         r = self.c.post(f"/api/contests/{cid}/restore/validate", data=big, content_type="application/json")
         self.assertEqual((r.status_code, r.json["error_code"]), (413, "upload_too_large"))
+
+
+class PhoneLeaderboardSwitchTests(Base):
+    def test_cards_by_default_and_old_table_by_setting(self):
+        import os
+        from unittest import mock
+        self.assertIn('"phone_leaderboard": true', self.c.get("/").data.decode())
+        with mock.patch.dict(os.environ, {"PROOFSOURCE_PHONE_LEADERBOARD": "table"}):
+            self.assertIn('"phone_leaderboard": false', self.c.get("/").data.decode())

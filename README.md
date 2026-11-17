@@ -98,7 +98,7 @@ The organizers choose one of three submission modes; the contest page shows whic
 **My Pages** opens your own page (`…/me`) with:
 - your rank, proofread, accepted and pending counts and total points; *Needs fix* and *Rejected* appear when you have such pages
 - a breakdown by book
-- every page with its status and the reviewer's note
+- every page with its status and the reviewer's note (on phones: page names are shortened, status and points share one line, and the note appears only when there is one)
 
 Click any name on the leaderboard to see that participant's pages in the same way.
 
@@ -324,7 +324,7 @@ Reload the page (<kbd>Ctrl</kbd>+<kbd>F5</kbd>) and click **MediaWiki Login** ag
 <details>
 <summary><b>Does it work on mobile?</b></summary>
 
-Yes. The whole tool works on phones, tablets and desktops.
+Yes. The whole tool works on phones, tablets and desktops. On phones the tables (leaderboards, reviewer statistics, activity log, results, a participant's pages) turn into cards instead of scrolling sideways. The person who runs the tool can bring back the old scrolling leaderboard on phones with the setting `PROOFSOURCE_PHONE_LEADERBOARD=table`.
 </details>
 
 ---
