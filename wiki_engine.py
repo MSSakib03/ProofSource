@@ -201,7 +201,7 @@ def get_api_url(wiki_domain: str) -> str:
 
 def parse_wiki_timestamp(ts_str: str) -> datetime:
     if not ts_str:
-        return datetime.utcfromtimestamp(0)
+        return datetime(1970, 1, 1)
     return datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%SZ")
 
 MAX_PAGE_NUMBER = 100000

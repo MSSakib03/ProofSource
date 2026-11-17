@@ -20,8 +20,13 @@ import glob
 import time
 import hashlib
 import sqlite3
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from decimal import Decimal
+
+
+def utcnow() -> datetime:
+    """Return a naive datetime in UTC, replacing deprecated utcnow()."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 BACKUP_SCHEMA_VERSION = 1
 SNAPSHOT_KEEP = int(os.environ.get("PROOFSOURCE_SNAPSHOT_KEEP", "21"))
@@ -129,7 +134,7 @@ def export_contest(contest, ContestPage, AuditLog, page_chunk: int = 2000, secre
         "format": "proofsource-backup",
         "schema_version": BACKUP_SCHEMA_VERSION,
         "contest_id": contest.id,
-        "exported_at": _dt(datetime.utcnow()),
+        "exported_at": _dt(utcnow()),
         "counts": {"books": len(books), "pages": len(pages), "audit": len(audit)},
         "checksum": checksum,
         "data": data,
@@ -214,7 +219,7 @@ def validate_backup(payload, expected_contest_id=None, secret: str = None, allow
 def save_json_file(payload: dict, prefix: str, keep: int = JSON_BACKUPS_KEEP) -> str:
     """Writes a private JSON file; keeps only the newest `keep` files with this prefix
     (keep=None keeps all, e.g. for deleted contests)."""
-    name = f"{prefix}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.json"
+    name = f"{prefix}-{utcnow().strftime('%Y%m%d-%H%M%S')}.json"
     path = os.path.join(backup_dir(), name)
     tmp = path + ".tmp"
     with _private_open(tmp, "w", encoding="utf-8") as f:
@@ -258,7 +263,7 @@ def restore_contest(db, contest, payload, models, username: str) -> dict:
                 if name and name.lower() not in seen:
                     seen.add(name.lower())
                     db.session.add(Enrollment(contest_id=contest.id, username=name,
-                                              created_at=_parse_dt((e or {}).get("created_at")) or datetime.utcnow()))
+                                              created_at=_parse_dt((e or {}).get("created_at")) or utcnow()))
         db.session.flush()
 
         for f in CONTEST_FIELDS:
@@ -381,7 +386,7 @@ def _sqlite_snapshot(src: str, reason: str) -> dict:
         return {"ok": False, "error": "not_found"}
     if not _integrity_ok(src):
         return {"ok": False, "error": "source_integrity_failed"}
-    name = f"db-{reason}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.sqlite"
+    name = f"db-{reason}-{utcnow().strftime('%Y%m%d-%H%M%S')}.sqlite"
     dest = os.path.join(backup_dir(), name)
     tmp = dest + ".tmp"
     _private_open(tmp, "w").close()
@@ -438,7 +443,7 @@ def dump_database_json(engine, metadata, path: str) -> dict:
     with _private_open(tmp, "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb") as gz:
         w = io.TextIOWrapper(gz, encoding="utf-8")
         w.write('{"format":"proofsource-db-dump","version":1,"dialect":%s,"created_at":%s,"tables":{' % (
-            json.dumps(engine.dialect.name), json.dumps(_dt(datetime.utcnow()))))
+            json.dumps(engine.dialect.name), json.dumps(_dt(utcnow()))))
         first_table = True
         with engine.connect() as conn:
             for table in metadata.sorted_tables:
@@ -466,7 +471,7 @@ def snapshot_database(engine, reason: str = "auto") -> dict:
     if src:
         return _sqlite_snapshot(src, reason)
     from models import db as _db   # late import: backup_engine stays usable without the app
-    name = f"db-{reason}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.json.gz"
+    name = f"db-{reason}-{utcnow().strftime('%Y%m%d-%H%M%S')}.json.gz"
     dest = os.path.join(backup_dir(), name)
     try:
         counts = dump_database_json(engine, _db.metadata, dest)
@@ -515,5 +520,5 @@ def list_snapshots() -> list:
     paths = glob.glob(os.path.join(backup_dir(), "db-*.sqlite")) + glob.glob(os.path.join(backup_dir(), "db-*.json.gz"))
     for p in sorted(paths, key=os.path.getmtime, reverse=True):
         out.append({"file": os.path.basename(p), "size": os.path.getsize(p),
-                    "time": datetime.utcfromtimestamp(os.path.getmtime(p)).strftime("%Y-%m-%dT%H:%M:%SZ")})
+                    "time": datetime.fromtimestamp(os.path.getmtime(p), timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")})
     return out

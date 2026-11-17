@@ -1,9 +1,14 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event, inspect, text
 
 db = SQLAlchemy()
+
+
+def utcnow() -> datetime:
+    """Return a naive datetime in UTC, replacing deprecated datetime.utcnow()."""
+    return datetime.now(timezone.utc).replace(tzinfo=None)
 
 # MariaDB/ToolsDB: always utf8mb4 (Bangla and every other script) with a binary collation, so
 # text comparisons behave exactly like SQLite. The default *_ci collations are case- AND
@@ -25,7 +30,7 @@ class Hub(db.Model):
     description = db.Column(db.Text, default="")
     created_by = db.Column(db.String(100), nullable=False, default="")
     admins = db.Column(db.Text, default="")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
     # --- v7: central control panel ---
     link = db.Column(db.String(500), default="")
     start_time = db.Column(db.DateTime, nullable=True)
@@ -69,7 +74,7 @@ class Contest(db.Model):
     approval_status = db.Column(db.String(30), default='pending', index=True)
     approved_by = db.Column(db.String(100), nullable=True)
     last_synced_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
     # --- v6 ---
     review_enabled = db.Column(db.Boolean, default=True)
     bulk_review_enabled = db.Column(db.Boolean, default=False)
@@ -118,7 +123,7 @@ class IndexBook(db.Model):
     custom_points = db.Column(db.Integer, nullable=True)
     excluded_pages = db.Column(db.Text, default="")
     is_active = db.Column(db.Boolean, default=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
     # --- v6: optional per-book window (falls back to contest window) ---
     start_time = db.Column(db.DateTime, nullable=True)
     end_time = db.Column(db.DateTime, nullable=True)
@@ -193,7 +198,7 @@ class AuditLog(db.Model):
     old_value = db.Column(db.Text, default="")
     new_value = db.Column(db.Text, default="")
     details = db.Column(db.Text, default="")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=utcnow, index=True)
 
 
 @event.listens_for(AuditLog, 'before_update')
@@ -213,7 +218,7 @@ class SlugAlias(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     old_slug = db.Column(db.String(100), nullable=False, unique=True, index=True)
     contest_id = db.Column(db.Integer, db.ForeignKey('contests.id', ondelete='CASCADE'), nullable=False, index=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class Enrollment(db.Model):
@@ -226,7 +231,7 @@ class Enrollment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     contest_id = db.Column(db.Integer, db.ForeignKey('contests.id', ondelete='CASCADE'), nullable=False, index=True)
     username = db.Column(db.String(100), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class ToolAdmin(db.Model):
@@ -236,7 +241,7 @@ class ToolAdmin(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), nullable=False, unique=True)
     added_by = db.Column(db.String(100), nullable=False, default="")
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 class OAuthLogin(db.Model):
@@ -248,7 +253,7 @@ class OAuthLogin(db.Model):
     access_token = db.Column(db.Text, nullable=False)
     refresh_token = db.Column(db.Text, nullable=True)
     expires_at = db.Column(db.DateTime, nullable=True)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=utcnow)
 
 
 # Which of two rows for the same page survives the clean-up: the one that carries a decision.

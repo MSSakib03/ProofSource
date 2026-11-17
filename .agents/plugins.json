@@ -1,0 +1,13 @@
+{
+  "entries": [
+    {
+      "path": "~/.gemini/config/plugins/modern-web-guidance"
+    },
+    {
+      "path": "~/.gemini/config/plugins/ponytail"
+    },
+    {
+      "path": "~/.gemini/config/plugins/context-mode"
+    }
+  ]
+}

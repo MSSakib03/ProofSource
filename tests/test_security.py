@@ -8,7 +8,7 @@ import unittest
 from datetime import datetime, timedelta
 from unittest import mock
 
-from test_app import A, Base, db, backup_engine, wiki_engine, Contest, ContestPage, Hub, OAuthLogin  # noqa: F401
+from test_app import A, Base, db, backup_engine, wiki_engine, Contest, ContestPage, Hub, OAuthLogin, utcnow  # noqa: F401
 
 
 class CSRFTests(Base):
@@ -72,7 +72,7 @@ class WikiDomainTests(Base):
 
     def test_contest_on_foreign_server_is_refused(self):
         self.login("Admin")
-        now = datetime.utcnow()
+        now = utcnow()
         r = self.c.post("/api/contests", json={"title": "x", "wiki_domain": "attacker.example",
                                                "start_time": now.strftime("%Y-%m-%dT%H:%M"),
                                                "end_time": (now + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")})
@@ -177,7 +177,7 @@ class IdentityTests(Base):
         self.login("Admin")
         with A.app.app_context():
             for rec in OAuthLogin.query.all():
-                rec.created_at = datetime.utcnow() - timedelta(days=60)
+                rec.created_at = utcnow() - timedelta(days=60)
             db.session.commit()
         self.assertFalse(self.c.get("/api/session").json["logged_in"])
 
@@ -310,7 +310,7 @@ class AbuseTests(Base):
         with A.app.app_context():
             p = ContestPage.query.filter_by(contest_id=cid).first()
             p.locked_by_jury = "Admin"
-            p.jury_lock_expires = datetime.utcnow() + timedelta(minutes=5)
+            p.jury_lock_expires = utcnow() + timedelta(minutes=5)
             db.session.commit()
             pid = p.id
         rev = A.app.test_client(); self.login("Rev", rev)

@@ -39,7 +39,7 @@ wiki_engine.requests.post = _no_network
 
 import app as A  # noqa: E402
 import backup_engine  # noqa: E402
-from models import db, Contest, IndexBook, ContestPage, AuditLog, OAuthLogin, Hub  # noqa: E402,F401 (Hub is re-exported to test_security)
+from models import db, Contest, IndexBook, ContestPage, AuditLog, OAuthLogin, Hub, utcnow  # noqa: E402,F401 (Hub is re-exported to test_security)
 
 A.app.config["SESSION_COOKIE_SECURE"] = False
 A.app.config["FORCED_SYNC_MIN_SECONDS"] = 0   # tests sync back to back
@@ -108,7 +108,7 @@ class Base(unittest.TestCase):
         client = client or self.c
         with A.app.app_context():
             rec = OAuthLogin(id=os.urandom(8).hex(), username=name, access_token="tok",
-                             expires_at=datetime.utcnow() + timedelta(hours=1))
+                             expires_at=utcnow() + timedelta(hours=1))
             db.session.add(rec)
             db.session.commit()
             lid = rec.id
@@ -119,7 +119,7 @@ class Base(unittest.TestCase):
     def make_contest(self, review=True, bulk=False, books="Index:Book.pdf", entries=None, **extra):
         A.fetch_live_book_pages_from_wiki = live(entries or {})
         self.login("Admin")
-        now = datetime.utcnow()
+        now = utcnow()
         body = {"title": "Test", "slug": extra.pop("slug", "test"), "wiki_domain": "bn.wikisource.org",
                 "start_time": (now - timedelta(days=5)).strftime("%Y-%m-%dT%H:%M"),
                 "end_time": (now + timedelta(days=5)).strftime("%Y-%m-%dT%H:%M"),
@@ -365,7 +365,7 @@ class BackupTests(Base):
             res = backup_engine.snapshot_database(db.engine, "test")
             self.assertTrue(res["ok"], res)
             c = db.session.get(Contest, cid)
-            c.created_at = datetime.utcnow() - timedelta(days=40)
+            c.created_at = utcnow() - timedelta(days=40)
             db.session.commit()
         self.assertEqual(self.c.get(f"/api/contests/{cid}").json["contest"]["backup_reminder"]["level"], "month")
 
@@ -414,7 +414,7 @@ class CountingRuleTests(unittest.TestCase):
 
 class CentralTests(Base):
     def central(self, client=None, **extra):
-        now = datetime.utcnow()
+        now = utcnow()
         body = {"title": "Indic Week", "slug": "indic",
                 "start_time": (now - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M"),
                 "end_time": (now + timedelta(days=5)).strftime("%Y-%m-%dT%H:%M"),
@@ -558,7 +558,7 @@ class DeleteTests(Base):
 
     def test_tool_admin_who_is_contest_admin_deletes_directly(self):
         boss = A.app.test_client(); self.login("MS Sakib", boss)
-        now = datetime.utcnow()
+        now = utcnow()
         cid = boss.post("/api/contests", json={"title": "Mine", "start_time": now.strftime("%Y-%m-%dT%H:%M"),
                                                "end_time": (now + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")}).json["contest_id"]
         self.assertTrue(boss.post(f"/api/contests/{cid}/delete").json["success"])

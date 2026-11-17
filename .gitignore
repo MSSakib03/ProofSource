@@ -31,3 +31,7 @@ Thumbs.db
 
 # Node (CSS build tooling only)
 node_modules/
+
+# Graphify intermediate files
+.graphify*
+graphify-out/cache/
