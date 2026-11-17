@@ -130,6 +130,21 @@ matches SQLite exactly. `manage.py copy-db` migrates an existing SQLite database
 rows SQLite never rejected), and snapshots work on MariaDB as gzip'd JSON dumps. The full test suite
 passes on both SQLite and MariaDB 10.11. SQLite remains the default for local development and tests.
 
+## Follow-up review (multi-worker and proxy hardening)
+
+| # | Severity | Finding | Fix |
+|---|---|---|---|
+| 16 | High | Several uWSGI workers starting together could each end up with a different in-memory secret key (one wrote the key file, the others fell back after a failed write) → random CSRF failures, lost sessions, invalid backup signatures | the key file is published atomically (private temp file + hard link); a worker that loses the race adopts the stored key |
+| 17 | High | Default upload limit of 200 MB, parsed in RAM (1–2 GB), could OOM-kill a Toolforge pod | default lowered to 32 MB (`PROOFSOURCE_MAX_UPLOAD_MB`) |
+| 18 | Medium | Every anonymous visitor shared one rate-limit bucket (`anon`): one script could lock everybody out | anonymous buckets are keyed by client address |
+| 19 | Medium | `request.remote_addr` was the Toolforge ingress, not the visitor | `ProxyFix` for the configured number of hops (`PROOFSOURCE_PROXY_HOPS`, default 1) |
+
+Also in this round: once a contest has begun its start time and Wikisource project can no longer be
+changed (server-enforced, so a stale form or API call cannot bypass the interface), a book's own dates
+must lie inside the contest window, and deleting a contest moves it to a one-week trash that only tool
+admins can see (the JSON backup is still written at deletion time). Tests: `tests/test_hardening.py`,
+`tests/test_v10.py`.
+
 ## Not changed (accepted risks / follow-ups)
 - `'unsafe-eval'` in CSP is required by Vue's runtime template compiler; removing it needs a build
   step that precompiles the template.

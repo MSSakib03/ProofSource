@@ -194,6 +194,9 @@ Press **Save Configuration**: a short summary of the settings appears. Check it 
 If you are an administrator of that Wikisource, the contest is active immediately. Otherwise it waits until a local administrator or the tool admin approves it.
 
 ### Configuration (⚙)
+- **New contest:** the tabs are walked through with **Next**; only the last tab (**Books**) has **Save configuration**.
+- **Existing contest:** edits made on one tab are kept when you switch tabs or save a book; a dot marks tabs with unsaved edits, and the confirmation lists only what changed.
+- **Once the contest has started** its start time and Wikisource project are fixed; the end time can still move. A book's own dates must stay inside the contest's dates.
 - Every setting can be changed later, and each change is recorded in the **Activity Log**.
 - The configuration page has tabs: **General**, **Rules & points**, **Review**, **Books** and **Backup**. The first three are saved together with **Save configuration**.
 - **Books:** every book is one row; **Edit** opens it to set custom points, excluded pages and a book-specific time window, then press **Save book**. Books are saved one at a time, not with **Save configuration**.
@@ -215,6 +218,12 @@ With **Equal share**, pending pages are divided equally among reviewers, keeping
 - **Download leaderboard CSV**
 - A daily proofreading chart.
 - **Revert rejected pages:** with the batch rule, set rejected pages back to *Not proofread* after the contest (up to 50 per click; press again if more remain).
+
+### Messages to participants
+On a participant's page, reviewers and admins see **Message about pages** when that person has pages that *need a fix* or were *not accepted*. A message is prefilled (with the reviewer's reasons), freely editable wikitext, and is posted on the participant's talk page on the wiki with your account. A page already mentioned is not offered again until it gets a new decision.
+
+### Deleting a contest (tool admin)
+Deleting moves a contest to the **Trash** (visible to tool admins only). It is restorable for 7 days, after which it is removed for good; the trash can also be emptied at any time.
 
 ### Activity log
 Visible to admins only. It records who changed what and when, with old and new values: configuration, books, points, review decisions, bulk reviews, backups and more. Nobody can edit or delete it.
