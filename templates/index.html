@@ -63,6 +63,7 @@
           <a v-if="loggedIn" href="/" @click.prevent="openCreateContest" class="ps-nav-link flex items-center" :class="view === 'create' ? 'is-active' : ''">{{ t('newContest') }}</a>
           <a v-if="loggedIn" href="/" @click.prevent="openCreateCentral" class="ps-nav-link flex items-center" :class="view === 'central_form' ? 'is-active' : ''">{{ t('newCentral') }}</a>
           <a v-if="isSuperAdmin" href="/" @click.prevent="openToolAdmins" class="ps-nav-link flex items-center" :class="view === 'tooladmins' ? 'is-active' : ''">{{ t('toolAdmins') }}</a>
+          <a v-if="isSuperAdmin" href="/" @click.prevent="openTrash" class="ps-nav-link flex items-center" :class="view === 'trash' ? 'is-active' : ''">{{ t('trash') }}</a>
         </nav>
       </div>
 
@@ -164,6 +165,7 @@
               </button>
               <a v-if="!loggedIn" href="/login" class="ps-btn ps-btn-primary no-underline">{{ t('loginToTakePart') }}</a>
               <button v-if="isSuperAdmin" @click="openToolAdmins" class="ps-btn md:hidden">{{ t('toolAdmins') }}</button>
+              <button v-if="isSuperAdmin" @click="openTrash" class="ps-btn md:hidden">{{ t('trash') }}</button>
               <a href="https://github.com/MSSakib03/ProofSource#readme" target="_blank" rel="noopener" class="ps-btn ps-btn-quiet no-underline max-md:hidden">{{ t('howItWorks') }} ↗</a>
             </div>
           </div>
@@ -1379,6 +1381,12 @@
           <div class="ps-eyebrow">{{ upages.isMe ? t('myPages') : t('participantPages') }}</div>
           <h1 class="ps-serif text-2xl leading-tight text-slate-900 dark:text-slate-50 break-words">{{ upages.username }}</h1>
           <a :href="'https://' + active.contest.wiki_domain + '/wiki/Special:Contributions/' + encodeURIComponent(upages.username)" target="_blank" rel="noopener" class="text-xs text-ws-cerulean dark:text-ws-nature hover:underline">{{ t('wikiContributions') }} ↗</a>
+          <div v-if="canNotifyUser" class="mt-2">
+            <button type="button" @click="openNotice" :disabled="busy" class="ps-btn" :title="notice_.count ? t('noticeButtonHelp') : t('noticeNothing')">
+              <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+              {{ t('noticeButton') }}<span v-if="notice_.count" class="ps-count">{{ fmtNum(notice_.count) }}</span>
+            </button>
+          </div>
         </div>
         <div v-if="upages.summary.rank" class="text-center px-5 py-2 rounded-xl bg-ws-nature/10 border border-ws-nature/25">
           <div class="text-[0.625rem] uppercase text-slate-500">{{ t('rank') }}</div>
@@ -1694,6 +1702,41 @@
       </div>
     </div>
 
+    <div v-if="view === 'trash'" class="max-w-2xl mx-auto ps-view">
+      <div class="ps-card p-4 sm:p-6 space-y-4">
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <h2 class="ps-serif text-xl text-slate-900 dark:text-slate-50">{{ t('trash') }}</h2>
+            <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{{ t('trashHelp').replace('{n}', fmtNum(trash.days)) }}</p>
+          </div>
+          <button @click="goHome" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100 shrink-0">{{ t('backHome') }}</button>
+        </div>
+        <p v-if="!trash.items.length" class="ps-zero text-sm py-6 text-center">{{ t('trashEmpty') }}</p>
+        <ul v-else class="divide-y divide-slate-200 dark:divide-slate-800 border border-slate-200 dark:border-slate-800 rounded">
+          <li v-for="it in trash.items" :key="it.type + (it.id || it.slug)" class="p-3 flex flex-col sm:flex-row sm:items-center gap-2.5">
+            <div class="min-w-0 flex-1">
+              <div class="flex flex-wrap items-center gap-1.5">
+                <span class="ps-chip !py-0">{{ it.type === 'central' ? t('centralWord') : projectLabel(it.lang_code ? it.lang_code + '.wikisource.org' : '') }}</span>
+                <span class="font-semibold break-words min-w-0">{{ it.title }}</span>
+              </div>
+              <div class="text-xs text-slate-600 dark:text-slate-400 mt-1">
+                {{ t('trashDeletedBy').replace('{u}', it.deleted_by || '—').replace('{d}', formatDateTime(it.deleted_iso)) }}
+                · {{ it.type === 'central' ? t('trashProjects').replace('{n}', fmtNum(it.projects)) : t('trashPages').replace('{n}', fmtNum(it.pages)) }}
+              </div>
+              <div class="text-xs text-amber-700 dark:text-amber-400 mt-0.5">{{ t('trashRemovedOn').replace('{d}', formatDateTime(it.purge_iso)) }}</div>
+            </div>
+            <div class="flex gap-2 shrink-0">
+              <button @click="restoreTrash(it)" :disabled="busy" class="ps-btn">{{ t('trashRestore') }}</button>
+              <button @click="purgeTrash(it)" :disabled="busy" class="ps-btn ps-btn-quiet-danger">{{ t('trashDeleteNow') }}</button>
+            </div>
+          </li>
+        </ul>
+        <div v-if="trash.items.length" class="flex justify-end">
+          <button @click="emptyTrash" :disabled="busy" class="ps-btn ps-btn-danger">{{ t('trashEmptyAll') }}</button>
+        </div>
+      </div>
+    </div>
+
     <div v-if="view === 'tooladmins'" class="max-w-2xl mx-auto ps-view">
       <div class="ps-card p-5 sm:p-6 space-y-4">
         <div class="flex items-center justify-between gap-3 border-b border-slate-200 dark:border-slate-800 pb-3">
@@ -1802,6 +1845,31 @@
         <button @click="confirmConfigSave" :disabled="busy" class="ps-btn ps-btn-primary">
           <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>{{ t('pv_confirm') }}
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- message to a proofreader: prefilled, editable wikitext posted to their talk page -->
+  <div v-if="notice_.open" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-3 sm:p-4" role="dialog" aria-modal="true" aria-labelledby="ps-notice-title" @keydown.esc="notice_.open = false">
+    <div class="ps-card max-w-2xl w-full max-h-[90vh] flex flex-col shadow-xl overflow-hidden">
+      <div class="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800">
+        <h3 id="ps-notice-title" class="ps-serif text-xl">{{ t('noticeTitle') }}</h3>
+        <p class="text-xs text-slate-600 dark:text-slate-400 mt-1">{{ t('noticeHelp').replace('{u}', upages ? upages.username : '') }}</p>
+      </div>
+      <div class="p-4 sm:p-5 space-y-3 overflow-y-auto text-sm">
+        <div>
+          <label class="ps-label" for="ps-notice-subject">{{ t('noticeSubject') }}</label>
+          <input id="ps-notice-subject" v-model="notice_.subject" type="text" maxlength="200" class="ps-input" />
+        </div>
+        <div>
+          <label class="ps-label" for="ps-notice-text">{{ t('noticeText') }}</label>
+          <textarea id="ps-notice-text" v-model="notice_.text" rows="12" class="ps-input font-mono text-xs leading-relaxed" spellcheck="false"></textarea>
+          <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">{{ t('noticeTextHelp') }}</p>
+        </div>
+      </div>
+      <div class="px-4 sm:px-5 py-3 border-t border-slate-200 dark:border-slate-800 flex justify-end gap-2 bg-slate-50 dark:bg-slate-900/60">
+        <button type="button" @click="notice_.open = false" class="ps-btn ps-btn-quiet">{{ t('cancel') }}</button>
+        <button type="button" @click="sendNotice" :disabled="busy || !notice_.text.trim() || !notice_.subject.trim()" class="ps-btn ps-btn-primary">{{ busy ? t('saving') : t('noticeSend') }}</button>
       </div>
     </div>
   </div>
@@ -2010,13 +2078,13 @@ const TEXT_SIZES = [{ id: 's', label: 'sizeS', px: 12 }, { id: 'm', label: 'size
 const I18N = {
   en: {
     contests: 'Contests', newContest: 'New Contest', showLess: 'Show less',
-    deleteRequested: 'Deletion requested', cancelRequest: 'Cancel request', deletePermanently: 'Delete permanently',
+    deleteRequested: 'Deletion requested', cancelRequest: 'Cancel request', deletePermanently: 'Move to trash',
     requestDelete: 'Request deletion', dangerZone: 'Danger zone', datesNotSet: 'Dates not set yet',
     deleteExplain: 'A contest admin can request deletion; the tool admin then deletes it. A full backup is saved on the server first.',
     deleteExplainCentral: 'Deleting a central contest also deletes all its project contests (each is backed up on the server first).',
-    deleteReasonPrompt: 'Reason for deletion (shown to the tool admin):', deleteConfirmTitle: 'Delete permanently?',
-    deleteConfirmMsg: 'This removes the contest and all its pages from the tool. A backup copy is kept on the server.',
-    deleteRequestSent: 'Deletion request sent to the tool admin', deleted: 'Deleted. Backup saved on the server.',
+    deleteReasonPrompt: 'Reason for deletion (shown to the tool admin):', deleteConfirmTitle: 'Move to the trash?',
+    deleteConfirmMsg: 'The contest and all its pages disappear for everybody and wait in the trash for 7 days. You can restore it or empty the trash at any time. A backup copy is also kept on the server.',
+    deleteRequestSent: 'Deletion request sent to the tool admin', deleted: 'Moved to the trash (kept for 7 days). Backup saved on the server.',
     pendingDeleteRequests: 'Deletion requests waiting for you', centralResultsTitle: 'Combined results (WikiTable)', copy: 'Copy', copied: 'Copied',
     err_delete_forbidden: 'Only the tool admin can delete, after a contest admin requests it', err_delete_via_central: 'This project belongs to a central contest — request deletion there',
     // v7
@@ -2113,6 +2181,16 @@ const I18N = {
     auditTrail: 'Activity Log', allActions: 'All actions', time: 'Time', action: 'Action', target: 'Target', change: 'Change',
     noAuditEntries: 'No activity recorded yet.', prev: 'Previous', next: 'Next',
     centralStartedNote: 'This central contest has started: its start time can no longer change, and projects can be added but not removed.',
+    noticeButton: 'Message about pages', noticeButtonHelp: 'Tell this user which pages need a fix or were not accepted', noticeNothing: 'No new pages to message about',
+    noticeTitle: 'Message to the proofreader', noticeHelp: 'Posted on the talk page of {u} on the wiki, with your account. Edit it as you like.',
+    noticeSubject: 'Section title', noticeText: 'Message (wikitext)', noticeTextHelp: 'Your signature (~~~~) is added at the end. Pages already mentioned are not listed again next time.',
+    noticeSend: 'Send message', noticeSent: 'Message sent about {n} pages',
+    err_notice_empty: 'Write a title and a message', err_notice_no_pages: 'These pages were already mentioned or changed', err_notice_failed: 'The wiki did not accept the message',
+    err_login_required: 'Please log in first',
+    trash: 'Trash', trashHelp: 'Deleted contests wait here for {n} days, then they are removed for good. Only tool admins see this.', trashEmpty: 'The trash is empty.',
+    trashDeletedBy: 'Deleted by {u} on {d}', trashProjects: '{n} projects', trashPages: '{n} pages', trashRemovedOn: 'Removed for good on {d}',
+    trashRestore: 'Restore', trashRestored: 'Restored', trashDeleteNow: 'Delete now', trashDeleteNowMsg: '“{t}” and all its pages will be removed for good.',
+    trashEmptyAll: 'Empty trash', trashEmptyMsg: 'Everything in the trash will be removed for good.', trashPurged: 'Removed', centralWord: 'Central',
     cfgNext: 'Next', cfgBack: 'Back', unsavedChanges: 'Unsaved changes', pv_changes: 'These changes will be saved:', noChanges: 'No changes to save',
     discardTitle: 'Discard your changes?', discardMsg: 'Some changes are not saved yet. Leaving now will throw them away.',
     startedLockNote: 'This contest has started: the start time and the Wikisource project can no longer be changed. The end time can.',
@@ -2221,13 +2299,13 @@ const I18N = {
   },
   bn: {
     contests: 'প্রতিযোগিতাসমূহ', newContest: 'নতুন প্রতিযোগিতা', showLess: 'কম দেখান',
-    deleteRequested: 'মুছে ফেলার অনুরোধ করা হয়েছে', cancelRequest: 'অনুরোধ বাতিল', deletePermanently: 'স্থায়ীভাবে মুছুন',
+    deleteRequested: 'মুছে ফেলার অনুরোধ করা হয়েছে', cancelRequest: 'অনুরোধ বাতিল', deletePermanently: 'ট্র্যাশে পাঠান',
     requestDelete: 'মুছে ফেলার অনুরোধ', dangerZone: 'সতর্কতা অঞ্চল', datesNotSet: 'তারিখ এখনো ঠিক করা হয়নি',
     deleteExplain: 'প্রতিযোগিতার অ্যাডমিন মুছে ফেলার অনুরোধ করবেন; এরপর টুল অ্যাডমিন মুছবেন। মোছার আগে সার্ভারে সম্পূর্ণ ব্যাকআপ রাখা হয়।',
     deleteExplainCentral: 'কেন্দ্রীয় প্রতিযোগিতা মুছলে এর সব প্রকল্পের প্রতিযোগিতাও মুছে যাবে (প্রতিটির ব্যাকআপ আগে সার্ভারে রাখা হবে)।',
-    deleteReasonPrompt: 'মুছে ফেলার কারণ (টুল অ্যাডমিন দেখবেন):', deleteConfirmTitle: 'স্থায়ীভাবে মুছবেন?',
-    deleteConfirmMsg: 'প্রতিযোগিতা ও এর সব পাতা টুল থেকে মুছে যাবে। সার্ভারে একটি ব্যাকআপ কপি থাকবে।',
-    deleteRequestSent: 'টুল অ্যাডমিনের কাছে মুছে ফেলার অনুরোধ পাঠানো হয়েছে', deleted: 'মুছে ফেলা হয়েছে। সার্ভারে ব্যাকআপ রাখা আছে।',
+    deleteReasonPrompt: 'মুছে ফেলার কারণ (টুল অ্যাডমিন দেখবেন):', deleteConfirmTitle: 'ট্র্যাশে পাঠাবেন?',
+    deleteConfirmMsg: 'প্রতিযোগিতা ও এর সব পাতা সবার কাছ থেকে সরে গিয়ে ৭ দিন ট্র্যাশে থাকবে। যেকোনো সময় ফিরিয়ে আনা বা ট্র্যাশ খালি করা যাবে। সার্ভারেও একটি ব্যাকআপ কপি থাকবে।',
+    deleteRequestSent: 'টুল অ্যাডমিনের কাছে মুছে ফেলার অনুরোধ পাঠানো হয়েছে', deleted: 'ট্র্যাশে পাঠানো হয়েছে (৭ দিন থাকবে)। সার্ভারে ব্যাকআপ রাখা আছে।',
     pendingDeleteRequests: 'আপনার জন্য অপেক্ষমাণ মুছে ফেলার অনুরোধ', centralResultsTitle: 'সম্মিলিত ফলাফল (উইকি-টেবিল)', copy: 'কপি', copied: 'কপি হয়েছে',
     err_delete_forbidden: 'অ্যাডমিন অনুরোধ করার পর শুধু টুল অ্যাডমিন মুছতে পারবেন', err_delete_via_central: 'এটি কেন্দ্রীয় প্রতিযোগিতার অংশ — সেখান থেকে অনুরোধ করুন',
     newCentral: 'নতুন কেন্দ্রীয় প্রতিযোগিতা', editCentral: 'কেন্দ্রীয় প্রতিযোগিতার কনফিগারেশন', centralContest: 'কেন্দ্রীয় প্রতিযোগিতা', centralShort: 'কেন্দ্রীয়',
@@ -2315,6 +2393,16 @@ const I18N = {
     auditTrail: 'কার্যক্রমের ইতিহাস', allActions: 'সব কার্যক্রম', time: 'সময়', action: 'কার্যক্রম', target: 'বিষয়', change: 'পরিবর্তন',
     noAuditEntries: 'এখনো কোনো কার্যক্রম নথিভুক্ত হয়নি।', prev: 'আগের', next: 'পরের',
     centralStartedNote: 'কেন্দ্রীয় প্রতিযোগিতা শুরু হয়ে গেছে: শুরুর সময় আর বদলানো যাবে না, প্রকল্প যোগ করা গেলেও বাদ দেওয়া যাবে না।',
+    noticeButton: 'পাতা নিয়ে বার্তা', noticeButtonHelp: 'কোন পাতাগুলো সংশোধন প্রয়োজন বা গৃহীত হয়নি, ব্যবহারকারীকে জানান', noticeNothing: 'বার্তা পাঠানোর মতো নতুন পাতা নেই',
+    noticeTitle: 'মুদ্রণ সংশোধকের কাছে বার্তা', noticeHelp: 'আপনার অ্যাকাউন্ট দিয়ে উইকিতে {u}-এর আলাপ পাতায় যোগ হবে। চাইলে বদলে নিন।',
+    noticeSubject: 'অনুচ্ছেদের শিরোনাম', noticeText: 'বার্তা (উইকিটেক্সট)', noticeTextHelp: 'শেষে আপনার স্বাক্ষর (~~~~) যোগ হবে। যেসব পাতার কথা বলা হয়েছে, পরেরবার সেগুলো আর আসবে না।',
+    noticeSend: 'বার্তা পাঠান', noticeSent: '{n}টি পাতা নিয়ে বার্তা পাঠানো হয়েছে',
+    err_notice_empty: 'শিরোনাম ও বার্তা লিখুন', err_notice_no_pages: 'এই পাতাগুলো ইতিমধ্যে জানানো হয়েছে বা বদলে গেছে', err_notice_failed: 'উইকি বার্তাটি গ্রহণ করেনি',
+    err_login_required: 'আগে লগইন করুন',
+    trash: 'ট্র্যাশ', trashHelp: 'মুছে ফেলা প্রতিযোগিতা {n} দিন এখানে থাকে, তারপর স্থায়ীভাবে মুছে যায়। শুধু টুল অ্যাডমিনরা এটি দেখেন।', trashEmpty: 'ট্র্যাশ খালি।',
+    trashDeletedBy: '{u} মুছেছেন, {d}', trashProjects: '{n}টি প্রকল্প', trashPages: '{n}টি পাতা', trashRemovedOn: 'স্থায়ীভাবে মুছবে: {d}',
+    trashRestore: 'ফিরিয়ে আনুন', trashRestored: 'ফিরিয়ে আনা হয়েছে', trashDeleteNow: 'এখনই মুছুন', trashDeleteNowMsg: '“{t}” ও এর সব পাতা স্থায়ীভাবে মুছে যাবে।',
+    trashEmptyAll: 'ট্র্যাশ খালি করুন', trashEmptyMsg: 'ট্র্যাশের সবকিছু স্থায়ীভাবে মুছে যাবে।', trashPurged: 'মুছে ফেলা হয়েছে', centralWord: 'কেন্দ্রীয়',
     cfgNext: 'পরবর্তী', cfgBack: 'পিছনে', unsavedChanges: 'অসংরক্ষিত পরিবর্তন', pv_changes: 'এই পরিবর্তনগুলো সংরক্ষিত হবে:', noChanges: 'সংরক্ষণ করার মতো কোনো পরিবর্তন নেই',
     discardTitle: 'পরিবর্তনগুলো বাদ দেবেন?', discardMsg: 'কিছু পরিবর্তন এখনো সংরক্ষিত হয়নি। এখন বের হলে সেগুলো হারিয়ে যাবে।',
     startedLockNote: 'প্রতিযোগিতা শুরু হয়ে গেছে: এখন আর শুরুর সময় ও উইকিসংকলন প্রকল্প বদলানো যাবে না। শেষের সময় বদলানো যাবে।',
@@ -2472,7 +2560,7 @@ createApp({
       contestSubTab: 'leaderboard', leaderboardLimit: 200,
       reserveBookId: '', newBookTitle: '', newBookPoints: 3, newBookExcluded: '', newBookStart: '', newBookEnd: '',
       bookToRemove: null, wikiTableCode: '',
-      form: {}, formBase: {}, cfgTab: 'general', bookOpen: null, isPhone: window.innerWidth < 640, showAllProjects: false,
+      form: {}, formBase: {}, cfgTab: 'general', bookOpen: null, isPhone: window.innerWidth < 640, showAllProjects: false, notice_: { open: false, count: 0, subject: '', text: '', page_ids: [] }, trash: { items: [], days: 7 },
       bookAdd: { query: 'নির্ঘণ্ট:', suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 },
       juryBookId: null, juryStatusFilter: 'pending_review', juryContributor: '',
       juryPage: null, juryQueue: [], juryQueueTotal: 0, juryPrefetch: null,
@@ -2523,6 +2611,11 @@ createApp({
     centralProjectsHidden() {
       const all = (this.central && this.central.projects) || [];
       return this.isPhone && all.length > 14 ? (this.showAllProjects ? all.length : all.length - 13) : 0;
+    },
+    /* reviewers and contest admins can message a proofreader about pages that need a fix or were not accepted */
+    canNotifyUser() {
+      return !!(this.loggedIn && this.active && this.upages && !this.upages.isMe && this.upages.review_enabled
+        && (this.active.contest.is_jury || this.active.contest.is_admin));
     },
     formDirty() { return JSON.stringify(this.form) !== JSON.stringify(this.formBase); },
     cfgTabIndex() { return this.cfgTabs.indexOf(this.cfgTab); },
@@ -3385,6 +3478,36 @@ createApp({
 
     // ---------- tool admins ----------
     metaUserUrl(u) { return 'https://meta.wikimedia.org/wiki/User:' + encodeURIComponent(String(u || '').replace(/ /g, '_')); },
+    // ---------- trash (tool admin) ----------
+    async openTrash() {
+      const r = await this.api('/api/admin/trash');
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); this.goHome(); return; }
+      this.trash = { items: r.data.items, days: r.data.days };
+      this.view = 'trash';
+    },
+    trashBody(it) { return it.type === 'central' ? { type: 'central', slug: it.slug } : { type: 'contest', id: it.id }; },
+    async restoreTrash(it) {
+      this.busy = true;
+      const r = await this.api('/api/admin/trash/restore', { method: 'POST', json: this.trashBody(it) });
+      this.busy = false;
+      if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+      this.notify(this.t('trashRestored'), 'success');
+      this.loadContests(); await this.openTrash();
+    },
+    purgeTrash(it) {
+      this.ask(this.t('trashDeleteNow'), this.t('trashDeleteNowMsg').replace('{t}', it.title), async () => {
+        const r = await this.api('/api/admin/trash/purge', { method: 'POST', json: this.trashBody(it) });
+        if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+        this.notify(this.t('trashPurged'), 'success'); await this.openTrash();
+      }, true);
+    },
+    emptyTrash() {
+      this.ask(this.t('trashEmptyAll'), this.t('trashEmptyMsg'), async () => {
+        const r = await this.api('/api/admin/trash/purge', { method: 'POST', json: { all: true } });
+        if (!r.ok) { this.notify(this.errText(r.data), 'error'); return; }
+        this.notify(this.t('trashPurged'), 'success'); await this.openTrash();
+      }, true);
+    },
     async openToolAdmins() {
       const r = await this.api('/api/admin/tool-admins');
       if (!r.ok) { this.notify(this.errText(r.data), 'error'); this.goHome(); return; }
@@ -3421,6 +3544,26 @@ createApp({
       if (tab && !tab.closed) { try { tab.opener = null; } catch (e) { /* ignore */ } tab.location.replace(url); }
       else { this.notify(this.t('popupBlocked')); setTimeout(() => { window.location.href = url; }, 900); }
     },
+    noticeUrl() { return `/api/contests/${this.active.contest.id}/user/${encodeURIComponent(this.upages.username)}/notice`; },
+    async loadNotice() {
+      this.notice_ = { open: false, count: 0, subject: '', text: '', page_ids: [] };
+      if (!this.canNotifyUser) return;
+      const r = await this.api(this.noticeUrl());
+      if (r.ok) this.notice_ = { open: false, count: r.data.count, subject: r.data.subject, text: r.data.text, page_ids: r.data.page_ids };
+    },
+    async openNotice() {
+      await this.loadNotice();                               // always the current list of pages
+      if (!this.notice_.count) { this.notify(this.t('noticeNothing'), 'info'); return; }
+      this.notice_.open = true;
+    },
+    async sendNotice() {
+      this.busy = true;
+      const r = await this.api(this.noticeUrl(), { method: 'POST', json: { subject: this.notice_.subject, text: this.notice_.text, page_ids: this.notice_.page_ids } });
+      this.busy = false;
+      if (!r.ok) { this.notify(this.errText(r.data) + (r.data.detail ? ': ' + r.data.detail : ''), 'error'); return; }
+      this.notify(this.t('noticeSent').replace('{n}', this.fmtNum(r.data.sent)), 'success');
+      await this.loadNotice();
+    },
     async openUserPages(username, push = true) {
       if (!username || !this.active) return;
       const isMe = this.currentUser && username.toLowerCase() === this.currentUser.toLowerCase();
@@ -3429,6 +3572,7 @@ createApp({
       await this.loadUserPages(1);
       this.endLoad();
       this.view = 'userpages';
+      this.loadNotice();
       const c = this.active.contest;
       const target = `/contest/${c.lang_code}/${c.slug}/` + (isMe ? 'me' : 'user/' + encodeURIComponent(username));
       if (window.location.pathname !== target) { if (push) window.history.pushState({}, '', target); else window.history.replaceState({}, '', target); }
