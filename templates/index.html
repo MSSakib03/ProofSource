@@ -2786,9 +2786,10 @@ createApp({
   methods: {
     /* The name and Logout sit side by side while they fit; when a long name would crowd the
      * ProofSource wordmark (or overflow the bar), Logout moves into a menu under the name. */
-    /* Phone leaderboard cards: rank, name, the few counts and the points share ONE line (class ps-one) only when
-     * that works for EVERY row of the list; if even one row does not fit, all rows keep the counts under the name,
-     * so the list never looks half and half. Only tables with ranks are touched. */
+    /* Phone leaderboard cards. Rows with many counts (4+) are two lines by nature and stay that way. The "short" rows
+     * (at most 3 counts, no per-project line) decide together: if every one of them fits rank, name, counts and points
+     * on ONE line (class ps-one) they all use one line, otherwise they all use two. Measured, so a smaller text size
+     * can bring them back to one line and a larger one sends them to two. */
     fitLb() {
       if (!this.lbCards) return;
       this.$nextTick(() => {
@@ -2796,14 +2797,13 @@ createApp({
         document.querySelectorAll('table.ps-lb').forEach(table => {
           const rows = [...table.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('td.ps-c-rank'));
           rows.forEach(tr => tr.classList.remove('ps-one'));
-          if (!phone || !rows.length) return;
-          const fits = rows.every(tr => {
+          if (!phone) return;
+          const short = rows.filter(tr => {
             const wide = tr.querySelector('td.ps-c-wide');
-            if (wide && wide.textContent.trim()) return false;           // per-project points need their own line
-            tr.classList.add('ps-one');
-            return tr.scrollWidth <= tr.clientWidth + 1;
+            return !(wide && wide.textContent.trim()) && tr.querySelectorAll('td.ps-c-stat:not(.ps-zero)').length <= 3;
           });
-          if (!fits) rows.forEach(tr => tr.classList.remove('ps-one'));
+          short.forEach(tr => tr.classList.add('ps-one'));
+          if (!short.every(tr => tr.scrollWidth <= tr.clientWidth + 1)) short.forEach(tr => tr.classList.remove('ps-one'));
         });
       });
     },
