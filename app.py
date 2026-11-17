@@ -14,7 +14,7 @@ from datetime import datetime, timedelta
 from urllib.parse import urlencode, quote, urlsplit
 import requests
 from werkzeug.middleware.proxy_fix import ProxyFix
-from flask import Flask, g, render_template, request, jsonify, session, redirect, url_for, Response, stream_with_context
+from flask import Flask, abort, g, render_template, request, jsonify, session, redirect, url_for, Response, stream_with_context
 from sqlalchemy import func, case, and_, or_
 from sqlalchemy.exc import IntegrityError
 from models import (db, utcnow, Contest, IndexBook, ContestPage, OAuthLogin, AuditLog, SlugAlias, Hub, Enrollment,
@@ -505,11 +505,27 @@ def find_contest_by_slug(slug: str):
     slug = (slug or "").lower()
     c = Contest.query.filter_by(slug=slug).first()
     if c:
-        return c, False
+        return (None, False) if c.deleted_at else (c, False)
     alias = SlugAlias.query.filter_by(old_slug=slug).first()
     if alias:
-        return db.session.get(Contest, alias.contest_id), True
+        c = db.session.get(Contest, alias.contest_id)
+        return (None, False) if c is None or c.deleted_at else (c, True)
     return None, False
+
+
+def live_contest(cid: int) -> Contest:
+    """A contest that is not in the trash (a trashed one is gone for everybody but the tool admin)."""
+    c = db.session.get(Contest, cid)
+    if c is None or c.deleted_at:
+        abort(404)
+    return c
+
+
+def live_hub(slug: str) -> Hub:
+    h = Hub.query.filter_by(slug=(slug or "").lower()).first()
+    if h is None or h.deleted_at:
+        abort(404)
+    return h
 
 
 # =====================================================================
@@ -911,6 +927,11 @@ def init_db():
         db_config_warnings()
     if request.endpoint != "static":
         backup_engine.maybe_auto_snapshot(db.engine)
+        try:
+            purge_expired_trash()
+        except Exception:
+            db.session.rollback()
+            log.exception("trash sweep failed")
 
 
 @app.before_request
@@ -1210,7 +1231,7 @@ def api_contest_by_slug(lang, slug):
 def api_list_contests():
     now = utcnow()
     current_user = get_current_user()
-    contests = Contest.query.order_by(Contest.start_time.desc()).all()
+    contests = Contest.query.filter(Contest.deleted_at.is_(None)).order_by(Contest.start_time.desc()).all()
 
     counts = {}
     for cid, st, n in (db.session.query(ContestPage.contest_id, ContestPage.review_status, func.count(ContestPage.id))
@@ -1251,14 +1272,14 @@ def api_list_contests():
             "review_enabled": c.is_review_enabled,
             "hub_slug": c.hub.slug if c.hub else None,
         })
-    centrals = [central_brief(h, now) for h in Hub.query.order_by(Hub.start_time.desc()).all()
+    centrals = [central_brief(h, now) for h in Hub.query.filter(Hub.deleted_at.is_(None)).order_by(Hub.start_time.desc()).all()
                 if h.approval_status != 'rejected' or is_central_admin(h, current_user)]
     delete_requests = []
     if is_super_admin(current_user):
         delete_requests = ([{"type": "contest", "id": c.id, "slug": c.slug, "lang_code": c.lang_code, "title": c.title,
                              **delete_request_info(c)} for c in contests if c.delete_requested_by] +
                            [{"type": "central", "slug": h.slug, "title": h.title, **delete_request_info(h)}
-                            for h in Hub.query.filter(Hub.delete_requested_by.isnot(None)).all()])
+                            for h in Hub.query.filter(Hub.delete_requested_by.isnot(None), Hub.deleted_at.is_(None)).all()])
     return jsonify({"contests": result, "centrals": centrals, "delete_requests": delete_requests})
 
 
@@ -1364,7 +1385,7 @@ def api_create_contest():
 
 @app.route("/api/contests/<int:cid>/approve", methods=["POST"])
 def api_approve_contest(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     current_user = get_current_user()
     if not can_approve_contest(c, current_user):
         return err("approve_forbidden", 403)
@@ -1505,7 +1526,7 @@ def contest_payload(c: Contest, current_user):
 @app.route("/api/contests/<int:cid>", methods=["GET"])
 def api_get_contest(cid):
     """Returns cached data immediately. ?sync=1 forces a blocking sync (manual button)."""
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     user = get_current_user()
     if request.args.get("sync") == "1" and c.approval_status == "approved" and user \
             and not _sync_too_soon(c, True) and rate_limit("sync", 10, 600, user) is None:
@@ -1524,7 +1545,7 @@ def _sync_too_soon(c: Contest, force: bool) -> bool:
 @app.route("/api/contests/<int:cid>/sync", methods=["POST"])
 def api_sync_contest(cid):
     """Background sync called by the frontend after showing cached data."""
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if c.approval_status != "approved":
         return jsonify({"success": True, "skipped": True, "reason": "not_approved"})
     user = get_current_user()
@@ -1547,7 +1568,7 @@ BOOL_DEFAULTS = {"review_enabled": True, "allow_custom_points": True}
 
 @app.route("/api/contests/<int:cid>/config", methods=["POST"])
 def api_update_contest_config(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_contest_admin(c, get_current_user()):
         return err("admin_only", 403)
     data = dict(json_body())
@@ -1693,7 +1714,7 @@ def _validate_book_input(data, total_pages=0):
 
 @app.route("/api/contests/<int:cid>/books", methods=["POST"])
 def api_add_contest_book(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_contest_admin(c, get_current_user()):
         return err("unauthorized", 403)
     data = json_body()
@@ -1734,7 +1755,7 @@ def api_add_contest_book(cid):
 
 @app.route("/api/contests/<int:cid>/books/<int:bid>/update", methods=["POST"])
 def api_update_contest_book(cid, bid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_contest_admin(c, get_current_user()):
         return err("unauthorized", 403)
     book = IndexBook.query.filter_by(id=bid, contest_id=cid).first_or_404()
@@ -1768,7 +1789,7 @@ def api_update_contest_book(cid, bid):
 
 @app.route("/api/contests/<int:cid>/books/<int:bid>/remove", methods=["POST"])
 def api_remove_contest_book(cid, bid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_contest_admin(c, get_current_user()):
         return err("unauthorized", 403)
     book = IndexBook.query.filter_by(id=bid, contest_id=cid).first_or_404()
@@ -1828,7 +1849,7 @@ def _pick_spaced_page(book, wiki_domain, now, rng):
 
 @app.route("/api/contests/<int:cid>/reserve-page", methods=["POST"])
 def api_reserve_contest_page(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if c.approval_status != 'approved':
         return err("contest_awaiting_approval")
     current_user = get_current_user()
@@ -1916,7 +1937,7 @@ def apply_submission_mode(c: Contest):
 def api_enroll(cid):
     """Semi-automatic submission: from now on this participant's eligible pages are listed automatically
     (including pages they already proofread in this contest)."""
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     user = get_current_user()
     if not user:
         return err("auth_required", 401)
@@ -1942,7 +1963,7 @@ def api_enroll(cid):
 @app.route("/api/contests/<int:cid>/my-eligible", methods=["GET"])
 def api_my_eligible(cid):
     """Manual submission: the logged-in user's pages that qualify but are not submitted yet."""
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     user = get_current_user()
     if not user:
         return err("auth_required", 401)
@@ -1957,7 +1978,7 @@ def api_my_eligible(cid):
 @app.route("/api/contests/<int:cid>/submit", methods=["POST"])
 def api_submit_pages(cid):
     """Manual submission of selected eligible pages (only the proofreader can submit their pages)."""
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     user = get_current_user()
     if not user:
         return err("auth_required", 401)
@@ -1997,7 +2018,7 @@ def _user_pages_query(c: Contest, username: str):
 
 @app.route("/api/contests/<int:cid>/user/<path:username>/pages", methods=["GET"])
 def api_contest_user_pages(cid, username):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     page_no = max(1, request.args.get("page", default=1, type=int))
     per = min(500, max(10, request.args.get("per", default=100, type=int)))
     status = request.args.get("status") or "all"
@@ -2158,7 +2179,7 @@ def _review_query(c: Contest, reviewer: str, book_id=None, status="pending_revie
 
 @app.route("/api/contests/<int:cid>/jury/next-page", methods=["GET"])
 def api_jury_next_page(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     reviewer = get_current_user()
     if not is_reviewer(c, reviewer):
         return jsonify({"has_page": False, "error_code": "unauthorized", "error": "Unauthorized"}), 403
@@ -2231,7 +2252,7 @@ def api_jury_next_page(cid):
 @app.route("/api/contests/<int:cid>/jury/lock", methods=["POST"])
 def api_jury_lock(cid):
     """Lightweight lock used when the UI shows a prefetched page instantly."""
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     reviewer = get_current_user()
     if not is_reviewer(c, reviewer):
         return err("unauthorized", 403)
@@ -2247,7 +2268,7 @@ def api_jury_lock(cid):
 
 @app.route("/api/contests/<int:cid>/jury/preview", methods=["POST"])
 def api_jury_preview(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_reviewer(c, get_current_user()):
         return err("unauthorized", 403)
     limited = rate_limit("preview", 120, 600)
@@ -2307,7 +2328,7 @@ def _apply_review(c: Contest, page: ContestPage, reviewer: str, decision: str, b
 
 @app.route("/api/contests/<int:cid>/jury/submit", methods=["POST"])
 def api_jury_submit(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     reviewer = get_current_user()
     if not is_reviewer(c, reviewer):
         return err("unauthorized", 403)
@@ -2345,7 +2366,7 @@ def api_jury_submit(cid):
 
 @app.route("/api/contests/<int:cid>/bulk/candidates", methods=["GET"])
 def api_bulk_candidates(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     reviewer = get_current_user()
     if not is_reviewer(c, reviewer):
         return err("unauthorized", 403)
@@ -2365,7 +2386,7 @@ def api_bulk_candidates(cid):
 def api_bulk_review(cid):
     """Processes up to 50 pages per call (frontend sends chunks). Each page commits on its own,
     so a failure never loses the pages that already succeeded."""
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     reviewer = get_current_user()
     if not is_reviewer(c, reviewer):
         return err("unauthorized", 403)
@@ -2416,7 +2437,7 @@ def api_bulk_review(cid):
 
 @app.route("/api/contests/<int:cid>/batch-revert", methods=["POST"])
 def api_batch_revert(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     reviewer = get_current_user()
     if not is_contest_admin(c, reviewer):
         return err("unauthorized", 403)
@@ -2448,7 +2469,7 @@ def api_batch_revert(cid):
 
 @app.route("/api/contests/<int:cid>/export-csv", methods=["GET"])
 def api_export_csv(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     si = io.StringIO()
     cw = csv.writer(si)
     cw.writerow(["Rank", "Participant", "Proofread", "Accepted", "Validated", "Pending", "Needs Fix",
@@ -2462,7 +2483,7 @@ def api_export_csv(cid):
 
 @app.route("/api/contests/<int:cid>/backup.json", methods=["GET"])
 def api_backup_json(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_contest_admin(c, get_current_user()):
         return err("admin_only", 403)
     limited = rate_limit("backup", 20, 3600)
@@ -2484,7 +2505,7 @@ def api_backup_json(cid):
 
 @app.route("/api/contests/<int:cid>/backup-pages.csv", methods=["GET"])
 def api_backup_pages_csv(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_contest_admin(c, get_current_user()):
         return err("admin_only", 403)
     log_action(c.id, "backup_export", "csv")
@@ -2514,7 +2535,7 @@ def _backup_problems(payload, c: Contest, user: str) -> list:
 
 @app.route("/api/contests/<int:cid>/restore/validate", methods=["POST"])
 def api_restore_validate(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_contest_admin(c, get_current_user()):
         return err("admin_only", 403)
     try:
@@ -2528,7 +2549,7 @@ def api_restore_validate(cid):
 
 @app.route("/api/contests/<int:cid>/restore", methods=["POST"])
 def api_restore(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     user = get_current_user()
     if not is_contest_admin(c, user):
         return err("admin_only", 403)
@@ -2558,7 +2579,7 @@ def api_restore(cid):
 
 @app.route("/api/contests/<int:cid>/audit", methods=["GET"])
 def api_audit(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     if not is_contest_admin(c, get_current_user()):
         return err("admin_only", 403)
     page_no = max(1, request.args.get("page", default=1, type=int))
@@ -2638,19 +2659,62 @@ def api_snapshots():
 #  Deletion (request by a contest admin, executed by the tool admin)
 # =====================================================================
 
-def _delete_contest(c: Contest, actor: str, reason: str = "") -> str:
-    """Server-side JSON backup first, then delete. The audit log keeps the record."""
+TRASH_DAYS = 7
+
+
+def _actor() -> str:
+    """Who an audit entry is written for: the logged-in user, or 'system' outside a request."""
+    return (get_current_user() if request else None) or "system"
+
+
+def _trash_contest(c: Contest, actor: str, reason: str = "", when=None) -> str:
+    """Deleting puts the contest in the trash (hidden from everybody but the tool admin) after a
+    server-side JSON backup; it is really removed after TRASH_DAYS or when the trash is emptied."""
     payload = backup_engine.export_contest(c, ContestPage, AuditLog, secret=app.secret_key)
     path = backup_engine.save_json_file(payload, f"deleted-contest{c.id}-{c.slug}", keep=None)
     log_action(c.id, "contest_deleted", c.slug, details={"title": c.title, "requested_by": c.delete_requested_by,
                                                          "reason": reason or c.delete_reason, "backup": os.path.basename(path)},
                username=actor)
+    c.deleted_at, c.deleted_by = when or utcnow(), actor
+    c.delete_requested_by, c.delete_requested_at, c.delete_reason = None, None, ""
+    return os.path.basename(path)
+
+
+def _purge_contest(c: Contest):
+    """The real removal (after the trash period). The audit log keeps the record."""
+    log_action(c.id, "contest_purged", c.slug, details={"title": c.title}, username=_actor())
     SlugAlias.query.filter_by(contest_id=c.id).delete()
     Enrollment.query.filter_by(contest_id=c.id).delete(synchronize_session=False)
     ContestPage.query.filter_by(contest_id=c.id).delete(synchronize_session=False)
     IndexBook.query.filter_by(contest_id=c.id).delete(synchronize_session=False)
     db.session.delete(c)
-    return os.path.basename(path)
+
+
+def _purge_hub(h: Hub):
+    for c in list(h.contests):
+        _purge_contest(c)
+    log_action(None, "central_purged", h.slug, details={"title": h.title}, username=_actor())
+    db.session.delete(h)
+
+
+_last_trash_sweep = [0.0]
+
+
+def purge_expired_trash(force: bool = False) -> int:
+    """Removes whatever has been in the trash longer than TRASH_DAYS. Cheap: runs at most every 10 minutes."""
+    if not force and time.monotonic() - _last_trash_sweep[0] < 600:
+        return 0
+    _last_trash_sweep[0] = time.monotonic()
+    cutoff = utcnow() - timedelta(days=TRASH_DAYS)
+    n = 0
+    for h in Hub.query.filter(Hub.deleted_at.isnot(None), Hub.deleted_at < cutoff).all():
+        _purge_hub(h); n += 1
+    for c in Contest.query.filter(Contest.deleted_at.isnot(None), Contest.deleted_at < cutoff).all():
+        if c.hub_id is None or db.session.get(Hub, c.hub_id) is None:
+            _purge_contest(c); n += 1
+    if n:
+        db.session.commit()
+    return n
 
 
 def _request_delete(obj, user, reason):
@@ -2661,7 +2725,7 @@ def _request_delete(obj, user, reason):
 
 @app.route("/api/contests/<int:cid>/delete-request", methods=["POST", "DELETE"])
 def api_contest_delete_request(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     user = get_current_user()
     if c.hub_id:
         return err("delete_via_central")
@@ -2679,20 +2743,20 @@ def api_contest_delete_request(cid):
 
 @app.route("/api/contests/<int:cid>/delete", methods=["POST"])
 def api_contest_delete(cid):
-    c = Contest.query.get_or_404(cid)
+    c = live_contest(cid)
     user = get_current_user()
     if c.hub_id:
         return err("delete_via_central")
     if not can_delete(c, user):
         return err("delete_forbidden", 403)
-    backup = _delete_contest(c, user)
+    backup = _trash_contest(c, user)
     db.session.commit()
-    return jsonify({"success": True, "backup": backup})
+    return jsonify({"success": True, "backup": backup, "trash_days": TRASH_DAYS})
 
 
 @app.route("/api/central/<slug>/delete-request", methods=["POST", "DELETE"])
 def api_central_delete_request(slug):
-    h = Hub.query.filter_by(slug=slug.lower()).first_or_404()
+    h = live_hub(slug)
     user = get_current_user()
     if not is_listed_admin(h, user):
         return err("admin_only", 403)
@@ -2707,16 +2771,101 @@ def api_central_delete_request(slug):
 
 @app.route("/api/central/<slug>/delete", methods=["POST"])
 def api_central_delete(slug):
-    h = Hub.query.filter_by(slug=slug.lower()).first_or_404()
+    h = live_hub(slug)
     user = get_current_user()
     if not can_delete(h, user):
         return err("delete_forbidden", 403)
-    backups = [_delete_contest(c, user, f"central {h.slug} deleted") for c in list(h.contests)]
+    when = utcnow()
+    backups = [_trash_contest(c, user, f"central {h.slug} deleted", when) for c in list(h.contests)]
     log_action(None, "central_deleted", h.slug, details={"title": h.title, "requested_by": h.delete_requested_by,
                                                         "reason": h.delete_reason, "backups": backups}, username=user)
-    db.session.delete(h)
+    h.deleted_at, h.deleted_by = when, user
+    h.delete_requested_by, h.delete_requested_at, h.delete_reason = None, None, ""
     db.session.commit()
-    return jsonify({"success": True, "backups": backups})
+    return jsonify({"success": True, "backups": backups, "trash_days": TRASH_DAYS})
+
+
+# ---------- trash (tool admin only) ----------
+
+def _trash_entries():
+    now = utcnow()
+    out = []
+    for h in Hub.query.filter(Hub.deleted_at.isnot(None)).all():
+        out.append({"type": "central", "slug": h.slug, "title": h.title, "deleted_by": h.deleted_by,
+                    "deleted_iso": iso(h.deleted_at), "purge_iso": iso(h.deleted_at + timedelta(days=TRASH_DAYS)),
+                    "projects": len(h.contests)})
+    for c in Contest.query.filter(Contest.deleted_at.isnot(None)).all():
+        if c.hub_id and c.hub and c.hub.deleted_at:
+            continue            # listed under its central contest
+        out.append({"type": "contest", "id": c.id, "slug": c.slug, "lang_code": c.lang_code, "title": c.title,
+                    "deleted_by": c.deleted_by, "deleted_iso": iso(c.deleted_at),
+                    "purge_iso": iso(c.deleted_at + timedelta(days=TRASH_DAYS)),
+                    "pages": ContestPage.query.filter_by(contest_id=c.id).count()})
+    out.sort(key=lambda e: e["deleted_iso"], reverse=True)
+    return out
+
+
+def _trash_target(data):
+    """(object, kind) for a trash request body, or (None, None)."""
+    if data.get("type") == "central":
+        h = Hub.query.filter_by(slug=str(data.get("slug") or "").lower()).first()
+        return (h, "central") if h and h.deleted_at else (None, None)
+    c = db.session.get(Contest, to_int(data.get("id"), 0, 0, 2**31 - 1)) if str(data.get("id") or "").isdigit() else None
+    return (c, "contest") if c and c.deleted_at else (None, None)
+
+
+@app.route("/api/admin/trash", methods=["GET"])
+def api_trash():
+    user = get_current_user()
+    if not is_super_admin(user):
+        return err("admin_only", 403)
+    purge_expired_trash(force=True)
+    return jsonify({"items": _trash_entries(), "days": TRASH_DAYS})
+
+
+@app.route("/api/admin/trash/restore", methods=["POST"])
+def api_trash_restore():
+    user = get_current_user()
+    if not is_super_admin(user):
+        return err("admin_only", 403)
+    obj, kind = _trash_target(json_body())
+    if obj is None:
+        return err("not_found", 404)
+    if kind == "contest" and obj.hub_id and obj.hub and obj.hub.deleted_at:
+        return err("restore_central_first")
+    if kind == "central":
+        for c in obj.contests:
+            if c.deleted_at:
+                c.deleted_at = c.deleted_by = None
+    obj.deleted_at = obj.deleted_by = None
+    log_action(getattr(obj, "id", None) if kind == "contest" else None, "trash_restored", obj.slug, username=user)
+    db.session.commit()
+    return jsonify({"success": True})
+
+
+@app.route("/api/admin/trash/purge", methods=["POST"])
+def api_trash_purge():
+    """Removes one trashed item for good, or (without a body target) empties the whole trash."""
+    user = get_current_user()
+    if not is_super_admin(user):
+        return err("admin_only", 403)
+    data = json_body()
+    if data.get("all"):
+        n = 0
+        for h in Hub.query.filter(Hub.deleted_at.isnot(None)).all():
+            _purge_hub(h); n += 1
+        for c in Contest.query.filter(Contest.deleted_at.isnot(None)).all():
+            _purge_contest(c); n += 1
+        log_action(None, "trash_emptied", "", details={"items": n}, username=user)
+        db.session.commit()
+        return jsonify({"success": True, "removed": n})
+    obj, kind = _trash_target(data)
+    if obj is None:
+        return err("not_found", 404)
+    _purge_hub(obj) if kind == "central" else _purge_contest(obj)
+    log_action(None, "trash_purged", obj.slug, username=user)
+    db.session.commit()
+    return jsonify({"success": True, "removed": 1})
 
 
 # =====================================================================
@@ -2867,7 +3016,7 @@ def api_list_central():
     user = get_current_user()
     now = utcnow()
     out = []
-    for h in Hub.query.order_by(Hub.start_time.desc()).all():
+    for h in Hub.query.filter(Hub.deleted_at.is_(None)).order_by(Hub.start_time.desc()).all():
         if h.approval_status == 'rejected' and not is_central_admin(h, user):
             continue
         out.append(central_brief(h, now))
@@ -2918,7 +3067,7 @@ def api_create_central():
 
 @app.route("/api/central/<slug>/config", methods=["POST"])
 def api_update_central(slug):
-    h = Hub.query.filter_by(slug=slug.lower()).first_or_404()
+    h = live_hub(slug)
     user = get_current_user()
     if not is_central_admin(h, user):
         return err("admin_only", 403)
@@ -2940,7 +3089,7 @@ def api_update_central(slug):
 
 @app.route("/api/central/<slug>/approve", methods=["POST"])
 def api_approve_central(slug):
-    h = Hub.query.filter_by(slug=slug.lower()).first_or_404()
+    h = live_hub(slug)
     user = get_current_user()
     if not can_approve_central(h, user):
         return err("approve_forbidden", 403)
@@ -2957,7 +3106,7 @@ def api_approve_central(slug):
 
 @app.route("/api/central/<slug>", methods=["GET"])
 def api_get_central(slug):
-    h = Hub.query.filter_by(slug=slug.lower()).first_or_404()
+    h = live_hub(slug)
     user = get_current_user()
     now = utcnow()
     combined, projects, daily = {}, [], {}

@@ -47,6 +47,9 @@ class Hub(db.Model):
     delete_requested_by = db.Column(db.String(100), nullable=True)
     delete_requested_at = db.Column(db.DateTime, nullable=True)
     delete_reason = db.Column(db.Text, default="")
+    # --- v10: deleted contests wait in the trash for a week before they are really removed ---
+    deleted_at = db.Column(db.DateTime, nullable=True, index=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
 
     contests = db.relationship('Contest', backref='hub', lazy=True)
 
@@ -95,6 +98,9 @@ class Contest(db.Model):
     #   manual = participants pick and submit their eligible pages themselves
     submission_mode = db.Column(db.String(10), default='auto')
     link = db.Column(db.String(500), default="")   # optional contest page on the wiki (title links to it)
+    # --- v10: trash (see Hub.deleted_at) ---
+    deleted_at = db.Column(db.DateTime, nullable=True, index=True)
+    deleted_by = db.Column(db.String(100), nullable=True)
 
     books = db.relationship('IndexBook', backref='contest', cascade="all, delete-orphan", lazy=True)
     pages = db.relationship('ContestPage', backref='contest', cascade="all, delete-orphan", lazy=True)
