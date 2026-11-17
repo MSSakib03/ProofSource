@@ -75,3 +75,68 @@ class TrashTests(Base):
         if r.json.get("success"):
             with A.app.app_context():
                 self.assertNotEqual(db.session.get(Contest, r.json["contest_id"]).slug, slug)
+
+
+def _fmt(dt):
+    return dt.strftime("%Y-%m-%dT%H:%M")
+
+
+class LockTests(Base):
+    def test_started_contest_keeps_its_start_and_project_but_the_end_can_move(self):
+        cid = self.make_contest()
+        with A.app.app_context():
+            c = db.session.get(Contest, cid)
+            start, end = c.start_time, c.end_time
+        r = self.c.post(f"/api/contests/{cid}/config", json={"start_time": _fmt(start + timedelta(days=1))})
+        self.assertEqual(r.json["error_code"], "start_locked")
+        r = self.c.post(f"/api/contests/{cid}/config", json={"wiki_domain": "en.wikisource.org"})
+        self.assertEqual(r.json["error_code"], "project_locked")
+        # the unchanged start (as the form sends it back) and a new end are fine
+        r = self.c.post(f"/api/contests/{cid}/config", json={"start_time": _fmt(start), "wiki_domain": "bn.wikisource.org",
+                                                              "end_time": _fmt(end + timedelta(days=3))})
+        self.assertTrue(r.json["success"], r.json)
+        with A.app.app_context():
+            c = db.session.get(Contest, cid)
+            self.assertEqual(c.start_time, start)
+            self.assertEqual(c.end_time, end + timedelta(days=3))
+
+    def test_contest_that_has_not_begun_can_still_move_everything(self):
+        now = utcnow()
+        cid = self.make_contest(start_time=_fmt(now + timedelta(days=2)), end_time=_fmt(now + timedelta(days=9)))
+        r = self.c.post(f"/api/contests/{cid}/config", json={"start_time": _fmt(now + timedelta(days=3)),
+                                                              "wiki_domain": "en.wikisource.org"})
+        self.assertTrue(r.json["success"], r.json)
+
+    def test_central_start_is_locked_and_projects_cannot_be_removed_after_start(self):
+        self.login("MS Sakib")
+        now = utcnow()
+        body = {"title": "Indic", "slug": "indic2", "start_time": _fmt(now - timedelta(days=1)),
+                "end_time": _fmt(now + timedelta(days=9)),
+                "projects": [{"wiki_domain": "bn.wikisource.org"}, {"wiki_domain": "hi.wikisource.org"}]}
+        self.assertTrue(self.c.post("/api/central", json=body).json["success"])
+        r = self.c.post("/api/central/indic2/config", json={"start_time": _fmt(now)})
+        self.assertEqual(r.json["error_code"], "start_locked")
+        r = self.c.post("/api/central/indic2/config", json={"projects": [{"wiki_domain": "bn.wikisource.org"}]})
+        self.assertEqual(r.json["error_code"], "project_locked")
+        r = self.c.post("/api/central/indic2/config", json={"end_time": _fmt(now + timedelta(days=20)),
+                                                            "projects": [{"wiki_domain": "bn.wikisource.org"},
+                                                                         {"wiki_domain": "hi.wikisource.org"},
+                                                                         {"wiki_domain": "as.wikisource.org"}]})
+        self.assertTrue(r.json["success"], r.json)
+
+
+class BookDateTests(Base):
+    def test_book_dates_must_stay_inside_the_contest(self):
+        cid = self.make_contest(books="")
+        now = utcnow()
+        ok = {"title": "Index:B.pdf", "start_time": _fmt(now - timedelta(days=3)), "end_time": _fmt(now + timedelta(days=1))}
+        bad_start = dict(ok, start_time=_fmt(now - timedelta(days=30)))
+        bad_end = dict(ok, end_time=_fmt(now + timedelta(days=30)))
+        for body in (bad_start, bad_end):
+            self.assertEqual(self.c.post(f"/api/contests/{cid}/books", json=body).json["error_code"], "book_dates_outside_contest")
+        r = self.c.post(f"/api/contests/{cid}/books", json=ok)
+        self.assertTrue(r.json["success"], r.json)
+        # editing is checked the same way
+        bid = r.json["book_id"]
+        r = self.c.post(f"/api/contests/{cid}/books/{bid}/update", json={"end_time": _fmt(now + timedelta(days=30))})
+        self.assertEqual(r.json["error_code"], "book_dates_outside_contest")

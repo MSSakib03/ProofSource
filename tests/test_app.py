@@ -201,10 +201,12 @@ class SyncTests(Base):
     def test_per_book_window_used(self):
         cid = self.make_contest(books="")
         A.fetch_live_book_pages_from_wiki = f = live({})
-        r = self.c.post(f"/api/contests/{cid}/books", json={"title": "Index:B.pdf", "start_time": "2020-01-01T00:00",
-                                                           "end_time": "2020-02-01T00:00"})
+        bs = (utcnow() - timedelta(days=3)).replace(second=0, microsecond=0)
+        r = self.c.post(f"/api/contests/{cid}/books", json={"title": "Index:B.pdf",
+                                                           "start_time": bs.strftime("%Y-%m-%dT%H:%M"),
+                                                           "end_time": (bs + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")})
         self.assertTrue(r.json["success"])
-        self.assertEqual(f.calls[-1]["start"], datetime(2020, 1, 1))
+        self.assertEqual(f.calls[-1]["start"], bs)
 
 
 class ReviewTests(Base):
@@ -483,7 +485,7 @@ class CentralTests(Base):
                                        review_status="pending_review"))
             db.session.commit()
         r = self.c.post("/api/central/indic/config", json={"projects": [{"wiki_domain": "bn.wikisource.org"}]})
-        self.assertEqual(r.json["error_code"], "project_has_data")
+        self.assertIn(r.json["error_code"], ("project_locked", "project_has_data"))
 
 
 class AssignmentTests(Base):

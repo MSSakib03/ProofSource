@@ -350,7 +350,7 @@ class DeepCheckTests(Base):
     def test_wiki_cannot_change_once_pages_are_recorded(self):
         cid = self.make_contest(entries={1: ("Alice", 3, 1)})
         r = self.c.post(f"/api/contests/{cid}/config", json={"wiki_domain": "en.wikisource.org"})
-        self.assertEqual(r.json["error_code"], "wiki_has_data")
+        self.assertEqual(r.json["error_code"], "project_locked")      # started: the project is fixed
         with A.app.app_context():
             self.assertEqual(db.session.get(Contest, cid).wiki_domain, "bn.wikisource.org")
 

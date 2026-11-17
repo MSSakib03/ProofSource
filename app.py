@@ -308,6 +308,10 @@ def rate_limit(bucket: str, limit: int, per_seconds: float, user: str = None):
     return None
 
 
+def _minute(dt):
+    return dt.replace(second=0, microsecond=0)
+
+
 def parse_dt_in(val):
     if not val:
         return None
@@ -1584,12 +1588,15 @@ def api_update_contest_config(cid):
     if "title" in data and not clip(data.get("title"), LEN_TITLE):
         return err("title_required")
     domain_changed = False
+    started = utcnow() >= c.start_time
     if "wiki_domain" in data and data["wiki_domain"] is not None:
         dom = normalize_wiki_domain(data["wiki_domain"])
         if not dom:
             return err("invalid_project")
         data["wiki_domain"] = dom
         domain_changed = dom != c.wiki_domain
+        if domain_changed and started:
+            return err("project_locked")      # the project cannot change once the contest has begun
         if domain_changed and ContestPage.query.filter(
                 ContestPage.contest_id == c.id,
                 ContestPage.review_status.in_(LISTED_STATUSES + ('reverted',))).count():
@@ -1605,6 +1612,10 @@ def api_update_contest_config(cid):
         return err("invalid_dates")
     if new_end <= new_start:
         return err("end_before_start")
+    if started and _minute(new_start) != _minute(c.start_time):
+        return err("start_locked")            # the end can still move, the start cannot
+    if started:
+        new_start = c.start_time
 
     new_slug = re.sub(r'[^a-zA-Z0-9_-]', '', str(data.get("slug") or "").strip()).lower()[:60]
     if new_slug and new_slug != c.slug:
@@ -1697,7 +1708,7 @@ def _recalc_points(contest: Contest, book: IndexBook = None):
          .update({"base_points": pts}, synchronize_session=False))
 
 
-def _validate_book_input(data, total_pages=0):
+def _validate_book_input(data, total_pages=0, contest=None):
     excl = clip(data.get("excluded_pages"), 5000)
     _, bad = parse_excluded_pages_strict(excl, total_pages or 0)
     if bad:
@@ -1709,6 +1720,11 @@ def _validate_book_input(data, total_pages=0):
         return None, err("invalid_dates")
     if bs and be and be <= bs:
         return None, err("end_before_start")
+    if contest is not None:
+        # a book's own dates narrow the contest window, they never reach outside it
+        for d in (bs, be):
+            if d and not (contest.start_time <= d <= contest.end_time):
+                return None, err("book_dates_outside_contest")
     return {"excluded_pages": excl, "start_time": bs, "end_time": be}, None
 
 
@@ -1721,7 +1737,7 @@ def api_add_contest_book(cid):
     raw_title = clip(data.get("title"), 1000)
     if not raw_title:
         return err("book_title_required")
-    vals, e = _validate_book_input(data)
+    vals, e = _validate_book_input(data, 0, c)
     if e:
         return e
     base_name = extract_base_book_name(c.wiki_domain, raw_title)
@@ -1763,7 +1779,7 @@ def api_update_contest_book(cid, bid):
     payload = {"excluded_pages": data.get("excluded_pages", book.excluded_pages or ""),
                "start_time": data.get("start_time", book.start_time.strftime(DT_FMT_IN) if book.start_time else ""),
                "end_time": data.get("end_time", book.end_time.strftime(DT_FMT_IN) if book.end_time else "")}
-    vals, e = _validate_book_input(payload, book.total_pages)
+    vals, e = _validate_book_input(payload, book.total_pages, c)
     if e:
         return e
     old = {"points": get_book_points(c, book), "excluded": book.excluded_pages or "",
@@ -2970,7 +2986,7 @@ def propagate_central(h: Hub, dates_changed: bool, points_changed: bool):
             _recalc_points(c)
 
 
-def _central_fields_from(data: dict, h: Hub):
+def _central_fields_from(data: dict, h: Hub, lock_started: bool = False):
     if "title" in data:
         if not (data.get("title") or "").strip():
             raise ValueError("title_required")
@@ -2984,7 +3000,12 @@ def _central_fields_from(data: dict, h: Hub):
         if f in data and data[f] is not None:
             setattr(h, f, clip(data[f], n))
     if data.get("start_time"):
-        h.start_time = parse_dt_in(data["start_time"])
+        new_start = parse_dt_in(data["start_time"])
+        if lock_started and h.start_time and utcnow() >= h.start_time:
+            if _minute(new_start) != _minute(h.start_time):
+                raise ValueError("start_locked")      # once begun, the start cannot move
+        else:
+            h.start_time = new_start
     if data.get("end_time"):
         h.end_time = parse_dt_in(data["end_time"])
     if not h.start_time or not h.end_time:
@@ -3074,9 +3095,13 @@ def api_update_central(slug):
     data = json_body()
     old = (h.start_time, h.end_time, h.proofread_points, h.custom_points_policy)
     try:
-        _central_fields_from(data, h)
+        _central_fields_from(data, h, lock_started=True)
         if "projects" in data:
-            sync_children(h, _parse_projects(data["projects"]), user)
+            projects = _parse_projects(data["projects"])
+            if h.start_time and utcnow() >= h.start_time and \
+                    {c.wiki_domain for c in h.contests} - {p["wiki_domain"] for p in projects}:
+                raise ValueError("project_locked")    # projects can be added, not taken away, once begun
+            sync_children(h, projects, user)
     except ValueError as e:
         db.session.rollback()
         return err(str(e))

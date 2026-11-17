@@ -80,7 +80,8 @@ class WikiDomainTests(Base):
         self.assertEqual(r.json["error_code"], "invalid_project")
 
     def test_switching_wiki_needs_new_approval(self):
-        cid = self.make_contest()
+        cid = self.make_contest(start_time=(utcnow() + timedelta(days=1)).strftime("%Y-%m-%dT%H:%M"),
+                                end_time=(utcnow() + timedelta(days=9)).strftime("%Y-%m-%dT%H:%M"))
         r = self.c.post(f"/api/contests/{cid}/config", json={"wiki_domain": "evil.example"})
         self.assertEqual(r.json["error_code"], "invalid_project")
         r = self.c.post(f"/api/contests/{cid}/config", json={"wiki_domain": "en.wikisource.org"})
