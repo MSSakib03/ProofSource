@@ -10,7 +10,7 @@
 ![Flask](https://img.shields.io/badge/Flask-3.0-236798)
 ![SQLAlchemy](https://img.shields.io/badge/SQLAlchemy-2.x-006699)
 ![Vue](https://img.shields.io/badge/Vue-3-4D8AC0)
-![Tests](https://img.shields.io/badge/tests-117%20passing-2e7d32)
+![Tests](https://img.shields.io/badge/tests-122%20passing-2e7d32)
 
 </div>
 
@@ -118,6 +118,7 @@ Set with `toolforge envvars create NAME VALUE`. Secrets are never stored in code
 | `PROOFSOURCE_SYNC_SECONDS` | Longest a sync may run inside one web request; the next request carries on (`0` = no limit) | `25` |
 | `PROOFSOURCE_MAX_UPLOAD_MB` | Largest accepted request (backup restore; the file is parsed in memory, so keep it modest) | `32` |
 | `PROOFSOURCE_PROXY_HOPS` | Proxies in front of the tool whose `X-Forwarded-For/Proto` are trusted (Toolforge ingress = 1); `0` = trust none | `1` |
+| `PROOFSOURCE_PHONE_LEADERBOARD` | `table` brings back the old sideways-scrolling leaderboard on phones (default: cards) | `cards` |
 | `PROOFSOURCE_INSECURE_COOKIES` | `1` only for local http development | — |
 
 ---
@@ -296,7 +297,9 @@ Errors return `{"success": false, "error_code": "...", "error": "..."}`; the fro
 - Buttons: the main action is solid blue (`.ps-btn-primary`); every other `.ps-btn` uses the Codex *normal progressive* look (pale blue fill, blue outline and text). The sync button carries a "Sync" label except on phones narrower than 380 px. The header logo sits in a thin rounded outline (`.ps-logo-tile`).
 - Icons for the home-page totals (desktop only) are taken from the Wikimedia Codex icon set (`@wikimedia/codex-icons`, MIT): `cdxIconLive`, `cdxIconArticleCheck`, `cdxIconLogoWikisource`, inlined as SVG.
 - The reviewer chips on the contest page are measured (`fitJuries`): as many as fit on one line beside the dates on wide screens, two lines on tablets, then "+N". Phones use a two-column grid of equal-width chips (long names are cut with an ellipsis): two rows, the last cell being "+N".
-- Footer: on phones the two links about the host (Toolforge, terms of use) are left out.
+- Footer: on phones one centred line, `ProofSource · Created by … · Report an issue` (it wraps centred only on very narrow screens); the Source code/Toolforge/terms links are desktop-only.
+- **Phone tables** (`<640px`): every wide table carries `ps-stack` (CSS in `static/src/app.css`) and each cell a `data-label`, so rows become cards without a second template. `ps-lb` is the leaderboard card (rank, name, points, then count chips; zero counts hidden via `.ps-zero`), `ps-up` the user-page card (page name, status and points on one line, the reviewer's note only when present). Long page names are shortened on phones by `shortPageTitle` (2–3 words, `…/<number>`). The two main leaderboards can go back to the old scrolling table with `PROOFSOURCE_PHONE_LEADERBOARD=table` (server flag → `PS_INITIAL.phone_leaderboard` → `lbCards`).
+- Form validation: `validateConfig` / `validateCentral` mark the required fields (name, project, start, end; central also needs a project) with a red `*` and show the error on the field; the server enforces the same rules.
 - Dates are always UTC, with Bangla digits and month names in Bangla. On the contest page the dates sit at the left edge and the countdown at the right edge of one line. `fitDateRow` measures it in three steps: the full countdown if it fits, else without its smallest unit, and if even that needs a second line both chips are left-aligned.
 - Text size: the **AA** button in the header sets `data-ps-size` (`s`/`l`/`xl`) on `<html>`, which changes the root font size (87.5 % / 112.5 % / 125 %). Every size in the template and stylesheet is in `rem`, so the whole interface scales; never add `px` font sizes. The choice is stored in `ps_text_size` and applied before first paint. On phones the theme switch lives in the same menu, and the button shows the theme icon beside an “A”.
 - The header and the reviewer chips are re-measured when a web font finishes loading (`document.fonts` `loadingdone`), because the Bangla fonts arrive after the first layout.

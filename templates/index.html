@@ -844,7 +844,7 @@
 
       <div v-if="contestSubTab === 'leaderboard'" class="ps-card overflow-hidden">
         <div class="overflow-x-auto w-full">
-          <table class="ps-stack ps-lb w-full min-w-[580px] text-left border-collapse text-sm">
+          <table :class="lbCards ? 'ps-stack ps-lb' : ''" class="w-full min-w-[580px] text-left border-collapse text-sm">
             <thead>
               <tr class="border-b border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
                 <th class="py-3 px-4 font-semibold w-14">#</th>
@@ -1203,7 +1203,7 @@
       </div>
 
       <div v-if="centralTab === 'leaderboard'" class="ps-card overflow-hidden">
-        <div class="overflow-x-auto"><table class="ps-stack ps-lb w-full min-w-[560px] text-left text-sm">
+        <div class="overflow-x-auto"><table :class="lbCards ? 'ps-stack ps-lb' : ''" class="w-full min-w-[560px] text-left text-sm">
           <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
             <th class="py-3 px-4 font-medium w-14">#</th><th class="py-3 px-4 font-medium">{{ t('user') }}</th>
             <th class="py-3 px-4 font-medium">{{ t('perProject') }}</th><th class="py-3 px-4 font-medium text-right">{{ t('proofread') }}</th>
@@ -1431,7 +1431,7 @@
             <option value="reverted">{{ t('reverted') }}</option>
           </select>
         </div>
-        <div class="overflow-x-auto"><table class="ps-stack w-full min-w-[520px] text-left text-xs">
+        <div class="overflow-x-auto"><table class="ps-stack ps-up w-full min-w-[520px] text-left text-xs">
           <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase">
             <th class="py-2.5 px-4 font-medium">{{ t('page') }}</th><th class="py-2.5 px-4 font-medium">{{ t('status') }}</th>
             <th class="py-2.5 px-4 font-medium text-right">{{ t('points') }}</th><th v-if="upages.review_enabled" class="py-2.5 px-4 font-medium">{{ t('reviewerNote') }}</th>
@@ -1439,11 +1439,11 @@
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
             <tr v-if="upages.pages.length === 0"><td colspan="4" class="py-8 text-center text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="p in upages.pages" :key="p.id + p.role" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td data-label="" class="ps-c-title py-2.5 px-4 max-w-[16rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(p.page_title)" target="_blank" rel="noopener" class="font-medium text-ws-cerulean dark:text-ws-nature hover:underline block truncate" :title="p.page_title">{{ p.page_title }}</a>
+              <td data-label="" class="ps-c-title py-2.5 px-4 max-w-[16rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(p.page_title)" target="_blank" rel="noopener" class="font-medium text-ws-cerulean dark:text-ws-nature hover:underline block truncate" :title="p.page_title"><span class="max-sm:hidden">{{ p.page_title }}</span><span class="sm:hidden">{{ shortPageTitle(p.page_title) }}</span></a>
                 <span v-if="p.role === 'validator'" class="text-[0.625rem] text-slate-500">{{ t('validated') }}</span></td>
-              <td :data-label="t('status')" class="py-2.5 px-4 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(p.review_status)">{{ statusLabel(p.review_status) }}</span></td>
-              <td :data-label="t('points')" class="py-2.5 px-4 text-right tabular-nums font-semibold">{{ fmtNum(p.total_points) }}</td>
-              <td :data-label="t('reviewerNote')" v-if="upages.review_enabled" class="ps-c-text py-2.5 px-4 text-slate-500">{{ p.jury_note || '—' }}</td>
+              <td data-label="" class="ps-c-inline py-2.5 px-4 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(p.review_status)">{{ statusLabel(p.review_status) }}</span></td>
+              <td :data-label="t('points')" class="ps-c-inline py-2.5 px-4 text-right tabular-nums font-semibold">{{ fmtNum(p.total_points) }}</td>
+              <td :data-label="t('reviewerNote')" v-if="upages.review_enabled" :class="p.jury_note ? '' : 'ps-empty'" class="ps-c-text ps-c-note py-2.5 px-4 text-slate-500">{{ p.jury_note || '—' }}</td>
             </tr>
           </tbody>
         </table></div>
@@ -2136,9 +2136,7 @@ const I18N = {
     juryGetsPoints: 'Award validation points to reviewers when validating in tool',
     rejectedHandling: 'Rejected Page Handling', holdBatchRevert: 'Hold during contest & revert to Not Proofread in batch after contest',
     instantRevert: 'Immediately revert to Not Proofread on Wikisource upon rejection',
-    existingIndexBooks: 'Configured Index Books (points, excluded pages, own time window)',
     pointsPerPage: 'Points/Page', excludedPages: 'Excluded Pages', update: 'Update',
-    indexBooksOnePerLine: 'Index Pages (one per line)', addMoreIndexBooks: 'Add New Index Pages (one per line)',
     saveConfiguration: 'Save Configuration', saving: 'Saving...', cancel: 'Cancel', confirm: 'Confirm',
     pendingApprovalBannerTitle: 'This contest is awaiting administrator approval',
     pendingApprovalBannerDesc: 'The tool admin or a local Wikisource Administrator must approve this contest to activate it.',
@@ -2363,9 +2361,7 @@ const I18N = {
     modeInAppValidate: 'টুল থেকেই সরাসরি উইকিসংকলনে বৈধকরণ হবে', juryGetsPoints: 'পর্যালোচক বৈধকরণ করলে তার জন্য পয়েন্ট পাবেন',
     rejectedHandling: 'বাতিল পাতার নিয়ম', holdBatchRevert: 'প্রতিযোগিতা শেষে এক ক্লিকে সব বাতিল পাতা ‘মুদ্রণ সংশোধন করা হয়নি’ অবস্থায় ফেরানো হবে',
     instantRevert: 'বাতিল করার সাথে সাথেই উইকিতে ‘মুদ্রণ সংশোধন করা হয়নি’ হয়ে যাবে',
-    existingIndexBooks: 'যুক্ত থাকা নির্ঘণ্ট বইসমূহ (পয়েন্ট, বাদ দেওয়া পাতা, নিজস্ব সময়সীমা)',
     pointsPerPage: 'পয়েন্ট/পাতা', excludedPages: 'বাদ দেওয়া পাতা', update: 'হালনাগাদ',
-    indexBooksOnePerLine: 'নির্ঘণ্ট পাতার তালিকা (প্রতি লাইনে একটি)', addMoreIndexBooks: 'নতুন নির্ঘণ্ট বই যুক্ত করুন (প্রতি লাইনে একটি)',
     saveConfiguration: 'কনফিগারেশন সংরক্ষণ করুন', saving: 'সংরক্ষিত হচ্ছে...', cancel: 'বাতিল', confirm: 'নিশ্চিত করুন',
     pendingApprovalBannerTitle: 'এই প্রতিযোগিতাটি অনুমোদনের অপেক্ষায় রয়েছে',
     pendingApprovalBannerDesc: 'টুল অ্যাডমিন অথবা সংশ্লিষ্ট উইকিসংকলনের প্রশাসক অনুমোদন করলেই প্রতিযোগিতাটি চালু হবে।',
@@ -2586,7 +2582,7 @@ createApp({
       contestSubTab: 'leaderboard', leaderboardLimit: 200,
       reserveBookId: '', newBookTitle: '', newBookPoints: 3, newBookExcluded: '', newBookStart: '', newBookEnd: '',
       bookToRemove: null, wikiTableCode: '',
-      form: {}, formBase: {}, cfgTab: 'general', bookOpen: null, isPhone: window.innerWidth < 640, showAllProjects: false, notice_: { open: false, count: 0, subject: '', text: '', page_ids: [] }, trash: { items: [], days: 7 }, fieldErr: {},
+      form: {}, formBase: {}, cfgTab: 'general', bookOpen: null, isPhone: window.innerWidth < 640, showAllProjects: false, notice_: { open: false, count: 0, subject: '', text: '', page_ids: [] }, trash: { items: [], days: 7 }, fieldErr: {}, lbCards: (window.PS_INITIAL || {}).phone_leaderboard !== false,
       bookAdd: { query: 'নির্ঘণ্ট:', suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 },
       juryBookId: null, juryStatusFilter: 'pending_review', juryContributor: '',
       juryPage: null, juryQueue: [], juryQueueTotal: 0, juryPrefetch: null,
@@ -3264,6 +3260,21 @@ createApp({
       if (first) this.notify(this.t(e[first]), 'error');
       return !first;
     },
+    /* "পাতা:Long book name - Author (1927).pdf/6" -> "Long book name.../6" (phones: 2-3 words, at least 1) */
+    shortPageTitle(title) {
+      let s = String(title || '');
+      const colon = s.indexOf(':');
+      if (colon >= 0 && colon < 30) s = s.slice(colon + 1);           // the namespace ("Page:", "পাতা:")
+      const m = s.match(/\/\s*([^/]+)$/);
+      const num = m ? m[1].trim() : '';
+      let name = (m ? s.slice(0, m.index) : s).replace(/\.(pdf|djvu|tiff?)$/i, '');
+      const cut = name.search(/\s[-–—]\s|\s*\(/);                    // author / year part
+      const head = (cut > 0 ? name.slice(0, cut) : name).trim();
+      const words = head.split(/\s+/).filter(Boolean);
+      const max = words.slice(0, 3).join(' ').length > 22 ? 2 : 3;        // long words: two are enough
+      const kept = words.slice(0, Math.max(1, max));
+      return kept.join(' ') + (cut > 0 || kept.length < words.length ? '...' : '') + (num ? '/' + num : '');
+    },
     cancelConfig() {
       const leave = () => { if (this.view === 'create') this.goHome(); else this.view = 'contest'; };
       if (!(this.formDirty || this.bookAdd.pending.length)) { leave(); return; }
@@ -3348,7 +3359,6 @@ createApp({
       return added;
     },
     pvList(v) { return String(v || '').split(',').map(x => x.trim()).filter(Boolean); },
-    pvLines(v) { return String(v || '').split('\n').map(x => x.trim()).filter(Boolean); },
     pvDate(v) { return v ? this.digits(String(v).replace('T', ' ')) : '—'; },
     openConfigPreview() {
       if (!this.validateConfig()) return;

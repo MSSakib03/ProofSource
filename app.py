@@ -1020,6 +1020,8 @@ def template_helpers():
 def render_spa(init: dict):
     init = dict(init)
     init["csrf_token"] = security.csrf_token()
+    # phone leaderboard as cards (default) or the old scrolling table: PROOFSOURCE_PHONE_LEADERBOARD=table
+    init["phone_leaderboard"] = os.environ.get("PROOFSOURCE_PHONE_LEADERBOARD", "cards").strip().lower() != "table"
     return render_template("index.html", initial=init)
 
 

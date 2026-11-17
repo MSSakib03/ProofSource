@@ -365,6 +365,13 @@
   .ps-stack td.ps-c-text::before { float: left; margin-right: .75rem; }
   .ps-stack td.ps-c-block { display: block; text-align: left !important; }
   .ps-stack td.ps-c-block::before { display: block; margin-bottom: .25rem; }
+  .ps-stack td.ps-empty { display: none; }
+  /* user pages: title, then status + points on one line (wrapping if they cannot fit), the reviewer's note only when there is one */
+  .ps-stack.ps-up tr { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem .9rem; }
+  .ps-stack.ps-up td { padding: 0 !important; }
+  .ps-stack.ps-up td.ps-c-title { flex-basis: 100%; }
+  .ps-stack.ps-up td.ps-c-inline { display: inline-flex; flex: none; gap: .35rem; }
+  .ps-stack.ps-up td.ps-c-note { flex-basis: 100%; }
   .ps-stack td[colspan] { display: block; text-align: center !important; }
 
   .ps-stack.ps-lb tr { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .6rem; }
