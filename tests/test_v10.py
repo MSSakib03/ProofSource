@@ -209,3 +209,35 @@ class CentralNoticeTests(Base):
         self.assertEqual((d["announcement_en"], d["announcement_bn"]), ("Welcome", "স্বাগতম"))
         self.assertTrue(self.c.post("/api/central/ind3/config", json={"announcement_en": "Updated"}).json["success"])
         self.assertEqual(self.c.get("/api/central/ind3").json["central"]["announcement_en"], "Updated")
+
+
+class StartedGuardTests(Base):
+    def test_slug_is_locked_and_the_end_cannot_move_into_the_past(self):
+        cid = self.make_contest()
+        r = self.c.post(f"/api/contests/{cid}/config", json={"slug": "other"})
+        self.assertEqual(r.json["error_code"], "slug_locked")
+        r = self.c.post(f"/api/contests/{cid}/config", json={"slug": "test"})            # the form sends the same slug back
+        self.assertTrue(r.json["success"], r.json)
+        r = self.c.post(f"/api/contests/{cid}/config", json={"end_time": _fmt(utcnow() - timedelta(hours=1))})
+        self.assertEqual(r.json["error_code"], "end_in_past")
+        r = self.c.post(f"/api/contests/{cid}/config", json={"end_time": _fmt(utcnow() + timedelta(days=1))})
+        self.assertTrue(r.json["success"], r.json)
+
+    def test_slug_can_still_change_before_the_start(self):
+        now = utcnow()
+        cid = self.make_contest(start_time=_fmt(now + timedelta(days=2)), end_time=_fmt(now + timedelta(days=9)))
+        self.assertTrue(self.c.post(f"/api/contests/{cid}/config", json={"slug": "new-name"}).json["success"])
+
+    def test_an_ended_contest_can_still_be_edited_without_touching_its_end(self):
+        cid = self.make_contest()
+        with A.app.app_context():
+            c = db.session.get(Contest, cid)
+            c.end_time = utcnow() - timedelta(days=1); end = _fmt(c.end_time); db.session.commit()
+        r = self.c.post(f"/api/contests/{cid}/config", json={"end_time": end, "description": "after the end"})
+        self.assertTrue(r.json["success"], r.json)
+
+    def test_oversized_restore_says_so(self):
+        cid = self.make_contest()
+        big = b"{" + b" " * (A.app.config["MAX_CONTENT_LENGTH"] + 10) + b"}"
+        r = self.c.post(f"/api/contests/{cid}/restore/validate", data=big, content_type="application/json")
+        self.assertEqual((r.status_code, r.json["error_code"]), (413, "upload_too_large"))
