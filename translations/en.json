@@ -237,7 +237,6 @@
  "withoutReviewDesc": "works like a Proofread Week; every eligible page counts",
  "enableBulkReview": "Enable Bulk Review (advanced, off by default)",
  "globalLeaderboard": "Global Leaderboard",
- "perProject": "Per project",
  "announcementEn": "Announcement (English)",
  "announcementBn": "Announcement (Bangla)",
  "announcementHint": "Leave empty to hide. Supports [[Page|text]], [https://url text], '''bold'''",
