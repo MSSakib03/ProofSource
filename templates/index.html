@@ -304,20 +304,21 @@
       <div class="ps-card p-4 sm:p-6 space-y-5">
         <div class="flex items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4">
           <h2 class="ps-serif text-xl text-slate-900 dark:text-slate-50">{{ view === 'create' ? t('createContest') : t('editContestConfig') }}</h2>
-          <button @click="view === 'create' ? goHome() : (view = 'contest')" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">
+          <button @click="cancelConfig" class="text-xs text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">
             {{ t('cancel') }}
           </button>
         </div>
 
         <div class="ps-tabs !mt-2" role="tablist">
           <button v-for="tab in cfgTabs" :key="tab" type="button" role="tab" :aria-selected="cfgTab === tab" @click="cfgTab = tab"
-                  :class="cfgTab === tab ? 'ps-tab is-active' : 'ps-tab'" class="whitespace-nowrap">{{ t('cfg_' + tab) }}<span v-if="tab === 'books' && cfgBookCount" class="ps-count">{{ fmtNum(cfgBookCount) }}</span></button>
+                  :class="cfgTab === tab ? 'ps-tab is-active' : 'ps-tab'" class="whitespace-nowrap">{{ t('cfg_' + tab) }}<span v-if="tab === 'books' && cfgBookCount" class="ps-count">{{ fmtNum(cfgBookCount) }}</span><span v-if="view === 'edit_config' && cfgTabDirty[tab]" class="inline-block w-1.5 h-1.5 rounded-full bg-amber-500 ml-1.5 align-middle" :title="t('unsavedChanges')"></span></button>
         </div>
 
         <div v-if="view === 'edit_config' && active && active.contest.hub_slug" class="text-xs p-3 rounded-lg bg-ws-nature/10 border border-ws-nature/25 text-ws-dark dark:text-ws-nature">
           {{ t('childRulesNotice') }} <a :href="'/central/' + active.contest.hub_slug" @click.prevent="openCentral(active.contest.hub_slug)" class="font-semibold underline">{{ active.contest.hub_title }}</a>
         </div>
         <div v-show="cfgTab !== 'backup'" class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+          <p v-if="cfgTab === 'general' && startedLockNote" class="sm:col-span-2 text-xs p-3 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-amber-900 dark:text-amber-200">{{ t('startedLockNote') }}</p>
           <div v-show="cfgTab === 'general'" class="sm:col-span-2">
             <label class="ps-label">{{ t('contestName') }}</label>
             <input v-model="form.title" type="text" class="ps-input" />
@@ -435,11 +436,11 @@
           </div>
 
           <div v-show="cfgTab === 'general'" class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
+            <div :class="showBnAnnouncement ? '' : 'sm:col-span-2'">
               <label class="ps-label">{{ t('announcementEn') }}</label>
               <textarea v-model="form.announcement_en" rows="2" :placeholder="t('announcementHint')" class="ps-input text-xs"></textarea>
             </div>
-            <div>
+            <div v-if="showBnAnnouncement">
               <label class="ps-label">{{ t('announcementBn') }}</label>
               <textarea v-model="form.announcement_bn" rows="2" :placeholder="t('announcementHint')" class="ps-input text-xs"></textarea>
             </div>
@@ -506,11 +507,11 @@
                     </div>
                     <div>
                       <label class="ps-label">{{ t('bookStart') }} (UTC)</label>
-                      <input v-model="b.start_local" type="datetime-local" class="ps-input" />
+                      <input v-model="b.start_local" type="datetime-local" :min="form.start_time" :max="form.end_time" class="ps-input" />
                     </div>
                     <div>
                       <label class="ps-label">{{ t('bookEnd') }} (UTC)</label>
-                      <input v-model="b.end_local" type="datetime-local" class="ps-input" />
+                      <input v-model="b.end_local" type="datetime-local" :min="form.start_time" :max="form.end_time" class="ps-input" />
                     </div>
                     <p class="sm:col-span-2 text-xs text-slate-500 dark:text-slate-400">{{ t('bookWindowHint') }}</p>
                     <div class="sm:col-span-2 flex items-center justify-between gap-2">
@@ -529,7 +530,7 @@
                 <div class="flex gap-2">
                   <input id="ps-book-add" v-model="bookAdd.query" @input="suggestBooks" @keydown.enter.prevent="queueTypedBooks" @paste="onBookPaste" type="text" autocomplete="off"
                          :placeholder="t('bookSearchPh')" class="ps-input flex-1 min-w-0" role="combobox" aria-autocomplete="list" :aria-expanded="bookAdd.suggestions.length ? 'true' : 'false'" />
-                  <button type="button" @click="queueTypedBooks" :disabled="!bookAdd.query.trim()" class="ps-btn shrink-0">{{ t('addToList') }}</button>
+                  <button type="button" @click="queueTypedBooks" :disabled="!bookAdd.query.trim() || bookAdd.query.trim() === bookPrefix" class="ps-btn shrink-0">{{ t('addToList') }}</button>
                 </div>
                 <ul v-if="bookAdd.suggestions.length" role="listbox" class="absolute z-20 left-0 right-0 mt-1 ps-card shadow-xl max-h-60 overflow-y-auto py-1">
                   <li v-for="sg in bookAdd.suggestions" :key="sg" role="option">
@@ -563,11 +564,11 @@
                 </div>
                 <div>
                   <label class="ps-label">{{ t('bookStart') }} (UTC)</label>
-                  <input v-model="bookAdd.start" type="datetime-local" class="ps-input" />
+                  <input v-model="bookAdd.start" type="datetime-local" :min="form.start_time" :max="form.end_time" class="ps-input" />
                 </div>
                 <div>
                   <label class="ps-label">{{ t('bookEnd') }} (UTC)</label>
-                  <input v-model="bookAdd.end" type="datetime-local" class="ps-input" />
+                  <input v-model="bookAdd.end" type="datetime-local" :min="form.start_time" :max="form.end_time" class="ps-input" />
                 </div>
                 <p class="sm:col-span-3 text-xs text-slate-500 dark:text-slate-400">{{ t('bookSharedHelp') }}</p>
               </div>
@@ -584,8 +585,10 @@
 
         <p v-show="view === 'edit_config' && cfgTab === 'books'" class="text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-slate-200 dark:border-slate-800">{{ t('booksSaveNote') }}</p>
         <div v-show="cfgTab !== 'backup' && !(view === 'edit_config' && cfgTab === 'books')" class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
-          <button @click="openConfigPreview" :disabled="busy"
-                  class="ps-btn ps-btn-primary">
+          <!-- new contest: walk through the tabs with Next; the last tab saves. Existing contest: save from any tab. -->
+          <button v-if="view === 'create' && cfgTabIndex > 0" type="button" @click="cfgStep(-1)" class="ps-btn ps-btn-quiet">{{ t('cfgBack') }}</button>
+          <button v-if="view === 'create' && !cfgIsLast" type="button" @click="cfgStep(1)" class="ps-btn ps-btn-primary">{{ t('cfgNext') }}</button>
+          <button v-else @click="openConfigPreview" :disabled="busy" class="ps-btn ps-btn-primary">
             {{ busy ? t('saving') : t('saveConfiguration') }}
           </button>
         </div>
@@ -1735,7 +1738,18 @@
           <span class="ps-chip">{{ t('mode_' + form.submission_mode) }}</span>
         </div>
       </div>
-      <div class="px-4 sm:px-5 py-3 overflow-y-auto text-xs space-y-3">
+      <div v-if="view === 'edit_config'" class="px-4 sm:px-5 py-3 overflow-y-auto text-xs">
+        <!-- an existing contest: only what is different from the saved configuration -->
+        <p class="font-semibold mb-2">{{ t('pv_changes') }}</p>
+        <ul class="space-y-2.5">
+          <li v-for="ch in cfgChanges" :key="ch.key" class="border-l-2 border-ws-cerulean pl-2.5">
+            <div class="ps-label !mb-0.5">{{ ch.label }}</div>
+            <div class="text-slate-500 line-through break-words" v-if="ch.from !== '—'">{{ ch.from }}</div>
+            <div class="font-medium break-words">{{ ch.to }}</div>
+          </li>
+        </ul>
+      </div>
+      <div v-else class="px-4 sm:px-5 py-3 overflow-y-auto text-xs space-y-3">
         <dl class="ps-pv">
           <dt>{{ t('pv_link') }}</dt><dd class="font-mono break-all">/contest/{{ formLangPreview }}/{{ form.slug || ('‹' + t('pv_random') + '›') }}</dd>
           <dt>{{ t('pv_period') }}</dt><dd class="tabular-nums">{{ pvDate(form.start_time) }} – {{ pvDate(form.end_time) }}</dd>
@@ -2070,7 +2084,7 @@ const I18N = {
     announcementEn: 'Announcement (English)', announcementBn: 'Announcement (Bangla)',
     announcementHint: 'Leave empty to hide. Supports [[Page|text]], [https://url text], \'\'\'bold\'\'\'',
     // per-book window
-    bookWindow: 'Book time window', bookWindowHint: 'Optional. Empty = use the contest window. May be outside the contest window.',
+    bookWindow: 'Book time window', bookWindowHint: 'Optional. Empty = use the contest window. Dates must be inside the contest window.',
     // review panel
     filterContributor: 'Filter by contributor',
     selected: 'Selected', bulkAccept: 'Accept selected', bulkReject: 'Reject selected',
@@ -2080,6 +2094,11 @@ const I18N = {
     // audit
     auditTrail: 'Activity Log', allActions: 'All actions', time: 'Time', action: 'Action', target: 'Target', change: 'Change',
     noAuditEntries: 'No activity recorded yet.', prev: 'Previous', next: 'Next',
+    cfgNext: 'Next', cfgBack: 'Back', unsavedChanges: 'Unsaved changes', pv_changes: 'These changes will be saved:', noChanges: 'No changes to save',
+    discardTitle: 'Discard your changes?', discardMsg: 'Some changes are not saved yet. Leaving now will throw them away.',
+    startedLockNote: 'This contest has started: the start time and the Wikisource project can no longer be changed. The end time can.',
+    err_start_locked: 'The start time cannot change once the contest has started', err_project_locked: 'The Wikisource project cannot change once the contest has started',
+    err_book_dates_outside_contest: 'A book’s dates must be inside the contest’s time frame',
     act_contest_create: 'Contest created', act_contest_approval: 'Approval', act_config_change: 'Configuration changed',
     act_contest_dates_change: 'Dates changed', act_reviewers_change: 'Reviewers changed', act_user_exclusion: 'User exclusion',
     act_announcement_change: 'Announcement changed', act_points_change: 'Points changed', act_book_add: 'Book added',
@@ -2268,7 +2287,7 @@ const I18N = {
     globalLeaderboard: 'সম্মিলিত লিডারবোর্ড', perProject: 'প্রকল্পভিত্তিক',
     announcementEn: 'নোটিশ (ইংরেজি)', announcementBn: 'নোটিশ (বাংলা)',
     announcementHint: 'খালি রাখলে নোটিশ বোর্ড দেখাবে না। [[পাতা|লেখা]], [https://url লেখা], \'\'\'বোল্ড\'\'\' সমর্থিত',
-    bookWindow: 'বইয়ের সময়সীমা', bookWindowHint: 'ঐচ্ছিক। খালি থাকলে প্রতিযোগিতার সময়সীমা প্রযোজ্য। প্রতিযোগিতার সময়ের বাইরেও হতে পারে।',
+    bookWindow: 'বইয়ের সময়সীমা', bookWindowHint: 'ঐচ্ছিক। খালি থাকলে প্রতিযোগিতার সময়সীমা প্রযোজ্য। তারিখ প্রতিযোগিতার সময়সীমার ভেতরে হতে হবে।',
     filterContributor: 'অংশগ্রহণকারী দিয়ে ফিল্টার',
     selected: 'নির্বাচিত', bulkAccept: 'নির্বাচিতগুলো গ্রহণ', bulkReject: 'নির্বাচিতগুলো বাতিল',
     bulkTouchWiki: 'উইকিসংকলনেও হালনাগাদ করুন (ধীর)', bulkConfirmTitle: 'বাল্ক অ্যাকশন নিশ্চিত করুন',
@@ -2276,6 +2295,11 @@ const I18N = {
     bulkUnchanged: 'অপরিবর্তিত', bulkFailed: 'ব্যর্থ',
     auditTrail: 'কার্যক্রমের ইতিহাস', allActions: 'সব কার্যক্রম', time: 'সময়', action: 'কার্যক্রম', target: 'বিষয়', change: 'পরিবর্তন',
     noAuditEntries: 'এখনো কোনো কার্যক্রম নথিভুক্ত হয়নি।', prev: 'আগের', next: 'পরের',
+    cfgNext: 'পরবর্তী', cfgBack: 'পিছনে', unsavedChanges: 'অসংরক্ষিত পরিবর্তন', pv_changes: 'এই পরিবর্তনগুলো সংরক্ষিত হবে:', noChanges: 'সংরক্ষণ করার মতো কোনো পরিবর্তন নেই',
+    discardTitle: 'পরিবর্তনগুলো বাদ দেবেন?', discardMsg: 'কিছু পরিবর্তন এখনো সংরক্ষিত হয়নি। এখন বের হলে সেগুলো হারিয়ে যাবে।',
+    startedLockNote: 'প্রতিযোগিতা শুরু হয়ে গেছে: এখন আর শুরুর সময় ও উইকিসংকলন প্রকল্প বদলানো যাবে না। শেষের সময় বদলানো যাবে।',
+    err_start_locked: 'প্রতিযোগিতা শুরু হওয়ার পর শুরুর সময় বদলানো যায় না', err_project_locked: 'প্রতিযোগিতা শুরু হওয়ার পর উইকিসংকলন প্রকল্প বদলানো যায় না',
+    err_book_dates_outside_contest: 'বইয়ের তারিখ প্রতিযোগিতার সময়সীমার ভেতরে হতে হবে',
     act_contest_create: 'প্রতিযোগিতা তৈরি', act_contest_approval: 'অনুমোদন', act_config_change: 'কনফিগারেশন পরিবর্তন',
     act_contest_dates_change: 'তারিখ পরিবর্তন', act_reviewers_change: 'পর্যালোচক পরিবর্তন', act_user_exclusion: 'ব্যবহারকারী বাদ',
     act_announcement_change: 'নোটিশ পরিবর্তন', act_points_change: 'পয়েন্ট পরিবর্তন', act_book_add: 'বই যোগ',
@@ -2428,8 +2452,8 @@ createApp({
       contestSubTab: 'leaderboard', leaderboardLimit: 200,
       reserveBookId: '', newBookTitle: '', newBookPoints: 3, newBookExcluded: '', newBookStart: '', newBookEnd: '',
       bookToRemove: null, wikiTableCode: '',
-      form: {}, cfgTab: 'general', bookOpen: null,
-      bookAdd: { query: '', suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 },
+      form: {}, formBase: {}, cfgTab: 'general', bookOpen: null,
+      bookAdd: { query: 'নির্ঘণ্ট:', suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 },
       juryBookId: null, juryStatusFilter: 'pending_review', juryContributor: '',
       juryPage: null, juryQueue: [], juryQueueTotal: 0, juryPrefetch: null,
       juryPaneTab: safeLoad('ws_jury_pane') || 'preview', zoom: 100, juryNote: '', juryBonus: 0,
@@ -2470,6 +2494,50 @@ createApp({
       const tabs = ['general', 'rules', 'review', 'books'];
       if (this.view === 'edit_config' && this.active && this.active.contest.is_admin) tabs.push('backup');
       return tabs;
+    },
+    formDirty() { return JSON.stringify(this.form) !== JSON.stringify(this.formBase); },
+    cfgTabIndex() { return this.cfgTabs.indexOf(this.cfgTab); },
+    cfgIsLast() { return this.cfgTab === 'books'; },
+    /* which tabs hold edits that are not saved yet (a dot on the tab) */
+    cfgTabDirty() {
+      const groups = {
+        general: ['title', 'wiki_domain', 'slug', 'description', 'link', 'start_time', 'end_time', 'admins', 'announcement_en', 'announcement_bn'],
+        rules: ['proofread_points', 'validate_points', 'max_bonus_points', 'excluded_users', 'submission_mode'],
+        review: ['juries', 'review_enabled', 'bulk_review_enabled', 'review_assignment', 'jury_mode', 'jury_gets_points', 'reject_action', 'allow_custom_points']
+      };
+      const out = {};
+      for (const [tab, keys] of Object.entries(groups)) out[tab] = keys.some(k => this.form[k] !== this.formBase[k]);
+      return out;
+    },
+    /* a contest that has begun keeps its start and project; only the end can move */
+    contestStarted() { return !!(this.view === 'edit_config' && this.active && this.active.contest.start_iso && Date.parse(this.active.contest.start_iso) <= Date.now()); },
+    startedLockNote() { return this.contestStarted && !this.active.contest.hub_slug; },
+    formIsBn() { return (this.form.wiki_domain || '').split('.')[0] === 'bn'; },
+    /* the Bangla announcement only makes sense on bn.wikisource (or when one is already stored) */
+    showBnAnnouncement() { return this.formIsBn || !!this.formBase.announcement_bn; },
+    bookPrefix() { return this.formIsBn ? 'নির্ঘণ্ট:' : 'Index:'; },
+    /* what differs from the saved configuration, for the confirmation popup */
+    cfgChanges() {
+      const f = this.form, b = this.formBase, t = k => this.t(k);
+      const yes = v => v ? '✓' : '✗';
+      const txt = v => { v = String(v ?? '').trim(); return v ? (v.length > 90 ? v.slice(0, 90) + '…' : v) : '—'; };
+      const rows = [
+        ['title', t('contestName'), txt], ['wiki_domain', t('wikisourceProject'), v => this.projectLabel(v)], ['slug', t('customSlugLabel'), txt],
+        ['description', t('description'), txt], ['link', t('contestPageLink'), txt],
+        ['start_time', t('startTime') + ' (UTC)', v => this.pvDate(v)], ['end_time', t('endTime') + ' (UTC)', v => this.pvDate(v)],
+        ['admins', t('admins'), txt], ['announcement_en', t('announcementEn'), txt], ['announcement_bn', t('announcementBn'), txt],
+        ['proofread_points', t('proofreadPoints'), txt], ['validate_points', t('validatePoints'), txt], ['max_bonus_points', t('maxBonusPoints'), txt],
+        ['excluded_users', t('excludedUsersLabel'), txt], ['submission_mode', t('submissionMode'), v => t('mode_' + v)],
+        ['juries', t('juries'), txt], ['review_enabled', t('contestReviewType'), v => v ? t('withReview') : t('withoutReview')],
+        ['bulk_review_enabled', t('enableBulkReview'), yes], ['review_assignment', t('reviewDistribution'), v => v === 'equal' ? t('distEqual') : t('distOpen')],
+        ['jury_mode', t('juryReviewMode'), v => v === 'in_app_validate' ? t('modeInAppValidate') : t('modeAcceptOnly')],
+        ['jury_gets_points', t('juryGetsPoints'), yes], ['reject_action', t('rejectedHandling'), v => v === 'instant_revert' ? t('instantRevert') : t('holdBatchRevert')],
+        ['allow_custom_points', t('allowCustomBookPoints'), yes]
+      ];
+      const out = [];
+      for (const [k, label, fmt] of rows) if (f[k] !== b[k]) out.push({ key: k, label, from: fmt(b[k]), to: fmt(f[k]) });
+      if (this.bookAdd.pending.length) out.push({ key: 'books', label: t('pv_newBooks'), from: '—', to: this.bookAdd.pending.map(x => x.title).join(', ') });
+      return out;
     },
     cfgBookCount() { return (this.view === 'edit_config' && this.active ? this.active.books.length : 0) + this.bookAdd.pending.length; },
     hasReverted() { return !!(this.active && this.active.leaderboard.some(r => r.reverted)); },
@@ -2526,6 +2594,11 @@ createApp({
       else if (this.homeProjectPinned) safeStore('ps_home_project', v);
     },
     currentUser() { this.fitUserMenu(); },
+    'form.wiki_domain'(now, old) {
+      const prefix = d => ((d || '').split('.')[0] === 'bn' ? 'নির্ঘণ্ট:' : 'Index:');
+      const q = this.bookAdd.query.trim();
+      if (!q || q === 'নির্ঘণ্ট:' || q === 'Index:') this.bookAdd.query = prefix(now);
+    },
     lang() { this.fitUserMenu(); this.fitJuries(); },
     'active.contest.juries_list'() { this.fitJuries(); },
     countdownText() { this.fitJuries(); }
@@ -2662,7 +2735,11 @@ createApp({
     },
     isExpanded(h) { return this.expanded[h.slug] !== undefined ? this.expanded[h.slug] : h.status === 'running'; },
     toggleTree(slug) { const h = this.centrals.find(x => x.slug === slug); this.expanded = { ...this.expanded, [slug]: !this.isExpanded(h) }; },
-    isLocked(f) { return this.view === 'edit_config' && this.active && (this.active.contest.locked_fields || []).includes(f); },
+    isLocked(f) {
+      if (this.view !== 'edit_config' || !this.active) return false;
+      if (this.contestStarted && (f === 'start_time' || f === 'wiki_domain')) return true;
+      return (this.active.contest.locked_fields || []).includes(f);
+    },
     projectShort(dom) { return (dom || '').split('.')[0]; },
     queueBookTitle(q) { const b = this.active && this.active.books.find(x => x.id === q.book_id); return b ? b.title + ' / ' + q.page_number : ''; },
     queueBookPrefix(q) {
@@ -2982,20 +3059,39 @@ createApp({
     },
     openCreateContest() {
       if (!this.loggedIn) { window.location.href = '/login'; return; }
-      this.form = this.blankForm(); this.resetConfigUi(); this.view = 'create';
+      this.form = this.blankForm(); this.formBase = JSON.parse(JSON.stringify(this.form)); this.resetConfigUi(); this.view = 'create';
     },
     resetConfigUi() {
       this.cfgTab = 'general'; this.bookOpen = null;
-      this.bookAdd = { query: '', suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 };
+      this.bookAdd = { query: this.bookPrefix, suggestions: [], pending: [], points: null, start: '', end: '', seq: 0 };
     },
     startEditConfig() { this.resetConfigUi(); this.openEditConfig(); },
-    formPayload() { const body = Object.assign({}, this.form); delete body.books; return body; },   // books go through addPendingBooks
+    cancelConfig() {
+      const leave = () => { if (this.view === 'create') this.goHome(); else this.view = 'contest'; };
+      if (!(this.formDirty || this.bookAdd.pending.length)) { leave(); return; }
+      this.confirmBox = { open: true, title: this.t('discardTitle'), message: this.t('discardMsg'), danger: true, onYes: leave };
+    },
+    /* Next / Back on a new contest; leaving "General" needs a name and a valid project */
+    cfgStep(d) {
+      if (d > 0 && this.cfgTab === 'general') {
+        if (!this.form.title) { this.notify(this.t('err_title_required'), 'error'); return; }
+        if (!this.wikiDomainOk(this.form.wiki_domain)) { this.notify(this.t('err_invalid_project'), 'error'); return; }
+      }
+      const i = this.cfgTabIndex + d;
+      if (i >= 0 && i < this.cfgTabs.length) { this.cfgTab = this.cfgTabs[i]; window.scrollTo(0, 0); }
+    },
+    formPayload() {
+      const body = Object.assign({}, this.form); delete body.books;
+      if (!this.showBnAnnouncement) body.announcement_bn = '';
+      if (this.contestStarted) { delete body.start_time; delete body.wiki_domain; }   // fixed once the contest has begun
+      return body;
+    },   // books go through addPendingBooks
 
     // ---------- adding books: suggestions from the wiki, a checked list, shared points and dates ----------
     suggestBooks() {
       clearTimeout(this._bookTimer);
       const q = this.bookAdd.query.trim();
-      if (q.length < 2 || q.includes('\n') || !this.wikiDomainOk(this.form.wiki_domain)) { this.bookAdd.suggestions = []; return; }
+      if (q.length <= this.bookPrefix.length || q.includes('\n') || !this.wikiDomainOk(this.form.wiki_domain)) { this.bookAdd.suggestions = []; return; }
       this._bookTimer = setTimeout(async () => {
         const r = await this.api(`/api/wiki/index-search?wiki=${encodeURIComponent(this.form.wiki_domain)}&q=${encodeURIComponent(q)}`);
         if (this.bookAdd.query.trim() !== q) return;          // an older answer arriving late
@@ -3003,9 +3099,18 @@ createApp({
         this.bookAdd.suggestions = (r.data.titles || []).filter(tl => !have.has(tl.toLowerCase()));
       }, 250);
     },
+    cleanBookTitle(raw) {      // "Index:X", "নির্ঘণ্ট:X" or a prefix typed twice all become the plain name behind one prefix
+      let t = String(raw || '').trim();
+      for (let i = 0; i < 3; i++) {
+        const m = t.match(/^(?:index|নির্ঘণ্ট)\s*:\s*/i);
+        if (!m) break;
+        t = t.slice(m[0].length);
+      }
+      return t ? this.bookPrefix + t : '';
+    },
     async queueBook(raw) {
-      const title = String(raw || '').trim();
-      this.bookAdd.query = ''; this.bookAdd.suggestions = [];
+      const title = this.cleanBookTitle(raw);
+      this.bookAdd.query = this.bookPrefix; this.bookAdd.suggestions = [];
       if (!title || this.bookAdd.pending.length >= 100) return;
       if (this.bookAdd.pending.some(x => x.title.toLowerCase() === title.toLowerCase() || x.typed === title.toLowerCase())) return;
       this.bookAdd.pending.push({ key: ++this.bookAdd.seq, title, typed: title.toLowerCase(), loading: true, exists: null, total: 0, error: '' });
@@ -3017,7 +3122,7 @@ createApp({
       item.exists = r.data.exists; item.total = r.data.total_pages || 0;
       if (r.data.title && !this.bookAdd.pending.some(x => x !== item && x.title.toLowerCase() === r.data.title.toLowerCase())) item.title = r.data.title;
     },
-    queueTypedBooks() { this.bookAdd.query.split(/\r?\n/).forEach(line => this.queueBook(line)); },
+    queueTypedBooks() { this.bookAdd.query.split(/\r?\n/).forEach(line => { if (line.trim() && line.trim() !== this.bookPrefix) this.queueBook(line); }); },
     onBookPaste(ev) {      // a pasted list (one book per line) goes straight into the list
       const text = (ev.clipboardData || window.clipboardData).getData('text') || '';
       if (!/\n/.test(text.trim())) return;
@@ -3041,7 +3146,7 @@ createApp({
       }
       this.busy = false;
       if (!cid) {
-        await this.openContest(contestId, false, true); this.openEditConfig();
+        await this.openContest(contestId, false, true); this.openEditConfig(true);
         this.notify(this.t('booksAddedN').replace('{n}', this.fmtNum(added)), this.bookAdd.pending.length ? 'error' : 'success');
         if (!this.bookAdd.pending.length) { this.bookAdd.points = null; this.bookAdd.start = ''; this.bookAdd.end = ''; }
       }
@@ -3053,6 +3158,7 @@ createApp({
     openConfigPreview() {
       if (!this.form.title) { this.notify(this.t('err_title_required'), 'error'); return; }
       if (!this.wikiDomainOk(this.form.wiki_domain)) { this.notify(this.t('err_invalid_project'), 'error'); return; }
+      if (this.view === 'edit_config' && !this.cfgChanges.length) { this.notify(this.t('noChanges'), 'info'); return; }
       this.cfgPreview.open = true;
     },
     confirmConfigSave() {
@@ -3134,8 +3240,10 @@ createApp({
       this.notify(r.data.complete === false ? this.t('syncPartial') : this.t('syncDone'), r.data.complete === false ? 'info' : 'success', r.data.complete === false ? 0 : 1600);
     },
     syncContestNow() { if (this.active) this.backgroundSync(this.active.contest.id, true); },
-    openEditConfig() {
+    openEditConfig(keepDraft = false) {
       const c = this.active.contest;
+      const keep = keepDraft && this.view === 'edit_config' && this.formDirty;   // book actions must not throw away unsaved edits
+      const draft = keep ? this.form : null;
       this.form = {
         slug: c.slug, title: c.title, description: c.description, wiki_domain: c.wiki_domain,
         start_time: c.start_time, end_time: c.end_time, proofread_points: c.proofread_points, validate_points: c.validate_points,
@@ -3146,6 +3254,8 @@ createApp({
         announcement_en: c.announcement_en || '', announcement_bn: c.announcement_bn || '',
         submission_mode: c.submission_mode || 'auto', link: c.link || ''
       };
+      this.formBase = JSON.parse(JSON.stringify(this.form));
+      if (draft) this.form = draft;
       this.active.books.forEach(b => { b.start_local = this.isoToLocalInput(b.start_iso); b.end_local = this.isoToLocalInput(b.end_iso); });
       this.restore = { checked: false, problems: [], counts: null, exported_at: null, text: '' };
       this.view = 'edit_config';
@@ -3164,7 +3274,7 @@ createApp({
         method: 'POST', json: { points: b.points, excluded_pages: b.excluded_pages, start_time: b.start_local || '', end_time: b.end_local || '' }
       });
       this.busy = false;
-      if (r.ok) { await this.openContest(this.active.contest.id, false, true); this.openEditConfig(); this.bookOpen = null; this.notify(this.t('bookUpdated'), 'success'); }
+      if (r.ok) { await this.openContest(this.active.contest.id, false, true); this.openEditConfig(true); this.bookOpen = null; this.notify(this.t('bookUpdated'), 'success'); }
       else this.notify(this.errText(r.data), 'error');
     },
     async addBookToContest() {
@@ -3186,7 +3296,7 @@ createApp({
       const r = await this.api(`/api/contests/${this.active.contest.id}/books/${this.bookToRemove.id}/remove`, { method: 'POST', json: { mode } });
       this.bookToRemove = null;
       await this.refreshContest();
-      if (currentView === 'edit_config') this.openEditConfig();
+      if (currentView === 'edit_config') this.openEditConfig(true);
       this.notify(r.ok ? this.t('bookRemoved') : this.errText(r.data), r.ok ? 'success' : 'error');
     },
     // ---------- submission: enrol (semi-automatic) and manual submit ----------
