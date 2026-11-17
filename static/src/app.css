@@ -345,6 +345,9 @@
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
 
+/* the per-project tag next to a name only shows in phone leaderboard cards */
+.ps-proj-tag { display: none; }
+
 /* ---------------------------------------------------------------- phone tables
  * Below 640px a table with .ps-stack becomes a list of cards: no sideways scrolling.
  * Every cell carries data-label (shown before its value); .ps-c-title is the card's heading.
@@ -395,6 +398,10 @@
   .ps-stack.ps-lb .ps-proj { order: 5; color: var(--ps-text); }
   .ps-stack.ps-lb .ps-proj-k { color: var(--ps-text-subtle); }
   .ps-stack.ps-lb .ps-colon { display: none; }
+  /* a user in one project: the project code as a small tag after the name (their points are that project's points) */
+  .ps-stack.ps-lb .ps-proj.ps-proj-single { display: none; }
+  .ps-stack.ps-lb .ps-proj-tag { display: inline-block; margin-left: .4rem; padding: 0 .3rem; vertical-align: .1em; font-size: .625rem; font-weight: 500;
+    line-height: 1.4; color: var(--ps-text-subtle); border: 1px solid var(--ps-border-muted); border-radius: .25rem; }
   /* one-line card (set by fitLb when it fits): rank, name, chips, points */
   .ps-stack.ps-lb tr.ps-one { flex-wrap: nowrap; }
   .ps-stack.ps-lb tr.ps-one::after { display: none; }

@@ -1146,8 +1146,7 @@
             <div class="min-w-0 space-y-1.5">
               <div class="ps-eyebrow !text-ws-cerulean dark:!text-ws-nature">{{ t('centralContest') }}</div>
               <h1 :class="titleWeight(central.central.title)" class="ps-serif text-[1.4rem] sm:text-[1.75rem] leading-snug text-ws-dark dark:text-[#8fb8e0] break-words">
-                <a v-if="safeUrl(central.central.link)" :href="safeUrl(central.central.link)" target="_blank" rel="noopener" class="ps-title-link">{{ central.central.title }}</a>
-                <template v-else>{{ central.central.title }}</template>
+                {{ central.central.title }}
               </h1>
               <p v-if="central.central.description" class="text-sm text-slate-600 dark:text-slate-400 leading-relaxed max-w-3xl line-clamp-2">{{ central.central.description }}</p>
             </div>
@@ -1215,8 +1214,8 @@
             <tr v-if="central.leaderboard.length === 0"><td colspan="6" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td data-label="" class="ps-c-rank py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(i)">{{ fmtNum(i + 1) }}</span></td>
-              <td data-label="" class="ps-c-name py-2.5 px-4 font-semibold">{{ r.username }}</td>
-              <td data-label="" class="ps-c-wide py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="ps-proj mr-2 whitespace-nowrap"><span class="ps-proj-k">{{ projectShort(dom) }}<span class="ps-colon">:</span></span> <span class="ps-proj-v">{{ fmtNum(pts) }}</span></span></td>
+              <td data-label="" class="ps-c-name py-2.5 px-4 font-semibold">{{ r.username }}<span v-if="Object.keys(r.projects || {}).length === 1" class="ps-proj-tag">{{ projectShort(Object.keys(r.projects)[0]) }}</span></td>
+              <td data-label="" class="ps-c-wide py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="ps-proj mr-2 whitespace-nowrap" :class="{ 'ps-proj-single': Object.keys(r.projects).length === 1 }"><span class="ps-proj-k">{{ projectShort(dom) }}<span class="ps-colon">:</span></span> <span class="ps-proj-v">{{ fmtNum(pts) }}</span></span></td>
               <td :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
               <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
               <td data-label="" class="ps-c-points py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
@@ -2346,7 +2345,8 @@ createApp({
     /* Phone leaderboard cards. A row is rank + name (+ points) on the first line and its counts as chips on the second,
      * the chips starting under the name (never under the rank). A row with at most 3 counts (per-project points count
      * too) moves its chips up next to the name, on ONE line (class ps-one), when they fit; each row decides for itself,
-     * so a long name only sends its own row back to two lines. In one-line rows the chips sit right next to the points
+     * so a long name only sends its own row back to two lines -
+     * unless that leaves a two-line row between one-line rows: then all rows use two lines. In one-line rows the chips sit right next to the points
      * and every chip column (counted from the right) and the points get the width of the widest one in the list, so a
      * two-digit number never pushes its neighbours out of line. Measured, so a larger text size simply means fewer
      * one-line rows. */
@@ -2354,7 +2354,7 @@ createApp({
       if (!this.lbCards) return;
       this.$nextTick(() => {
         const phone = window.innerWidth < 640;
-        const itemsOf = tr => [...tr.querySelectorAll('td.ps-c-stat:not(.ps-zero), .ps-proj')];
+        const itemsOf = tr => [...tr.querySelectorAll('td.ps-c-stat:not(.ps-zero), .ps-proj:not(.ps-proj-single)')];
         const w = el => Math.ceil(el.getBoundingClientRect().width);
         document.querySelectorAll('table.ps-lb').forEach(table => {
           const rows = [...table.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('td.ps-c-name'));
@@ -2376,13 +2376,16 @@ createApp({
             const colW = [0, 1, 2].map(k => Math.max(0, ...one.map(tr => { const it = itemsOf(tr); return it[it.length - 1 - k] ? w(it[it.length - 1 - k]) : 0; })));
             const pts = one.map(tr => tr.querySelector('td.ps-c-points')).filter(Boolean);
             const ptsW = Math.max(0, ...pts.map(w));
-            one.forEach(tr => itemsOf(tr).forEach((el, i, it) => { el.style.minWidth = colW[it.length - 1 - i] + 'px'; el.style.justifyContent = 'center'; }));
+            one.forEach(tr => itemsOf(tr).forEach((el, i, it) => { el.style.minWidth = colW[it.length - 1 - i] + 'px'; el.style.justifyContent = 'flex-start'; }));
             pts.forEach(td => { td.style.minWidth = ptsW + 'px'; });
             const bad = one.filter(tr => !fits(tr));
             if (!bad.length) break;
             reset(bad);
             one = one.filter(tr => !bad.includes(tr));
           }
+          // a two-line row between one-line rows looks out of place: then every row uses two lines
+          const idx = one.map(tr => rows.indexOf(tr));
+          if (idx.length && idx[idx.length - 1] - idx[0] + 1 !== idx.length) reset(rows);
         });
       });
     },
