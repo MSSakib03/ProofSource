@@ -846,7 +846,7 @@
 
       <div v-if="contestSubTab === 'leaderboard'" class="ps-card overflow-hidden">
         <div class="overflow-x-auto w-full">
-          <table :class="lbCards ? 'ps-stack ps-lb' : ''" class="w-full min-w-[580px] text-left border-collapse text-sm">
+          <table :class="lbCards ? 'ps-stack ps-lb ps-ranked' : ''" class="w-full min-w-[580px] text-left border-collapse text-sm">
             <thead>
               <tr class="border-b border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
                 <th class="py-3 px-4 font-semibold w-14">#</th>
@@ -1056,7 +1056,7 @@
               <thead>
                 <tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
                   <th class="py-3 px-4 font-semibold">{{ t('juryMember') }}</th>
-                  <th class="py-3 px-4 font-semibold text-right">{{ t('totalReviewed') }}</th>
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('reviewed') }}</th>
                   <th class="py-3 px-4 font-semibold text-right">{{ t('accepted') }}</th>
                   <th class="py-3 px-4 font-semibold text-right">{{ t('needsFix') }}</th>
                   <th class="py-3 px-4 font-semibold text-right">{{ t('rejected') }}</th>
@@ -1069,7 +1069,7 @@
                       {{ j.username }}
                     </a>
                   </td>
-                  <td :data-label="t('totalReviewed')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(j.reviewed) }}</td>
+                  <td :data-label="t('reviewed')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(j.reviewed) }}</td>
                   <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums" :class="j.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(j.accepted) }}</td>
                   <td :data-label="t('needsFix')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums" :class="j.needs_fix ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(j.needs_fix) }}</td>
                   <td :data-label="t('rejected')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums" :class="j.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(j.rejected) }}</td>
@@ -1205,7 +1205,7 @@
       </div>
 
       <div v-if="centralTab === 'leaderboard'" class="ps-card overflow-hidden">
-        <div class="overflow-x-auto"><table :class="lbCards ? 'ps-stack ps-lb' : ''" class="w-full min-w-[560px] text-left text-sm">
+        <div class="overflow-x-auto"><table :class="lbCards ? 'ps-stack ps-lb ps-ranked' : ''" class="w-full min-w-[560px] text-left text-sm">
           <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
             <th class="py-3 px-4 font-medium w-14">#</th><th class="py-3 px-4 font-medium">{{ t('user') }}</th>
             <th class="py-3 px-4 font-medium">{{ t('perProject') }}</th><th class="py-3 px-4 font-medium text-right">{{ t('proofread') }}</th>
@@ -1216,7 +1216,7 @@
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td data-label="" class="ps-c-rank py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(i)">{{ fmtNum(i + 1) }}</span></td>
               <td data-label="" class="ps-c-name py-2.5 px-4 font-semibold">{{ r.username }}</td>
-              <td data-label="" class="ps-c-wide py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="mr-2 whitespace-nowrap">{{ projectShort(dom) }}: {{ fmtNum(pts) }}</span></td>
+              <td data-label="" class="ps-c-wide py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="ps-proj mr-2 whitespace-nowrap"><span class="ps-proj-k">{{ projectShort(dom) }}<span class="ps-colon">:</span></span> <span class="ps-proj-v">{{ fmtNum(pts) }}</span></span></td>
               <td :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
               <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
               <td data-label="" class="ps-c-points py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
@@ -2343,46 +2343,46 @@ createApp({
   methods: {
     /* The name and Logout sit side by side while they fit; when a long name would crowd the
      * ProofSource wordmark (or overflow the bar), Logout moves into a menu under the name. */
-    /* Phone leaderboard cards. Rows with many counts (4+) are two lines by nature and stay that way. The "short" rows
-     * (at most 3 counts, no per-project line) decide together: if every one of them fits rank, name, counts and points
-     * on ONE line (class ps-one) they all use one line, otherwise they all use two. Measured, so a smaller text size
-     * can bring them back to one line and a larger one sends them to two. */
+    /* Phone leaderboard cards. A row is rank + name (+ points) on the first line and its counts as chips on the second,
+     * the chips starting under the name (never under the rank). A row with at most 3 counts (per-project points count
+     * too) moves its chips up next to the name, on ONE line (class ps-one), when they fit; each row decides for itself,
+     * so a long name only sends its own row back to two lines. In one-line rows the chips sit right next to the points
+     * and every chip column (counted from the right) and the points get the width of the widest one in the list, so a
+     * two-digit number never pushes its neighbours out of line. Measured, so a larger text size simply means fewer
+     * one-line rows. */
     fitLb() {
       if (!this.lbCards) return;
       this.$nextTick(() => {
         const phone = window.innerWidth < 640;
-        const chipsOf = tr => [...tr.querySelectorAll('td.ps-c-stat:not(.ps-zero)')];
+        const itemsOf = tr => [...tr.querySelectorAll('td.ps-c-stat:not(.ps-zero), .ps-proj')];
+        const w = el => Math.ceil(el.getBoundingClientRect().width);
         document.querySelectorAll('table.ps-lb').forEach(table => {
-          const rows = [...table.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('td.ps-c-rank'));
-          const clear = () => {
-            rows.forEach(tr => { tr.classList.remove('ps-one'); tr.querySelectorAll('td.ps-c-stat, td.ps-c-points').forEach(td => { td.style.minWidth = ''; }); });
-            table.style.removeProperty('--ps-name-w');
-          };
-          clear();
+          const rows = [...table.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('td.ps-c-name'));
+          const reset = trs => trs.forEach(tr => {
+            tr.classList.remove('ps-one');
+            tr.querySelectorAll('td.ps-c-stat, td.ps-c-points, .ps-proj').forEach(el => { el.style.minWidth = ''; el.style.justifyContent = ''; });
+          });
+          reset(rows);
           if (!phone) return;
-          const short = rows.filter(tr => {
-            const wide = tr.querySelector('td.ps-c-wide');
-            return !(wide && wide.textContent.trim()) && chipsOf(tr).length <= 3;
-          });
-          if (!short.length) return;
-          short.forEach(tr => tr.classList.add('ps-one'));
-          // columns: each count (1st, 2nd, 3rd) and the points get the width of the widest one in the list, so a
-          // two-digit number never pushes its neighbours out of line; the name takes the free space, which puts the
-          // counts right next to the points
-          const w = el => Math.ceil(el.getBoundingClientRect().width);
-          const chipW = [0, 1, 2].map(k => Math.max(0, ...short.map(tr => chipsOf(tr)[k] ? w(chipsOf(tr)[k]) : 0)));
-          const pointsW = Math.max(0, ...short.map(tr => w(tr.querySelector('td.ps-c-points'))));
-          short.forEach(tr => {
-            chipsOf(tr).forEach((td, k) => { td.style.minWidth = chipW[k] + 'px'; td.style.justifyContent = 'center'; });
-            const pt = tr.querySelector('td.ps-c-points'); pt.style.minWidth = pointsW + 'px'; pt.style.textAlign = 'right';
-          });
-          const textWidth = td => { const r = document.createRange(); r.selectNodeContents(td); return Math.ceil(r.getBoundingClientRect().width + (parseFloat(getComputedStyle(td).paddingRight) || 0)); };
-          const nameW = Math.max(0, ...short.map(tr => textWidth(tr.querySelector('td.ps-c-name'))));
-          if (nameW) table.style.setProperty('--ps-name-w', nameW + 'px');
-          // a row fits when its last item (the points) ends inside the card's padding box edge, not in the padding
-          const fits = tr => { const cs = getComputedStyle(tr), last = tr.querySelector('td.ps-c-points');
-            return last.getBoundingClientRect().right <= tr.getBoundingClientRect().right - (parseFloat(cs.paddingRight) || 0) + 1; };
-          if (!short.every(fits)) clear();
+          let one = rows.filter(tr => itemsOf(tr).length <= 3);
+          // a row fits when nothing in it ends past the card's padding edge
+          const fits = tr => {
+            const edge = tr.getBoundingClientRect().right - (parseFloat(getComputedStyle(tr).paddingRight) || 0) + 1;
+            return [...tr.querySelectorAll('td, .ps-proj')].every(el => el.getBoundingClientRect().right <= edge);
+          };
+          for (let pass = 0; pass < 4 && one.length; pass++) {
+            reset(one);
+            one.forEach(tr => tr.classList.add('ps-one'));
+            const colW = [0, 1, 2].map(k => Math.max(0, ...one.map(tr => { const it = itemsOf(tr); return it[it.length - 1 - k] ? w(it[it.length - 1 - k]) : 0; })));
+            const pts = one.map(tr => tr.querySelector('td.ps-c-points')).filter(Boolean);
+            const ptsW = Math.max(0, ...pts.map(w));
+            one.forEach(tr => itemsOf(tr).forEach((el, i, it) => { el.style.minWidth = colW[it.length - 1 - i] + 'px'; el.style.justifyContent = 'center'; }));
+            pts.forEach(td => { td.style.minWidth = ptsW + 'px'; });
+            const bad = one.filter(tr => !fits(tr));
+            if (!bad.length) break;
+            reset(bad);
+            one = one.filter(tr => !bad.includes(tr));
+          }
         });
       });
     },
