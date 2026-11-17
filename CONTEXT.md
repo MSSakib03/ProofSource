@@ -73,6 +73,7 @@ Python 3.11+ · Flask 3 · Flask-SQLAlchemy 3 (SQLAlchemy 2) · SQLite (dev) / *
 - One Vue app, options API. Add text to **both** `I18N.en` and `I18N.bn`; no hard-coded UI text. Keys used dynamically: `err_*`, `act_*`, `mode_*`, `cfg_*`, `pol_*`, `pv_*`, `revert_*`, `warn_*`.
 - Styling: Tailwind utility classes + tokens in `static/src/app.css`. After changing the template or that file run `npm install && npm run build:css` and **commit `static/css/app.css`** (Toolforge has no Node).
 - **Phone first**: below 640px wide tables become cards (`ps-stack` + a `data-label` on every cell; `ps-lb` leaderboard card, `ps-up` participant-page card). No horizontal scrolling on phones. Dates are UTC with Bangla digits in Bangla. The `AA` button scales the root font size, so use `rem`/relative sizes.
+- Phone header and leaderboard rows are *measured* (`fitUserMenu`, `fitLb`, like `fitJuries`): re-run them after anything that changes widths (language, text size, fonts, data).
 - Required fields carry a red `*`, errors appear on the field (`validateConfig`, `validateCentral`); the server enforces the same rules.
 - The create-contest form is a wizard (Next/Back, only the last tab saves); the edit form keeps drafts across tabs and its confirmation lists only the changes.
 - Jinja caches the template: **restart the dev server after editing `index.html`**.
