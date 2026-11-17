@@ -2031,7 +2031,7 @@ const I18N = {
     indexBooksOnePerLine: 'Index Pages (one per line)', addMoreIndexBooks: 'Add New Index Pages (one per line)',
     saveConfiguration: 'Save Configuration', saving: 'Saving...', cancel: 'Cancel', confirm: 'Confirm',
     pendingApprovalBannerTitle: 'This contest is awaiting administrator approval',
-    pendingApprovalBannerDesc: 'Tool Admin (MS Sakib) or a local Wikisource Administrator must approve this contest to activate it.',
+    pendingApprovalBannerDesc: 'The tool admin or a local Wikisource Administrator must approve this contest to activate it.',
     approveContest: 'Approve & Activate', myPages: 'My Pages', syncWithWiki: 'Sync Now', syncShort: 'Sync', syncing: 'Syncing...',
     lastSynced: 'Last synced', configure: 'Configuration', juryPanel: 'Review',
     totalBookPages: 'Eligible Pages', proofreadListed: 'Proofread / Validated', accepted: 'Accepted', reviewed: 'Reviewed',
@@ -2234,7 +2234,7 @@ const I18N = {
     indexBooksOnePerLine: 'নির্ঘণ্ট পাতার তালিকা (প্রতি লাইনে একটি)', addMoreIndexBooks: 'নতুন নির্ঘণ্ট বই যুক্ত করুন (প্রতি লাইনে একটি)',
     saveConfiguration: 'কনফিগারেশন সংরক্ষণ করুন', saving: 'সংরক্ষিত হচ্ছে...', cancel: 'বাতিল', confirm: 'নিশ্চিত করুন',
     pendingApprovalBannerTitle: 'এই প্রতিযোগিতাটি অনুমোদনের অপেক্ষায় রয়েছে',
-    pendingApprovalBannerDesc: 'টুল অ্যাডমিন (MS Sakib) অথবা সংশ্লিষ্ট উইকিসংকলনের প্রশাসক অনুমোদন করলেই প্রতিযোগিতাটি চালু হবে।',
+    pendingApprovalBannerDesc: 'টুল অ্যাডমিন অথবা সংশ্লিষ্ট উইকিসংকলনের প্রশাসক অনুমোদন করলেই প্রতিযোগিতাটি চালু হবে।',
     approveContest: 'অনুমোদন ও চালু করুন', myPages: 'আমার পাতাসমূহ', syncWithWiki: 'উইকি সিঙ্ক করুন', syncShort: 'সিঙ্ক', syncing: 'সিঙ্ক হচ্ছে...',
     lastSynced: 'সর্বশেষ সিঙ্ক', configure: 'কনফিগারেশন', juryPanel: 'পর্যালোচনা করুন',
     totalBookPages: 'বইয়ের মোট পাতা', proofreadListed: 'মুদ্রণ সংশোধিত ও বৈধকৃত', accepted: 'গৃহীত', reviewed: 'পর্যালোচিত',
@@ -2711,10 +2711,10 @@ createApp({
       if (data.invalid && data.invalid.length) msg += ': ' + data.invalid.join(', ');
       return msg;
     },
-    notify(msg, type = 'info') {
+    notify(msg, type = 'info', ms = 0) {
       this.notice = msg; this.noticeType = type;
       clearTimeout(this.noticeTimer);
-      this.noticeTimer = setTimeout(() => { this.notice = ''; }, type === 'error' ? 8000 : 5000);
+      this.noticeTimer = setTimeout(() => { this.notice = ''; }, ms || (type === 'error' ? 8000 : 5000));
     },
     ask(title, message, onYes, danger = false) { this.confirmBox = { open: true, title, message, onYes, danger }; },
     async api(url, opts = {}) {
@@ -3130,7 +3130,8 @@ createApp({
       if (!r.ok) { this.notify(this.t('syncFailed'), 'error'); return; }
       if (r.data.skipped) { if (force && r.data.reason === 'sync_in_progress') this.notify(this.t('syncStarted')); return; }
       if (this.active && this.active.contest.id === cid) await this.openContest(cid, false, true);
-      this.notify(r.data.complete === false ? this.t('syncPartial') : this.t('syncDone'), r.data.complete === false ? 'info' : 'success');
+      // "Synced" is just a confirmation: it goes away almost at once
+      this.notify(r.data.complete === false ? this.t('syncPartial') : this.t('syncDone'), r.data.complete === false ? 'info' : 'success', r.data.complete === false ? 0 : 1600);
     },
     syncContestNow() { if (this.active) this.backgroundSync(this.active.contest.id, true); },
     openEditConfig() {
