@@ -1207,18 +1207,16 @@
         <table class="ps-ctable w-full text-left text-sm">
           <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
             <th class="w-10 sm:w-14">#</th><th>{{ t('user') }}</th>
-            <th class="text-right">{{ t('proofread') }}</th>
-            <th class="text-right">{{ t('accepted') }}</th>
-            <th class="text-right">{{ t('points') }}</th>
+            <th>{{ t('proofread') }}</th><th>{{ t('accepted') }}</th><th>{{ t('points') }}</th>
           </tr></thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-            <tr v-if="central.leaderboard.length === 0"><td colspan="5" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
+            <tr v-if="!central.leaderboard.length"><td colspan="5" class="!py-8 !text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td><span class="ps-serif tabular-nums inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[0.8125rem] sm:text-sm" :class="rankClass(i)">{{ fmtNum(i + 1) }}</span></td>
-              <td><span class="font-semibold">{{ r.username }}</span><span v-for="dom in Object.keys(r.projects || {})" :key="dom" class="ps-code-tag">{{ projectShort(dom) }}</span></td>
-              <td class="text-right tabular-nums">{{ fmtNum(r.submitted) }}</td>
-              <td class="text-right tabular-nums" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'">{{ fmtNum(r.accepted) }}</td>
-              <td class="text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
+              <td class="font-semibold">{{ nameSplit(r.username)[0] }}<span class="whitespace-nowrap">{{ nameSplit(r.username)[1] }}<span v-for="dom in Object.keys(r.projects || {})" :key="dom" class="ps-code-tag">{{ projectShort(dom) }}</span></span></td>
+              <td>{{ fmtNum(r.submitted) }}</td>
+              <td :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'">{{ fmtNum(r.accepted) }}</td>
+              <td class="font-bold">{{ fmtNum(r.points) }}</td>
             </tr>
           </tbody>
         </table>
@@ -2362,7 +2360,6 @@ createApp({
           reset(rows);
           if (!phone) return;
           let one = rows.filter(tr => itemsOf(tr).length <= 3);
-          // a row fits when nothing in it ends past the card's padding edge
           const fits = tr => {
             const edge = tr.getBoundingClientRect().right - (parseFloat(getComputedStyle(tr).paddingRight) || 0) + 1;
             return [...tr.querySelectorAll('td')].every(el => el.getBoundingClientRect().right <= edge);
@@ -2380,7 +2377,7 @@ createApp({
             reset(bad);
             one = one.filter(tr => !bad.includes(tr));
           }
-          // a two-line row between one-line rows looks out of place: then every row uses two lines
+          // a two-line row between one-line rows: all use two lines
           const idx = one.map(tr => rows.indexOf(tr));
           if (idx.length && idx[idx.length - 1] - idx[0] + 1 !== idx.length) reset(rows);
         });
@@ -2525,6 +2522,8 @@ createApp({
       return (this.active.contest.locked_fields || []).includes(f);
     },
     projectShort(dom) { return (dom || '').split('.')[0]; },
+    // last word + project tags never split
+    nameSplit(n) { const m = /^(.*\s)?(\S{1,14})$/s.exec(n || ''); return m ? [m[1] || '', m[2]] : [n, '']; },
     queueBookTitle(q) { const b = this.active && this.active.books.find(x => x.id === q.book_id); return b ? b.title + ' / ' + q.page_number : ''; },
     queueBookPrefix(q) {
       if (!this.active || this.juryBookId || this.active.books.length < 2) return '';

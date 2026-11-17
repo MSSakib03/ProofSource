@@ -346,8 +346,12 @@
 }
 
 /* central leaderboard: a plain table at every width */
-.ps-ctable th, .ps-ctable td { padding: .5rem; }
+.ps-ctable th, .ps-ctable td { padding: .5rem .4rem; }
 .ps-ctable th { font-weight: 500; }
+.ps-ctable td:nth-child(2) { overflow-wrap: anywhere; }
+/* the number columns take only what they need (their headings may wrap), centred under the heading */
+.ps-ctable th:nth-child(n+3), .ps-ctable td:nth-child(n+3) { width: 1%; text-align: center; font-variant-numeric: tabular-nums; }
+.ps-ctable td:nth-child(n+3) { white-space: nowrap; }
 .ps-ctable th:first-child, .ps-ctable td:first-child { padding-left: .75rem; padding-right: .25rem; }
 .ps-ctable th:last-child, .ps-ctable td:last-child { padding-right: .75rem; }
 @media (min-width: 640px) { .ps-ctable th, .ps-ctable td, .ps-ctable th:first-child, .ps-ctable td:first-child, .ps-ctable th:last-child, .ps-ctable td:last-child { padding: .625rem 1rem; } }
