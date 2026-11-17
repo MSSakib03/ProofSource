@@ -56,7 +56,7 @@
   <circle cx="51" cy="44.5" r="8.6" fill="#4D8AC0" style="stroke:var(--ps-logo-ring,#2f4f8c)" stroke-width="3.2"/>
   <path d="M47.2 44.7l2.8 2.8 5.1-5.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg></span>
-          <span ref="wordmark" class="ps-wordmark !text-white leading-none whitespace-nowrap max-[380px]:hidden">ProofSource</span>
+          <span ref="wordmark" v-show="!wordmarkHidden" class="ps-wordmark !text-white leading-none whitespace-nowrap">ProofSource</span>
         </a>
         <nav class="hidden md:flex items-stretch gap-5 self-stretch" :aria-label="t('contests')">
           <a href="/" @click.prevent="goHome" class="ps-nav-link flex items-center" :class="view === 'home' ? 'is-active' : ''">{{ t('contests') }}</a>
@@ -113,8 +113,9 @@
           <button @click="logoutOAuth" :title="t('logout')" class="ml-0.5 px-2 py-0.5 rounded bg-black/25 hover:bg-rose-600 text-white transition text-[0.6875rem] whitespace-nowrap shrink-0">{{ t('logout') }}</button>
         </div>
         <div v-else ref="userBox" class="relative min-w-0" @keydown.esc="userMenuOpen = false">
-          <button @click.stop="userMenuOpen = !userMenuOpen" class="ps-hbtn max-w-full sm:max-w-[16rem]" aria-haspopup="menu" :aria-expanded="userMenuOpen ? 'true' : 'false'" :title="currentUser">
-            <span class="font-medium truncate whitespace-nowrap min-w-0">{{ currentUser }}</span>
+          <button @click.stop="userMenuOpen = !userMenuOpen" class="ps-hbtn max-w-full sm:max-w-[16rem]" aria-haspopup="menu" :aria-expanded="userMenuOpen ? 'true' : 'false'" :title="currentUser" :aria-label="currentUser">
+            <svg v-if="userMenuIcon" class="w-4 h-4 text-ws-nature shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+            <span v-else class="font-medium truncate whitespace-nowrap min-w-0">{{ currentUser }}</span>
             <svg class="w-3 h-3 shrink-0 transition-transform" :class="userMenuOpen ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
           </button>
           <div v-if="userMenuOpen" role="menu" @click.stop class="absolute right-0 top-full mt-1.5 min-w-[11rem] max-w-[80vw] ps-card shadow-xl py-1 text-sm text-slate-800 dark:text-slate-100 z-40">
@@ -2573,7 +2574,7 @@ createApp({
       darkMode: document.documentElement.classList.contains('dark'), csrfToken: (window.PS_INITIAL || {}).csrf_token || '',
       view: 'home', homeFilter: 'running', busy: false, syncing: false,
       notice: '', noticeType: 'info', noticeTimer: null,
-      loggedIn: false, currentUser: null, wikiProjects: loadCachedWikis(), userMenuCompact: false, userMenuOpen: false,
+      loggedIn: false, currentUser: null, wikiProjects: loadCachedWikis(), userMenuCompact: false, userMenuIcon: false, wordmarkHidden: false, userMenuOpen: false,
       textSize: document.documentElement.getAttribute('data-ps-size') || 'm', textSizes: TEXT_SIZES, sizeMenuOpen: false,
       contests: [], centrals: [], deleteRequests: [], showAllJuries: false, cfgPreview: { open: false }, dateRowMode: 'full', juryFit: 99, juryMeasuring: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
       expanded: {}, central: null, centralTab: 'leaderboard', cform: {}, upages: null, loadingBar: 0,
@@ -2742,18 +2743,20 @@ createApp({
     centralStarted() { return !!(this.cform.editing && this.central && this.central.central.start_iso && Date.parse(this.central.central.start_iso) <= Date.now()); }
   },
   watch: {
-    view(v) { window.scrollTo(0, 0); this.selectMode = false; this.selectedIds = []; if (v === 'contest') this.fitJuries(); },
+    view(v) { window.scrollTo(0, 0); this.selectMode = false; this.selectedIds = []; if (v === 'contest') this.fitJuries(); this.fitLb(); },
     homeProject(v) {
       if (!v) { this.homeProjectPinned = false; safeDrop('ps_home_project'); }
       else if (this.homeProjectPinned) safeStore('ps_home_project', v);
     },
     currentUser() { this.fitUserMenu(); },
+    contestSubTab() { this.fitLb(); }, centralTab() { this.fitLb(); }, leaderboardLimit() { this.fitLb(); },
+    'active.leaderboard'() { this.fitLb(); }, 'central.leaderboard'() { this.fitLb(); },
     'form.wiki_domain'(now, old) {
       const prefix = d => ((d || '').split('.')[0] === 'bn' ? 'নির্ঘণ্ট:' : 'Index:');
       const q = this.bookAdd.query.trim();
       if (!q || q === 'নির্ঘণ্ট:' || q === 'Index:') this.bookAdd.query = prefix(now);
     },
-    lang() { this.fitUserMenu(); this.fitJuries(); },
+    lang() { this.fitUserMenu(); this.fitJuries(); this.fitLb(); },
     'active.contest.juries_list'() { this.fitJuries(); },
     countdownText() { this.fitJuries(); }
   },
@@ -2770,30 +2773,57 @@ createApp({
     window.addEventListener('keydown', this.handleKeyShortcuts);
     window.addEventListener('popstate', this.handleRoutePop);
     let fitTimer = null;
-    window.addEventListener('resize', () => { this.isPhone = window.innerWidth < 640; clearTimeout(fitTimer); fitTimer = setTimeout(() => { this.fitUserMenu(); this.fitJuries(); }, 120); });
+    window.addEventListener('resize', () => { this.isPhone = window.innerWidth < 640; clearTimeout(fitTimer); fitTimer = setTimeout(() => { this.fitUserMenu(); this.fitJuries(); this.fitLb(); }, 120); });
     document.addEventListener('click', () => { this.userMenuOpen = false; this.sizeMenuOpen = false; });
-    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.fitUserMenu(); this.fitJuries(); });
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { this.fitUserMenu(); this.fitJuries(); this.fitLb(); });
     // The Bangla fonts load only when Bangla text first appears (unicode-range), i.e. after the
     // first measurement: measure again whenever a font arrives, or the header and reviewer chips
     // stay fitted to the fallback font's widths.
     if (document.fonts && document.fonts.addEventListener) {
-      document.fonts.addEventListener('loadingdone', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { this.fitUserMenu(); this.fitJuries(); }, 60); });
+      document.fonts.addEventListener('loadingdone', () => { clearTimeout(fitTimer); fitTimer = setTimeout(() => { this.fitUserMenu(); this.fitJuries(); this.fitLb(); }, 60); });
     }
   },
   methods: {
     /* The name and Logout sit side by side while they fit; when a long name would crowd the
      * ProofSource wordmark (or overflow the bar), Logout moves into a menu under the name. */
+    /* The header must always show the "ProofSource" wordmark. If the name and Logout do not fit beside it:
+     *   1. name + a dropdown holding Logout; 2. only a user icon (the dropdown holds name and Logout);
+     *   3. on extremely narrow screens the wordmark goes. Measured, so it holds for any language and text size. */
+    /* Phone leaderboard cards: rank, name, the few counts and the points share ONE line when they fit
+     * (class ps-one); otherwise the counts drop below the name. Only rows with a rank are touched. */
+    fitLb() {
+      if (!this.lbCards) return;
+      this.$nextTick(() => {
+        const phone = window.innerWidth < 640;
+        document.querySelectorAll('table.ps-lb tbody tr').forEach(tr => {
+          tr.classList.remove('ps-one');
+          if (!phone || !tr.querySelector('td.ps-c-rank')) return;
+          const wide = tr.querySelector('td.ps-c-wide');
+          if (wide && wide.textContent.trim()) return;               // central rows with per-project points stay stacked
+          tr.classList.add('ps-one');
+          if (tr.scrollWidth > tr.clientWidth + 1) tr.classList.remove('ps-one');
+        });
+      });
+    },
     async fitUserMenu() {
-      if (!this.loggedIn) { this.userMenuCompact = false; return; }
       this.userMenuOpen = false;
-      this.userMenuCompact = false;
+      this.userMenuCompact = false; this.userMenuIcon = false; this.wordmarkHidden = false;
+      if (!this.loggedIn) return;
+      const crowded = () => {
+        const row = this.$refs.headerRow, box = this.$refs.userBox, mark = this.$refs.wordmark;
+        if (!row || !box) return false;
+        if (row.scrollWidth > row.clientWidth + 1 || box.scrollWidth > box.clientWidth + 1) return true;
+        const nm = box.querySelector('span.truncate');                  // a name cut with "…" counts as crowded
+        if (nm && nm.scrollWidth > nm.clientWidth + 1) return true;
+        const right = this.$refs.headerRight || box;   // the wordmark must clear the whole button group, not only the name
+        return !!(mark && mark.offsetParent) && mark.getBoundingClientRect().right + 4 > right.getBoundingClientRect().left;
+      };
       await this.$nextTick();
-      const row = this.$refs.headerRow, box = this.$refs.userBox, mark = this.$refs.wordmark;
-      if (!row || !box) return;
-      let crowded = row.scrollWidth > row.clientWidth + 1 || box.scrollWidth > box.clientWidth + 1;
-      const right = this.$refs.headerRight || box;   // the wordmark must clear the whole button group, not only the name
-      if (!crowded && mark && mark.offsetParent) crowded = mark.getBoundingClientRect().right + 4 > right.getBoundingClientRect().left;
-      this.userMenuCompact = crowded;
+      if (!crowded()) return;
+      this.userMenuCompact = true; await this.$nextTick();
+      if (!crowded()) return;
+      this.userMenuIcon = true; await this.$nextTick();
+      if (crowded()) this.wordmarkHidden = true;
     },
     /* Dates + countdown: 'full' (everything, on one line), 'compact' (countdown without its smallest
      * unit), 'stack' (two lines, both at the left edge). Measured, so it holds for any language,
@@ -3047,7 +3077,8 @@ createApp({
       this.textSize = id; this.sizeMenuOpen = false;
       if (id === 'm') { document.documentElement.removeAttribute('data-ps-size'); safeDrop('ps_text_size'); }
       else { document.documentElement.setAttribute('data-ps-size', id); safeStore('ps_text_size', id); }
-      this.$nextTick(() => { this.fitUserMenu(); this.fitJuries(); });
+      this.$nextTick(() => { this.fitUserMenu(); this.fitJuries(); this.fitLb(); });
+      this.$nextTick(() => { this.fitUserMenu(); this.fitJuries(); this.fitLb(); });
     },
     async loadWikis() {
       const r = await this.api('/api/wikis');
