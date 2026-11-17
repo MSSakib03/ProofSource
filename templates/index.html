@@ -2351,24 +2351,38 @@ createApp({
       if (!this.lbCards) return;
       this.$nextTick(() => {
         const phone = window.innerWidth < 640;
+        const chipsOf = tr => [...tr.querySelectorAll('td.ps-c-stat:not(.ps-zero)')];
         document.querySelectorAll('table.ps-lb').forEach(table => {
           const rows = [...table.querySelectorAll('tbody tr')].filter(tr => tr.querySelector('td.ps-c-rank'));
-          rows.forEach(tr => tr.classList.remove('ps-one'));
-          table.style.removeProperty('--ps-name-w');
+          const clear = () => {
+            rows.forEach(tr => { tr.classList.remove('ps-one'); tr.querySelectorAll('td.ps-c-stat, td.ps-c-points').forEach(td => { td.style.minWidth = ''; }); });
+            table.style.removeProperty('--ps-name-w');
+          };
+          clear();
           if (!phone) return;
           const short = rows.filter(tr => {
             const wide = tr.querySelector('td.ps-c-wide');
-            return !(wide && wide.textContent.trim()) && tr.querySelectorAll('td.ps-c-stat:not(.ps-zero)').length <= 3;
+            return !(wide && wide.textContent.trim()) && chipsOf(tr).length <= 3;
           });
+          if (!short.length) return;
           short.forEach(tr => tr.classList.add('ps-one'));
-          // every name gets the width of the longest one, so the counts start at the same left edge in every row
+          // columns: each count (1st, 2nd, 3rd) and the points get the width of the widest one in the list, so a
+          // two-digit number never pushes its neighbours out of line; the name takes the free space, which puts the
+          // counts right next to the points
+          const w = el => Math.ceil(el.getBoundingClientRect().width);
+          const chipW = [0, 1, 2].map(k => Math.max(0, ...short.map(tr => chipsOf(tr)[k] ? w(chipsOf(tr)[k]) : 0)));
+          const pointsW = Math.max(0, ...short.map(tr => w(tr.querySelector('td.ps-c-points'))));
+          short.forEach(tr => {
+            chipsOf(tr).forEach((td, k) => { td.style.minWidth = chipW[k] + 'px'; td.style.justifyContent = 'center'; });
+            const pt = tr.querySelector('td.ps-c-points'); pt.style.minWidth = pointsW + 'px'; pt.style.textAlign = 'right';
+          });
           const textWidth = td => { const r = document.createRange(); r.selectNodeContents(td); return Math.ceil(r.getBoundingClientRect().width + (parseFloat(getComputedStyle(td).paddingRight) || 0)); };
           const nameW = Math.max(0, ...short.map(tr => textWidth(tr.querySelector('td.ps-c-name'))));
           if (nameW) table.style.setProperty('--ps-name-w', nameW + 'px');
           // a row fits when its last item (the points) ends inside the card's padding box edge, not in the padding
           const fits = tr => { const cs = getComputedStyle(tr), last = tr.querySelector('td.ps-c-points');
             return last.getBoundingClientRect().right <= tr.getBoundingClientRect().right - (parseFloat(cs.paddingRight) || 0) + 1; };
-          if (!short.every(fits)) { short.forEach(tr => tr.classList.remove('ps-one')); table.style.removeProperty('--ps-name-w'); }
+          if (!short.every(fits)) clear();
         });
       });
     },
