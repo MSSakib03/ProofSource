@@ -386,11 +386,12 @@
     border-radius: 999px; background: var(--ps-surface-2); }
   .ps-stack.ps-lb td.ps-c-stat.ps-zero { display: none; }
   /* one-line card (set by fitLb when everything fits): rank, name, counts, points */
-  .ps-stack.ps-lb tr.ps-one { flex-wrap: nowrap; }
+  .ps-stack.ps-lb tr.ps-one { flex-wrap: nowrap; gap: .2rem .3rem; padding-left: .6rem; padding-right: .6rem; }
+  .ps-stack.ps-lb tr.ps-one td.ps-c-stat { padding: .05rem .35rem !important; gap: .2rem; }
   .ps-stack.ps-lb tr.ps-one::after { display: none; }
-  .ps-stack.ps-lb tr.ps-one td.ps-c-name { flex: 1 1 auto; min-width: max-content; white-space: nowrap; }
+  .ps-stack.ps-lb tr.ps-one td.ps-c-name { flex: 0 0 var(--ps-name-w, auto); min-width: max-content; white-space: nowrap; padding-right: .2rem !important; box-sizing: border-box; }
   .ps-stack.ps-lb tr.ps-one td.ps-c-stat { order: 2; flex: none; white-space: nowrap; }
-  .ps-stack.ps-lb tr.ps-one td.ps-c-points { order: 3; }
+  .ps-stack.ps-lb tr.ps-one td.ps-c-points { order: 3; margin-left: auto; }
   .ps-stack.ps-lb td.ps-c-wide { order: 5; flex-basis: 100%; display: block; text-align: left !important; line-height: 1.3; }
   .ps-stack.ps-lb td.ps-c-wide:empty { display: none; }
 }
