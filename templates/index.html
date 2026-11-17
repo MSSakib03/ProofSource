@@ -56,7 +56,7 @@
   <circle cx="51" cy="44.5" r="8.6" fill="#4D8AC0" style="stroke:var(--ps-logo-ring,#2f4f8c)" stroke-width="3.2"/>
   <path d="M47.2 44.7l2.8 2.8 5.1-5.3" fill="none" stroke="#fff" stroke-width="2.7" stroke-linecap="round" stroke-linejoin="round"/>
 </svg></span>
-          <span ref="wordmark" v-show="!wordmarkHidden" class="ps-wordmark !text-white leading-none whitespace-nowrap">ProofSource</span>
+          <span ref="wordmark" v-show="!wordmarkHidden" class="ps-wordmark !text-white leading-none whitespace-nowrap" :class="wordmarkSmall ? 'is-small' : ''">ProofSource</span>
         </a>
         <nav class="hidden md:flex items-stretch gap-5 self-stretch" :aria-label="t('contests')">
           <a href="/" @click.prevent="goHome" class="ps-nav-link flex items-center" :class="view === 'home' ? 'is-active' : ''">{{ t('contests') }}</a>
@@ -1213,7 +1213,7 @@
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
             <tr v-if="central.leaderboard.length === 0"><td colspan="6" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td data-label="" class="ps-c-rank py-2.5 px-4 text-xs text-slate-500 tabular-nums">{{ fmtNum(i + 1) }}</td>
+              <td data-label="" class="ps-c-rank py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(i)">{{ fmtNum(i + 1) }}</span></td>
               <td data-label="" class="ps-c-name py-2.5 px-4 font-semibold">{{ r.username }}</td>
               <td data-label="" class="ps-c-wide py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="mr-2 whitespace-nowrap">{{ projectShort(dom) }}: {{ fmtNum(pts) }}</span></td>
               <td :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
@@ -2574,7 +2574,7 @@ createApp({
       darkMode: document.documentElement.classList.contains('dark'), csrfToken: (window.PS_INITIAL || {}).csrf_token || '',
       view: 'home', homeFilter: 'running', busy: false, syncing: false,
       notice: '', noticeType: 'info', noticeTimer: null,
-      loggedIn: false, currentUser: null, wikiProjects: loadCachedWikis(), userMenuCompact: false, userMenuIcon: false, wordmarkHidden: false, userMenuOpen: false,
+      loggedIn: false, currentUser: null, wikiProjects: loadCachedWikis(), userMenuCompact: false, userMenuIcon: false, wordmarkHidden: false, wordmarkSmall: false, userMenuOpen: false,
       textSize: document.documentElement.getAttribute('data-ps-size') || 'm', textSizes: TEXT_SIZES, sizeMenuOpen: false,
       contests: [], centrals: [], deleteRequests: [], showAllJuries: false, cfgPreview: { open: false }, dateRowMode: 'full', juryFit: 99, juryMeasuring: false, descOpen: false, centralWikiCode: '', contestsLoaded: false, homeSearch: '', homeProject: safeLoad('ps_home_project') || '', homeProjectPinned: !!safeLoad('ps_home_project'),
       expanded: {}, central: null, centralTab: 'leaderboard', cform: {}, upages: null, loadingBar: 0,
@@ -2815,7 +2815,7 @@ createApp({
       const seq = this._fitSeq = (this._fitSeq || 0) + 1;
       const stale = () => seq !== this._fitSeq;
       this.userMenuOpen = false;
-      this.wordmarkHidden = false;
+      this.wordmarkHidden = false; this.wordmarkSmall = false;
       if (!this.loggedIn) { this.userMenuCompact = false; this.userMenuIcon = false; }
       else if (window.innerWidth < 640) { this.userMenuCompact = true; this.userMenuIcon = true; }
       else { this.userMenuCompact = false; this.userMenuIcon = false; }
@@ -2836,6 +2836,7 @@ createApp({
         this.userMenuCompact = true; await this.$nextTick(); if (stale()) return;
         if (crowded()) { this.userMenuIcon = true; await this.$nextTick(); if (stale()) return; }
       }
+      if (crowded()) { this.wordmarkSmall = true; await this.$nextTick(); if (stale()) return; }   // very large text: smaller name and buttons
       if (crowded()) this.wordmarkHidden = true;                            // last resort on extremely narrow screens
     },
     /* Dates + countdown: 'full' (everything, on one line), 'compact' (countdown without its smallest
