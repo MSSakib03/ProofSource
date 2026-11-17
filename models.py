@@ -50,6 +50,9 @@ class Hub(db.Model):
     # --- v10: deleted contests wait in the trash for a week before they are really removed ---
     deleted_at = db.Column(db.DateTime, nullable=True, index=True)
     deleted_by = db.Column(db.String(100), nullable=True)
+    # --- v10: notice board of the central contest (the Bangla one only for central contests with a bn project) ---
+    announcement_en = db.Column(db.Text, default="")
+    announcement_bn = db.Column(db.Text, default="")
 
     contests = db.relationship('Contest', backref='hub', lazy=True)
 

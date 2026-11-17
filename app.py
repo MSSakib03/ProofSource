@@ -3104,7 +3104,7 @@ def _central_fields_from(data: dict, h: Hub, lock_started: bool = False):
         if link and not security.safe_http_url(link):
             raise ValueError("invalid_link")   # blocks javascript:/data: links (stored XSS)
         h.link = link
-    for f, n in (("description", LEN_TEXT), ("admins", LEN_USERS)):
+    for f, n in (("description", LEN_TEXT), ("admins", LEN_USERS), ("announcement_en", LEN_TEXT), ("announcement_bn", LEN_TEXT)):
         if f in data and data[f] is not None:
             setattr(h, f, clip(data[f], n))
     if data.get("start_time"):
@@ -3283,6 +3283,7 @@ def api_get_central(slug):
     return jsonify({
         "central": {
             **central_brief(h, now), "description": h.description or "",
+            "announcement_en": h.announcement_en or "", "announcement_bn": h.announcement_bn or "",
             "proofread_points": h.proofread_points, "validate_points": h.validate_points or 0,
             "custom_points_policy": h.custom_points_policy or "project", "bonus_policy": h.bonus_policy or "project",
             "review_policy": h.review_policy or "project",

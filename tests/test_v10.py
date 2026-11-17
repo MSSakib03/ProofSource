@@ -197,3 +197,17 @@ class NoticeTests(Base):
                         json={"subject": "s", "text": "t", "page_ids": d["page_ids"]})
         self.assertEqual(r.json["error_code"], "notice_failed")
         self.assertEqual(self.c.get(f"/api/contests/{self.cid}/user/Alice/notice").json["count"], 2)
+
+
+class CentralNoticeTests(Base):
+    def test_central_notice_is_saved_and_shown(self):
+        self.login("MS Sakib")
+        now = utcnow()
+        body = {"title": "Indic", "slug": "ind3", "start_time": _fmt(now + timedelta(days=1)), "end_time": _fmt(now + timedelta(days=9)),
+                "announcement_en": "Welcome", "announcement_bn": "স্বাগতম",
+                "projects": [{"wiki_domain": "bn.wikisource.org"}]}
+        self.assertTrue(self.c.post("/api/central", json=body).json["success"])
+        d = self.c.get("/api/central/ind3").json["central"]
+        self.assertEqual((d["announcement_en"], d["announcement_bn"]), ("Welcome", "স্বাগতম"))
+        self.assertTrue(self.c.post("/api/central/ind3/config", json={"announcement_en": "Updated"}).json["success"])
+        self.assertEqual(self.c.get("/api/central/ind3").json["central"]["announcement_en"], "Updated")
