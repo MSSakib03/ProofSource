@@ -1,9 +1,7 @@
 """v10: trash, start/end locks, book dates, tool-admin naming, page notices. No network."""
-import os
-import unittest
 from datetime import timedelta
 
-from test_app import A, Base, db, Contest, IndexBook, ContestPage, Hub, AuditLog, utcnow  # noqa: F401
+from test_app import A, Base, db, Contest, ContestPage, AuditLog, utcnow
 
 
 def boss_client(case):
