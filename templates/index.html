@@ -844,7 +844,7 @@
 
       <div v-if="contestSubTab === 'leaderboard'" class="ps-card overflow-hidden">
         <div class="overflow-x-auto w-full">
-          <table class="w-full min-w-[580px] text-left border-collapse text-sm">
+          <table class="ps-stack ps-lb w-full min-w-[580px] text-left border-collapse text-sm">
             <thead>
               <tr class="border-b border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
                 <th class="py-3 px-4 font-semibold w-14">#</th>
@@ -865,21 +865,21 @@
                 <td colspan="8" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td>
               </tr>
               <tr v-for="(r, idx) in active.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
-                <td class="py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(idx)">{{ fmtNum(idx + 1) }}</span></td>
-                <td class="py-2.5 px-4">
+                <td data-label="" class="ps-c-rank py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(idx)">{{ fmtNum(idx + 1) }}</span></td>
+                <td data-label="" class="ps-c-name py-2.5 px-4">
                   <button @click="openUserPages(r.username)" class="font-semibold text-ws-cerulean dark:text-ws-nature hover:underline text-left">
                     {{ r.username }}
                   </button>
                 </td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]">{{ fmtNum(r.submitted) }}</td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
+                <td :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]">{{ fmtNum(r.submitted) }}</td>
+                <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
                 <template v-if="active.contest.review_enabled">
-                  <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.pending ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(r.pending) }}</td>
-                  <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.needs_fix ? 'text-orange-600 dark:text-orange-400' : 'ps-zero'">{{ fmtNum(r.needs_fix) }}</td>
-                  <td class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(r.rejected) }}</td>
+                  <td :data-label="t('pending')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.pending ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(r.pending) }}</td>
+                  <td :data-label="t('needsFix')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.needs_fix ? 'text-orange-600 dark:text-orange-400' : 'ps-zero'">{{ fmtNum(r.needs_fix) }}</td>
+                  <td :data-label="t('rejected')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(r.rejected) }}</td>
                 </template>
-                <td v-if="hasReverted" class="py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.reverted ? 'text-slate-600 dark:text-slate-300' : 'ps-zero'">{{ fmtNum(r.reverted || 0) }}</td>
-                <td class="py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
+                <td :data-label="t('reverted')" v-if="hasReverted" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.reverted ? 'text-slate-600 dark:text-slate-300' : 'ps-zero'">{{ fmtNum(r.reverted || 0) }}</td>
+                <td data-label="" class="ps-c-points py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
               </tr>
             </tbody>
           </table>
@@ -918,7 +918,7 @@
 
         <div class="ps-card overflow-hidden">
           <div class="overflow-x-auto w-full">
-            <table class="w-full min-w-[600px] text-left border-collapse text-sm">
+            <table class="ps-stack w-full min-w-[600px] text-left border-collapse text-sm">
               <thead>
                 <tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
                   <th class="py-3.5 px-4 font-medium">{{ t('indexBook') }}</th>
@@ -930,7 +930,7 @@
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                 <tr v-for="b in active.books" :key="b.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td class="py-3.5 px-4 max-w-[14rem] sm:max-w-md">
+                  <td data-label="" class="ps-c-title py-3.5 px-4 max-w-[14rem] sm:max-w-md">
                     <a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(b.title)" target="_blank" rel="noopener" :title="b.title"
                        class="font-medium text-ws-cerulean dark:text-ws-nature hover:underline block truncate">
                       {{ b.title }}
@@ -942,12 +942,12 @@
                       {{ t('excludedPages') }}: <span class="font-mono">{{ b.excluded_pages }}</span>
                     </div>
                   </td>
-                  <td class="py-3.5 px-4 text-center whitespace-nowrap">
+                  <td :data-label="t('pointsPerPage')" class="py-3.5 px-4 text-center whitespace-nowrap">
                     <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-ws-nature/15 text-ws-dark dark:text-ws-nature">
                       {{ b.points }} {{ t('pts') }}
                     </span>
                   </td>
-                  <td class="py-3.5 px-4">
+                  <td :data-label="t('progress')" class="ps-c-block py-3.5 px-4">
                     <div class="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden flex">
                       <div class="bg-emerald-500 h-full" :style="{ width: Math.min(100, (b.accepted / Math.max(1, b.effective_pages)) * 100) + '%' }"></div>
                       <div class="bg-amber-400 h-full" :style="{ width: Math.min(100, (b.pending / Math.max(1, b.effective_pages)) * 100) + '%' }"></div>
@@ -957,8 +957,8 @@
                       <span v-if="active.contest.review_enabled">{{ t('pending') }}: {{ b.pending }}</span>
                     </div>
                   </td>
-                  <td class="py-3.5 px-4 text-right tabular-nums text-xs">{{ b.effective_pages }}</td>
-                  <td v-if="active.contest.is_jury || active.contest.is_admin" class="py-3.5 px-4 text-right space-x-3 whitespace-nowrap">
+                  <td :data-label="t('totalPages')" class="py-3.5 px-4 text-right tabular-nums text-xs">{{ b.effective_pages }}</td>
+                  <td data-label="" v-if="active.contest.is_jury || active.contest.is_admin" class="ps-c-actions py-3.5 px-4 text-right space-x-3 whitespace-nowrap">
                     <button v-if="active.contest.is_jury && active.contest.review_enabled" @click="openJuryWorkspace(b.id)"
                             class="text-xs font-semibold text-ws-cerulean dark:text-ws-nature hover:underline">
                       {{ t('review') }}
@@ -978,7 +978,7 @@
       <div v-if="contestSubTab === 'reverted' && active.reverted" class="ps-card overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-400">{{ t('revertedHelp') }}</div>
         <div class="overflow-x-auto w-full">
-          <table class="w-full min-w-[640px] text-left border-collapse text-sm">
+          <table class="ps-stack w-full min-w-[640px] text-left border-collapse text-sm">
             <thead>
               <tr class="border-b border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
                 <th class="py-3 px-4 font-bold">{{ t('page') }}</th><th class="py-3 px-4 font-bold">{{ t('user') }}</th>
@@ -988,11 +988,11 @@
             </thead>
             <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
               <tr v-for="r in active.reverted" :key="r.id" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                <td class="py-2.5 px-4 max-w-[18rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(r.page_title)" target="_blank" rel="noopener" class="font-semibold hover:underline block truncate" :title="r.page_title">{{ r.page_title }}</a></td>
-                <td class="py-2.5 px-4"><button @click="openUserPages(r.proofreader)" class="font-semibold text-ws-cerulean dark:text-ws-nature hover:underline">{{ r.proofreader }}</button></td>
-                <td class="py-2.5 px-4"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(r.reverted_from)">{{ statusLabel(r.reverted_from) }}</span></td>
-                <td class="py-2.5 px-4 text-xs">{{ t('revert_' + r.reason) }}<span v-if="r.reason === 'not_proofread'" class="text-slate-500"> ({{ wikiLevelLabel(r.wiki_level) }})</span></td>
-                <td class="py-2.5 px-4 text-right text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ formatDateTime(r.reverted_iso) }}</td>
+                <td data-label="" class="ps-c-title py-2.5 px-4 max-w-[18rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(r.page_title)" target="_blank" rel="noopener" class="font-semibold hover:underline block truncate" :title="r.page_title">{{ r.page_title }}</a></td>
+                <td :data-label="t('user')" class="py-2.5 px-4"><button @click="openUserPages(r.proofreader)" class="font-semibold text-ws-cerulean dark:text-ws-nature hover:underline">{{ r.proofreader }}</button></td>
+                <td :data-label="t('wasStatus')" class="py-2.5 px-4"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(r.reverted_from)">{{ statusLabel(r.reverted_from) }}</span></td>
+                <td :data-label="t('reason')" class="ps-c-text py-2.5 px-4 text-xs">{{ t('revert_' + r.reason) }}<span v-if="r.reason === 'not_proofread'" class="text-slate-500"> ({{ wikiLevelLabel(r.wiki_level) }})</span></td>
+                <td :data-label="t('when')" class="py-2.5 px-4 text-right text-xs text-slate-600 dark:text-slate-400 whitespace-nowrap">{{ formatDateTime(r.reverted_iso) }}</td>
               </tr>
             </tbody>
           </table>
@@ -1050,7 +1050,7 @@
             {{ t('juryStatistics') }}
           </div>
           <div class="overflow-x-auto w-full">
-            <table class="w-full min-w-[500px] text-left border-collapse text-sm">
+            <table class="ps-stack ps-lb w-full min-w-[500px] text-left border-collapse text-sm">
               <thead>
                 <tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
                   <th class="py-3 px-4 font-semibold">{{ t('juryMember') }}</th>
@@ -1062,15 +1062,15 @@
               </thead>
               <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
                 <tr v-for="j in active.jury_stats" :key="j.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-                  <td class="py-3 px-4 font-medium">
+                  <td data-label="" class="ps-c-name py-3 px-4 font-medium">
                     <a :href="'https://' + active.contest.wiki_domain + '/wiki/User_talk:' + encodeURIComponent(j.username)" target="_blank" rel="noopener" class="text-ws-cerulean dark:text-ws-nature hover:underline">
                       {{ j.username }}
                     </a>
                   </td>
-                  <td class="py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(j.reviewed) }}</td>
-                  <td class="py-2.5 px-4 text-right tabular-nums" :class="j.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(j.accepted) }}</td>
-                  <td class="py-2.5 px-4 text-right tabular-nums" :class="j.needs_fix ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(j.needs_fix) }}</td>
-                  <td class="py-2.5 px-4 text-right tabular-nums" :class="j.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(j.rejected) }}</td>
+                  <td :data-label="t('totalReviewed')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(j.reviewed) }}</td>
+                  <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums" :class="j.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(j.accepted) }}</td>
+                  <td :data-label="t('needsFix')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums" :class="j.needs_fix ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(j.needs_fix) }}</td>
+                  <td :data-label="t('rejected')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums" :class="j.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(j.rejected) }}</td>
                 </tr>
               </tbody>
             </table>
@@ -1087,7 +1087,7 @@
           </select>
         </div>
         <div class="overflow-x-auto w-full">
-          <table class="w-full min-w-[680px] text-left border-collapse text-xs">
+          <table class="ps-stack w-full min-w-[680px] text-left border-collapse text-xs">
             <thead>
               <tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-slate-500 uppercase">
                 <th class="py-2.5 px-4 font-medium">{{ t('time') }} (UTC)</th>
@@ -1100,11 +1100,11 @@
             <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
               <tr v-if="audit.entries.length === 0"><td colspan="5" class="py-8 text-center text-slate-500">{{ t('noAuditEntries') }}</td></tr>
               <tr v-for="e in audit.entries" :key="e.id" class="align-top">
-                <td class="py-2 px-4 whitespace-nowrap tabular-nums">{{ formatDateTime(e.created_iso) }}</td>
-                <td class="py-2 px-4 whitespace-nowrap">{{ e.username }}</td>
-                <td class="py-2 px-4 whitespace-nowrap font-medium">{{ t('act_' + e.action) }}</td>
-                <td class="py-2 px-4 max-w-[12rem] truncate" :title="e.target">{{ e.target }}</td>
-                <td class="py-2 px-4 text-slate-500 break-words max-w-[22rem]">
+                <td :data-label="t('time')" class="py-2 px-4 whitespace-nowrap tabular-nums">{{ formatDateTime(e.created_iso) }}</td>
+                <td :data-label="t('user')" class="py-2 px-4 whitespace-nowrap">{{ e.username }}</td>
+                <td :data-label="t('action')" class="py-2 px-4 whitespace-nowrap font-medium">{{ t('act_' + e.action) }}</td>
+                <td :data-label="t('target')" class="ps-c-text py-2 px-4 max-w-[12rem] truncate" :title="e.target">{{ e.target }}</td>
+                <td :data-label="t('change')" class="ps-c-text py-2 px-4 text-slate-500 break-words max-w-[22rem]">
                   <span v-if="e.old_value || e.new_value"><del class="text-rose-600/80">{{ shorten(e.old_value, 80) }}</del> → <ins class="no-underline text-emerald-700 dark:text-emerald-400">{{ shorten(e.new_value, 80) }}</ins></span>
                   <span v-if="e.details" class="block font-mono text-[0.625rem]">{{ shorten(e.details, 160) }}</span>
                 </td>
@@ -1203,7 +1203,7 @@
       </div>
 
       <div v-if="centralTab === 'leaderboard'" class="ps-card overflow-hidden">
-        <div class="overflow-x-auto"><table class="w-full min-w-[560px] text-left text-sm">
+        <div class="overflow-x-auto"><table class="ps-stack ps-lb w-full min-w-[560px] text-left text-sm">
           <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
             <th class="py-3 px-4 font-medium w-14">#</th><th class="py-3 px-4 font-medium">{{ t('user') }}</th>
             <th class="py-3 px-4 font-medium">{{ t('perProject') }}</th><th class="py-3 px-4 font-medium text-right">{{ t('proofread') }}</th>
@@ -1212,12 +1212,12 @@
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
             <tr v-if="central.leaderboard.length === 0"><td colspan="6" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="py-2.5 px-4 text-xs text-slate-500 tabular-nums">{{ fmtNum(i + 1) }}</td>
-              <td class="py-2.5 px-4 font-semibold">{{ r.username }}</td>
-              <td class="py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="mr-2 whitespace-nowrap">{{ projectShort(dom) }}: {{ fmtNum(pts) }}</span></td>
-              <td class="py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
-              <td class="py-2.5 px-4 text-right tabular-nums text-xs" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
-              <td class="py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
+              <td data-label="" class="ps-c-rank py-2.5 px-4 text-xs text-slate-500 tabular-nums">{{ fmtNum(i + 1) }}</td>
+              <td data-label="" class="ps-c-name py-2.5 px-4 font-semibold">{{ r.username }}</td>
+              <td data-label="" class="ps-c-wide py-2.5 px-4 text-[0.6875rem] text-slate-500"><span v-for="(pts, dom) in r.projects" :key="dom" class="mr-2 whitespace-nowrap">{{ projectShort(dom) }}: {{ fmtNum(pts) }}</span></td>
+              <td :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(r.submitted) }}</td>
+              <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
+              <td data-label="" class="ps-c-points py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
             </tr>
           </tbody>
         </table></div>
@@ -1273,7 +1273,7 @@
           </div></div>
         </div>
         <div class="ps-card overflow-hidden">
-          <div class="overflow-x-auto"><table class="w-full min-w-[520px] text-left text-sm">
+          <div class="overflow-x-auto"><table class="ps-stack ps-lb w-full min-w-[520px] text-left text-sm">
             <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-500 uppercase">
               <th class="py-3 px-4 font-medium">{{ t('project') }}</th><th class="py-3 px-4 font-medium text-right">{{ t('books') }}</th>
               <th class="py-3 px-4 font-medium text-right">{{ t('participants') }}</th><th class="py-3 px-4 font-medium text-right">{{ t('proofread') }}</th>
@@ -1281,12 +1281,12 @@
             </tr></thead>
             <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
               <tr v-for="p in central.projects" :key="p.contest_id">
-                <td class="py-2.5 px-4 font-medium">{{ projectLabel(p.wiki_domain) }}</td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(p.books) }}</td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(p.participants) }}</td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(p.listed) }}</td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(p.accepted) }}</td>
-                <td class="py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(central.stats.listed ? Math.round(p.listed * 100 / central.stats.listed) : 0) }}%</td>
+                <td data-label="" class="ps-c-name py-2.5 px-4 font-medium">{{ projectLabel(p.wiki_domain) }}</td>
+                <td :class="p.books ? '' : 'ps-zero'" :data-label="t('books')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(p.books) }}</td>
+                <td :class="p.participants ? '' : 'ps-zero'" :data-label="t('participants')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(p.participants) }}</td>
+                <td :class="p.listed ? '' : 'ps-zero'" :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(p.listed) }}</td>
+                <td :class="p.accepted ? '' : 'ps-zero'" :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(p.accepted) }}</td>
+                <td :data-label="t('shareOfTotal')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-xs">{{ fmtNum(central.stats.listed ? Math.round(p.listed * 100 / central.stats.listed) : 0) }}%</td>
               </tr>
             </tbody>
           </table></div>
@@ -1431,7 +1431,7 @@
             <option value="reverted">{{ t('reverted') }}</option>
           </select>
         </div>
-        <div class="overflow-x-auto"><table class="w-full min-w-[520px] text-left text-xs">
+        <div class="overflow-x-auto"><table class="ps-stack w-full min-w-[520px] text-left text-xs">
           <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/50 text-slate-500 uppercase">
             <th class="py-2.5 px-4 font-medium">{{ t('page') }}</th><th class="py-2.5 px-4 font-medium">{{ t('status') }}</th>
             <th class="py-2.5 px-4 font-medium text-right">{{ t('points') }}</th><th v-if="upages.review_enabled" class="py-2.5 px-4 font-medium">{{ t('reviewerNote') }}</th>
@@ -1439,11 +1439,11 @@
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
             <tr v-if="upages.pages.length === 0"><td colspan="4" class="py-8 text-center text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="p in upages.pages" :key="p.id + p.role" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
-              <td class="py-2.5 px-4 max-w-[16rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(p.page_title)" target="_blank" rel="noopener" class="font-medium text-ws-cerulean dark:text-ws-nature hover:underline block truncate" :title="p.page_title">{{ p.page_title }}</a>
+              <td data-label="" class="ps-c-title py-2.5 px-4 max-w-[16rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(p.page_title)" target="_blank" rel="noopener" class="font-medium text-ws-cerulean dark:text-ws-nature hover:underline block truncate" :title="p.page_title">{{ p.page_title }}</a>
                 <span v-if="p.role === 'validator'" class="text-[0.625rem] text-slate-500">{{ t('validated') }}</span></td>
-              <td class="py-2.5 px-4 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(p.review_status)">{{ statusLabel(p.review_status) }}</span></td>
-              <td class="py-2.5 px-4 text-right tabular-nums font-semibold">{{ fmtNum(p.total_points) }}</td>
-              <td v-if="upages.review_enabled" class="py-2.5 px-4 text-slate-500">{{ p.jury_note || '—' }}</td>
+              <td :data-label="t('status')" class="py-2.5 px-4 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(p.review_status)">{{ statusLabel(p.review_status) }}</span></td>
+              <td :data-label="t('points')" class="py-2.5 px-4 text-right tabular-nums font-semibold">{{ fmtNum(p.total_points) }}</td>
+              <td :data-label="t('reviewerNote')" v-if="upages.review_enabled" class="ps-c-text py-2.5 px-4 text-slate-500">{{ p.jury_note || '—' }}</td>
             </tr>
           </tbody>
         </table></div>
