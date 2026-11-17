@@ -13,6 +13,7 @@ import time
 from datetime import datetime, timedelta
 from urllib.parse import urlencode, quote, urlsplit
 import requests
+from werkzeug.middleware.proxy_fix import ProxyFix
 from flask import Flask, g, render_template, request, jsonify, session, redirect, url_for, Response, stream_with_context
 from sqlalchemy import func, case, and_, or_
 from sqlalchemy.exc import IntegrityError
@@ -45,35 +46,67 @@ from wiki_engine import (
 )
 import backup_engine
 
+def _read_key_file(path: str) -> str:
+    try:
+        with open(path, "r") as f:
+            return f.read().strip()
+    except OSError:
+        return ""
+
+
 def _load_secret_key() -> str:
-    """Same key for every uWSGI worker: env var first, else a file kept in the tool's home."""
+    """Same key for every uWSGI worker: env var first, else a file kept in the tool's home.
+
+    Workers start at the same moment, so the file is published atomically: the key is written to a
+    private temp file and hard-linked to its final name (fails if another worker got there first).
+    A worker that loses the race reads the winner's key instead of keeping its own."""
     env_key = os.environ.get("SECRET_KEY")
     if env_key:
         return env_key
     key_file = os.path.join(os.path.expanduser("~"), ".proofsource_secret_key")
-    try:
-        with open(key_file, "r") as f:
-            k = f.read().strip()
-            if k:
-                return k
-    except OSError:
-        pass
+    k = _read_key_file(key_file)
+    if k:
+        return k
     k = secrets.token_hex(32)
+    tmp = f"{key_file}.{os.getpid()}.{secrets.token_hex(4)}.tmp"
     try:
         # created 0600 from the start: tool homes on Toolforge are readable by other tools
-        fd = os.open(key_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "w") as f:
             f.write(k)
+        try:
+            os.link(tmp, key_file)      # atomic: the file appears complete, or not at all
+        except FileExistsError:
+            pass
+        except OSError:                 # filesystem without hard links
+            if not os.path.exists(key_file):
+                os.rename(tmp, key_file)
     except OSError:
         pass
+    finally:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+    for _ in range(20):                 # whoever won, everyone adopts the file's key
+        stored = _read_key_file(key_file)
+        if stored:
+            return stored
+        time.sleep(0.05)
+    log.warning("could not share a secret key between workers; set SECRET_KEY")
     return k
 
 app = Flask(__name__)
+# Toolforge puts a proxy in front of the tool: trust exactly that many hops so request.remote_addr is
+# the visitor, not the ingress (rate limits, logs). 0 turns it off (e.g. when running without a proxy).
+_PROXY_HOPS = int(os.environ.get("PROOFSOURCE_PROXY_HOPS", "1"))
+if _PROXY_HOPS > 0:
+    app.wsgi_app = ProxyFix(app.wsgi_app, x_for=_PROXY_HOPS, x_proto=_PROXY_HOPS)
 app.secret_key = _load_secret_key()
 app.config["SQLALCHEMY_DATABASE_URI"] = db_config.resolve_database_url()
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_ENGINE_OPTIONS"] = db_config.engine_options(app.config["SQLALCHEMY_DATABASE_URI"])
-app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("PROOFSOURCE_MAX_UPLOAD_MB", "200")) * 1024 * 1024  # backups
+app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("PROOFSOURCE_MAX_UPLOAD_MB", "32")) * 1024 * 1024  # backups (parsed in RAM: keep small)
 app.config["SESSION_COOKIE_SECURE"] = os.environ.get("PROOFSOURCE_INSECURE_COOKIES") != "1"   # 1 only for local http dev
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
@@ -268,7 +301,8 @@ def json_body() -> dict:
 
 def rate_limit(bucket: str, limit: int, per_seconds: float, user: str = None):
     """Returns an error response when the caller exceeded the limit, else None."""
-    key = f"{bucket}:{(user or get_current_user() or 'anon').lower()}"
+    who = user or get_current_user()
+    key = f"{bucket}:{who.lower()}" if who else f"{bucket}:ip:{request.remote_addr or 'unknown'}"
     if not limiter.hit(key, limit, per_seconds):
         return err("rate_limited", 429)
     return None
