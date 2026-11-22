@@ -670,6 +670,8 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
             if p_obj and p_obj.review_status not in ('unproofread', 'reverted') and (
                     page_num in excluded_page_nums or (p_obj.proofreader or "").lower() in excluded_usernames):
                 _drop_page(contest, p_obj, "excluded")
+            if p_obj and p_obj.validator and page_num in excluded_page_nums:
+                p_obj.validator = None          # excluded pages earn no validation points either
             continue
 
         proofreader_name = (lp.get("proofreader") or "").strip()
@@ -718,18 +720,38 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
                     p_obj.base_points = book_pts
             p_obj.last_rev_id = lp.get("rev_latest")
         else:
+            level = lp.get("level", 1)
             if p_obj:
-                level = lp.get("level", 1)
                 reason = "excluded" if is_excluded else ("not_proofread" if level < 3 else "ineligible")
                 _drop_page(contest, p_obj, reason, level)
+            # Validation-only credit: no proofread credit in this contest (e.g. the page was proofread
+            # before the contest, or by an excluded user), but someone validated it inside the window.
+            # Validation earns points automatically and is never reviewed, so a page that is not
+            # listed stays out of the review queue ('unproofread' row with a validator).
+            validator = (lp.get("validator") or "").strip()
+            if validator and level == 4 and page_num not in excluded_page_nums:
+                if not p_obj:
+                    p_obj = ContestPage(contest_id=contest.id, book_id=book.id, page_number=page_num,
+                                        page_title=lp["page_title"], review_status='unproofread',
+                                        base_points=0, bonus_points=0)
+                    db.session.add(p_obj)
+                p_obj.page_title = lp["page_title"]
+                p_obj.wiki_level = 4
+                p_obj.validator = validator
+            elif p_obj:
+                p_obj.validator = None
+            if p_obj:
                 p_obj.last_rev_id = lp.get("rev_latest")
 
     # pages that disappeared from the wiki listing: only trust that if the listing was complete
     if complete:
         for page_num, p_obj in existing_pages.items():
-            if (page_num not in live_map or page_num in excluded_page_nums) and \
-                    p_obj.review_status not in ('unproofread', 'reverted'):
+            gone = page_num not in live_map or page_num in excluded_page_nums
+            if gone and p_obj.review_status not in ('unproofread', 'reverted'):
                 _drop_page(contest, p_obj, "excluded" if page_num in excluded_page_nums else "ineligible")
+                p_obj.last_rev_id = None
+            if gone and p_obj.validator:
+                p_obj.validator = None          # no validation credit for removed / excluded pages
                 p_obj.last_rev_id = None
 
     if timed_out:
@@ -832,11 +854,15 @@ def compute_contest_leaderboard(contest: Contest) -> list:
 
     vrows = []
     if contest.validate_points and contest.validate_points > 0:
+        # Validation earns points automatically and is never reviewed, whatever the page's review
+        # status. Sync keeps `validator` only while the validation qualifies (first Proofread ->
+        # Validated inside the window, page not excluded); pages proofread before the contest are
+        # 'unproofread' rows that carry only a validator.
         vrows = (db.session.query(ContestPage.validator, func.count(ContestPage.id))
                  .filter(ContestPage.contest_id == contest.id,
-                         ContestPage.review_status.in_(LISTED_STATUSES),
                          ContestPage.wiki_level == 4,
-                         ContestPage.validator.isnot(None))
+                         ContestPage.validator.isnot(None),
+                         func.lower(ContestPage.validator) != func.lower(func.coalesce(ContestPage.proofreader, "")))
                  .group_by(ContestPage.validator).all())
 
     juries_low = {u.lower() for u in split_users(contest.juries)}
@@ -865,11 +891,14 @@ def compute_contest_leaderboard(contest: Contest) -> list:
         s["bonus"] += int(bonus or 0)
         s["points"] += int(pts or 0)
 
+    enrolled_low = enrolled_names(contest) if vrows and submission_mode(contest) == "enroll" else None
     for v, n in vrows:
         if not v or v.lower() in blocked_low:
             continue
         if v.lower() in juries_low and not contest.jury_gets_points:
             continue
+        if enrolled_low is not None and v.strip().lower() not in enrolled_low:
+            continue                                  # enrolment contests: only enrolled people score
         s = ensure(v)
         s["validated"] += int(n or 0)
         s["points"] += int(n or 0) * contest.validate_points
@@ -1535,6 +1564,7 @@ def contest_payload(c: Contest, current_user):
             "pending_pages": totals["pending"],
             "reviewed_pages": max(0, totals["listed"] - totals["pending"]), "rejected_hold_count": rejected_hold_count,
             "participants": len(leaderboard), "reverted_pages": totals["reverted"],
+            "validated_pages": sum(r["validated"] for r in leaderboard),
         },
         "reverted": reverted,
         "enrolled": enrolled,
@@ -2048,11 +2078,11 @@ def api_submit_pages(cid):
 def _user_pages_query(c: Contest, username: str):
     """A participant's own contest work: pages they proofread, plus pages they validated only when
     validation earns points (never a jury's in-tool work when juries get no validation points)."""
-    cond = ContestPage.proofreader == username
+    cond = and_(ContestPage.proofreader == username, ContestPage.review_status.in_(LISTED_STATUSES + ('reverted',)))
     if validation_visible(c, username):
+        # includes validation-only rows ('unproofread' + validator: proofread before the contest)
         cond = or_(cond, and_(ContestPage.validator == username, ContestPage.wiki_level == 4))
-    return ContestPage.query.filter(ContestPage.contest_id == c.id,
-                                    ContestPage.review_status.in_(LISTED_STATUSES + ('reverted',)), cond)
+    return ContestPage.query.filter(ContestPage.contest_id == c.id, cond)
 
 
 @app.route("/api/contests/<int:cid>/user/<path:username>/pages", methods=["GET"])
@@ -2063,7 +2093,10 @@ def api_contest_user_pages(cid, username):
     status = request.args.get("status") or "all"
     base = _user_pages_query(c, username)
     q = base
-    if status != "all":
+    if status == "validated":
+        q = q.filter(func.lower(ContestPage.validator) == username.strip().lower(), ContestPage.wiki_level == 4)
+    elif status != "all":
+        q = q.filter(ContestPage.proofreader == username)
         if status == "accepted" and not c.is_review_enabled:
             q = q.filter(ContestPage.review_status.in_(["accepted", "pending_review"]))
         else:
@@ -2100,7 +2133,7 @@ def api_contest_user_pages(cid, username):
             "page_number": p.page_number, "page_title": p.page_title, "wiki_level": p.wiki_level,
             "proofreader": p.proofreader, "role": "proofreader" if is_proof else "validator",
             "proofread_rev_id": p.proofread_rev_id, "proofread_iso": iso(p.proofread_time),
-            "review_status": "accepted" if acc else p.review_status,
+            "review_status": ("accepted" if acc else p.review_status) if is_proof else "validated",
             "total_points": ((p.base_points + p.bonus_points) if acc else 0) if is_proof else c.validate_points,
             "reviewed_by": p.reviewed_by if c.is_review_enabled else None,
             "jury_note": p.jury_note if c.is_review_enabled else None,
@@ -2618,11 +2651,22 @@ def api_export_csv(cid):
     c = live_contest(cid)
     si = io.StringIO()
     cw = csv.writer(si)
-    cw.writerow(["Rank", "Participant", "Proofread", "Accepted", "Validated", "Pending", "Needs Fix",
-                 "Rejected", "Bonus Points", "Total Points"])
+    # same columns as the on-screen leaderboard: Accepted/Pending/Needs fix/Rejected only with review,
+    # Validated only when validation earns points
+    review = c.is_review_enabled
+    val = bool(c.validate_points and c.validate_points > 0)
+    cols = [("Rank", None), ("Participant", "username"), ("Proofread", "submitted")]
+    if review:
+        cols += [("Accepted", "accepted"), ("Pending", "pending"), ("Needs Fix", "needs_fix"), ("Rejected", "rejected")]
+    if val:
+        cols.append(("Validated", "validated"))
+    if review:
+        cols.append(("Bonus Points", "bonus"))
+    cols.append(("Total Points", "points"))
+    cw.writerow([h for h, _ in cols])
     for idx, r in enumerate(compute_contest_leaderboard(c), start=1):
-        cw.writerow([idx, backup_engine.csv_safe(r["username"]), r["submitted"], r["accepted"], r["validated"], r["pending"],
-                     r["needs_fix"], r["rejected"], r["bonus"], r["points"]])
+        cw.writerow([idx if k is None else backup_engine.csv_safe(r[k]) if k == "username" else r[k]
+                     for _, k in cols])
     return Response(si.getvalue().encode("utf-8-sig"), mimetype="text/csv",
                     headers={"Content-Disposition": f"attachment;filename=proofsource_{c.slug}_results.csv"})
 
@@ -3294,10 +3338,11 @@ def api_get_central(slug):
         for r in board:
             key = r["username"].strip().lower()   # SUL: one global account name on every wiki
             d = combined.setdefault(key, {"username": r["username"], "points": 0, "accepted": 0, "submitted": 0,
-                                          "projects": {}})
+                                          "validated": 0, "projects": {}})
             d["points"] += r["points"]
             d["accepted"] += r["accepted"]
             d["submitted"] += r["submitted"]
+            d["validated"] += r["validated"]
             d["projects"][c.wiki_domain] = d["projects"].get(c.wiki_domain, 0) + r["points"]
         for row in compute_daily_activity(c):
             d = daily.setdefault(row["date"], {"date": row["date"], "proofread": 0, "accepted": 0})
@@ -3313,6 +3358,9 @@ def api_get_central(slug):
             "custom_points_policy": h.custom_points_policy or "project", "bonus_policy": h.bonus_policy or "project",
             "review_policy": h.review_policy or "project",
             "submission_policy": h.submission_policy or "project",
+            # leaderboard columns: Accepted only when some project reviews; Validated when it earns points
+            "review_enabled": any(c.is_review_enabled for c in h.contests),
+            "validation_enabled": bool(h.validate_points and h.validate_points > 0),
             "start_time": h.start_time.strftime(DT_FMT_IN) if h.start_time else "",
             "end_time": h.end_time.strftime(DT_FMT_IN) if h.end_time else "",
             "admins": h.admins or "", "admins_list": split_users(h.admins), "created_by": h.created_by,

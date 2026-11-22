@@ -779,12 +779,13 @@
       <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('participants') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.participants) }}</div></div>
         <div class="ps-stat is-problem"><div class="ps-stat-l">{{ t('books') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_books) }}</div></div>
-        <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ active.contest.validation_visible ? t('proofreadListed') : t('proofread') }}</div><div class="ps-stat-v text-ws-cerulean dark:text-ws-nature">{{ fmtNum(active.stats.listed_pages) }}</div></div>
+        <div class="ps-stat is-progressive"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v text-ws-cerulean dark:text-ws-nature">{{ fmtNum(active.stats.listed_pages) }}</div></div>
         <template v-if="active.contest.review_enabled">
           <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('reviewed') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(active.stats.reviewed_pages) }}</div></div>
           <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pendingReview') }}</div><div class="ps-stat-v text-amber-600 dark:text-amber-400">{{ fmtNum(active.stats.pending_pages) }}</div></div>
         </template>
         <div v-else class="ps-stat"><div class="ps-stat-l">{{ t('totalBookPages') }}</div><div class="ps-stat-v">{{ fmtNum(active.stats.total_book_pages) }}</div></div>
+        <div v-if="active.contest.validation_enabled" class="ps-stat is-validated"><div class="ps-stat-l">{{ t('validated') }}</div><div class="ps-stat-v text-violet-600 dark:text-violet-400">{{ fmtNum(active.stats.validated_pages || 0) }}</div></div>
         <button v-if="active.stats.reverted_pages" @click="contestSubTab = 'reverted'" class="ps-stat text-left hover:!border-slate-400" :title="t('revertedHelp')"><div class="ps-stat-l">{{ t('revertedPages') }}</div><div class="ps-stat-v text-slate-500">{{ fmtNum(active.stats.reverted_pages) }}</div></button>
       </div>
 
@@ -852,19 +853,20 @@
                 <th class="py-3 px-4 font-semibold w-14">#</th>
                 <th class="py-3 px-4 font-semibold">{{ t('user') }}</th>
                 <th class="py-3 px-4 font-semibold text-right">{{ t('proofread') }}</th>
-                <th class="py-3 px-4 font-semibold text-right">{{ t('accepted') }}</th>
                 <template v-if="active.contest.review_enabled">
+                  <th class="py-3 px-4 font-semibold text-right">{{ t('accepted') }}</th>
                   <th class="py-3 px-4 font-semibold text-right">{{ t('pending') }}</th>
                   <th class="py-3 px-4 font-semibold text-right">{{ t('needsFix') }}</th>
                   <th class="py-3 px-4 font-semibold text-right">{{ t('rejected') }}</th>
                 </template>
+                <th v-if="active.contest.validation_enabled" class="py-3 px-4 font-semibold text-right">{{ t('validated') }}</th>
                 <th v-if="hasReverted" class="py-3 px-4 font-semibold text-right" :title="t('revertedHelp')">{{ t('reverted') }}</th>
                 <th class="py-3 px-4 font-semibold text-right">{{ t('points') }}</th>
               </tr>
             </thead>
             <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
               <tr v-if="active.leaderboard.length === 0">
-                <td colspan="8" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td>
+                <td colspan="10" class="py-8 text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td>
               </tr>
               <tr v-for="(r, idx) in active.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50 transition">
                 <td data-label="" class="ps-c-rank py-2.5 px-4"><span class="ps-serif tabular-nums inline-flex items-center justify-center w-7 h-7 rounded-full text-sm" :class="rankClass(idx)">{{ fmtNum(idx + 1) }}</span></td>
@@ -874,12 +876,13 @@
                   </button>
                 </td>
                 <td :data-label="t('proofread')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]">{{ fmtNum(r.submitted) }}</td>
-                <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
                 <template v-if="active.contest.review_enabled">
+                  <td :data-label="t('accepted')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400 font-semibold' : 'ps-zero'">{{ fmtNum(r.accepted) }}</td>
                   <td :data-label="t('pending')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.pending ? 'text-amber-600 dark:text-amber-400' : 'ps-zero'">{{ fmtNum(r.pending) }}</td>
                   <td :data-label="t('needsFix')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.needs_fix ? 'text-orange-600 dark:text-orange-400' : 'ps-zero'">{{ fmtNum(r.needs_fix) }}</td>
                   <td :data-label="t('rejected')" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.rejected ? 'text-rose-600 dark:text-rose-400' : 'ps-zero'">{{ fmtNum(r.rejected) }}</td>
                 </template>
+                <td :data-label="t('validated')" v-if="active.contest.validation_enabled" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.validated ? 'text-violet-600 dark:text-violet-400 font-semibold' : 'ps-zero'">{{ fmtNum(r.validated || 0) }}</td>
                 <td :data-label="t('reverted')" v-if="hasReverted" class="ps-c-stat py-2.5 px-4 text-right tabular-nums text-[0.8125rem]" :class="r.reverted ? 'text-slate-600 dark:text-slate-300' : 'ps-zero'">{{ fmtNum(r.reverted || 0) }}</td>
                 <td data-label="" class="ps-c-points py-2.5 px-4 text-right tabular-nums font-bold">{{ fmtNum(r.points) }}</td>
               </tr>
@@ -1207,15 +1210,17 @@
         <table class="ps-ctable w-full text-left text-sm">
           <thead><tr class="border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900/60 text-xs text-slate-600 dark:text-slate-400">
             <th class="w-10 sm:w-14">#</th><th>{{ t('user') }}</th>
-            <th>{{ t('proofread') }}</th><th>{{ t('accepted') }}</th><th>{{ t('points') }}</th>
+            <th>{{ t('proofread') }}</th><th v-if="central.central.review_enabled">{{ t('accepted') }}</th>
+            <th v-if="central.central.validation_enabled">{{ t('validated') }}</th><th>{{ t('points') }}</th>
           </tr></thead>
           <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
-            <tr v-if="!central.leaderboard.length"><td colspan="5" class="!py-8 !text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
+            <tr v-if="!central.leaderboard.length"><td colspan="6" class="!py-8 !text-center text-xs text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="(r, i) in central.leaderboard.slice(0, leaderboardLimit)" :key="r.username" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td><span class="ps-serif tabular-nums inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[0.8125rem] sm:text-sm" :class="rankClass(i)">{{ fmtNum(i + 1) }}</span></td>
               <td class="font-semibold">{{ nameSplit(r.username)[0] }}<span class="whitespace-nowrap">{{ nameSplit(r.username)[1] }}<span v-for="dom in Object.keys(r.projects || {})" :key="dom" class="ps-code-tag">{{ projectShort(dom) }}</span></span></td>
               <td>{{ fmtNum(r.submitted) }}</td>
-              <td :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'">{{ fmtNum(r.accepted) }}</td>
+              <td v-if="central.central.review_enabled" :class="r.accepted ? 'text-emerald-600 dark:text-emerald-400' : 'text-slate-400'">{{ fmtNum(r.accepted) }}</td>
+              <td v-if="central.central.validation_enabled" :class="r.validated ? 'text-violet-600 dark:text-violet-400' : 'text-slate-400'">{{ fmtNum(r.validated || 0) }}</td>
               <td class="font-bold">{{ fmtNum(r.points) }}</td>
             </tr>
           </tbody>
@@ -1404,13 +1409,13 @@
       </div>
       <div class="ps-stats">
         <div class="ps-stat"><div class="ps-stat-l">{{ t('proofread') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.proofread) }}</div></div>
-        <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(upages.summary.accepted) }}</div></div>
         <template v-if="upages.review_enabled">
+          <div class="ps-stat is-success"><div class="ps-stat-l">{{ t('accepted') }}</div><div class="ps-stat-v text-emerald-600 dark:text-emerald-400">{{ fmtNum(upages.summary.accepted) }}</div></div>
           <div class="ps-stat is-warning"><div class="ps-stat-l">{{ t('pending') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.pending) }}</div></div>
           <div v-if="upages.summary.needs_fix" class="ps-stat is-problem"><div class="ps-stat-l">{{ t('needsFix') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.needs_fix) }}</div></div>
           <div v-if="upages.summary.rejected" class="ps-stat is-danger"><div class="ps-stat-l">{{ t('rejected') }}</div><div class="ps-stat-v text-rose-600 dark:text-rose-400">{{ fmtNum(upages.summary.rejected) }}</div></div>
         </template>
-        <div v-if="upages.show_validation" class="ps-stat"><div class="ps-stat-l">{{ t('validated') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.validated) }}</div></div>
+        <div v-if="upages.show_validation" class="ps-stat is-validated"><div class="ps-stat-l">{{ t('validated') }}</div><div class="ps-stat-v text-violet-600 dark:text-violet-400">{{ fmtNum(upages.summary.validated) }}</div></div>
         <div class="ps-stat"><div class="ps-stat-l">{{ t('points') }}</div><div class="ps-stat-v">{{ fmtNum(upages.summary.points) }}</div></div>
       </div>
       <div v-if="Object.keys(upages.by_book).length > 1" class="ps-card p-4 space-y-2">
@@ -1425,7 +1430,8 @@
         <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-2">
           <span class="text-xs font-bold text-slate-600 dark:text-slate-400">{{ t('submissions') }} ({{ fmtNum(upages.total) }})</span>
           <select v-model="upages.status" @change="loadUserPages(1)" class="ps-input !w-auto text-xs">
-            <option value="all">{{ t('all') }}</option><option value="accepted">{{ t('accepted') }}</option>
+            <option value="all">{{ t('all') }}</option><option value="accepted">{{ upages.review_enabled ? t('accepted') : t('proofread') }}</option>
+            <option v-if="upages.show_validation" value="validated">{{ t('validated') }}</option>
             <template v-if="upages.review_enabled"><option value="pending_review">{{ t('pending') }}</option><option value="needs_fix">{{ t('needsFix') }}</option><option value="rejected">{{ t('rejected') }}</option></template>
             <option value="reverted">{{ t('reverted') }}</option>
           </select>
@@ -2512,7 +2518,8 @@ createApp({
     reviewStatusClass(st) {
       return { accepted: 'border-emerald-500/30 text-emerald-700 dark:text-emerald-300', pending_review: 'border-amber-500/30 text-amber-700 dark:text-amber-300',
                needs_fix: 'border-orange-500/30 text-orange-700 dark:text-orange-300', rejected: 'border-rose-500/30 text-rose-700 dark:text-rose-300',
-               reverted: 'border-slate-400/60 text-slate-600 dark:text-slate-400 line-through decoration-slate-400/60' }[st] || 'border-slate-300';
+               reverted: 'border-slate-400/60 text-slate-600 dark:text-slate-400 line-through decoration-slate-400/60',
+               validated: 'border-violet-500/30 text-violet-700 dark:text-violet-300' }[st] || 'border-slate-300';
     },
     isExpanded(h) { return this.expanded[h.slug] !== undefined ? this.expanded[h.slug] : h.status === 'running'; },
     toggleTree(slug) { const h = this.centrals.find(x => x.slug === slug); this.expanded = { ...this.expanded, [slug]: !this.isExpanded(h) }; },
@@ -2739,7 +2746,7 @@ createApp({
     },
     statusLabel(st) {
       return { accepted: this.t('accepted'), pending_review: this.t('pending'), needs_fix: this.t('needsFix'), rejected: this.t('rejected'),
-               reverted: this.t('reverted'), eligible: this.t('eligibleStatus') }[st] || this.t('lvlUnproofread');
+               reverted: this.t('reverted'), eligible: this.t('eligibleStatus'), validated: this.t('validated') }[st] || this.t('lvlUnproofread');
     },
     toggleLang() { this.lang = this.lang === 'en' ? 'bn' : 'en'; safeStore('ws_lang', this.lang); document.documentElement.lang = this.lang; },
     toggleTheme() { this.darkMode = !this.darkMode; safeStore('ws_theme', this.darkMode ? 'dark' : 'light'); this.applyTheme(); },
@@ -2890,9 +2897,12 @@ createApp({
       const c = this.central, bold = '\x27\x27\x27';
       const doms = c.projects.map(p => p.wiki_domain);
       let wt = `== ${c.central.title} — ${this.t('globalLeaderboard')} ==\n`;
-      wt += `{| class="wikitable sortable"\n! # !! ${this.t('user')} !! ` + doms.map(d => this.projectShort(d)).join(' !! ') + ` !! ${this.t('proofread')} !! ${this.t('accepted')} !! ${this.t('points')}\n`;
+      const rev = c.central.review_enabled, val = c.central.validation_enabled;
+      wt += `{| class="wikitable sortable"\n! # !! ${this.t('user')} !! ` + doms.map(d => this.projectShort(d)).join(' !! ') + ` !! ${this.t('proofread')}`
+        + (rev ? ` !! ${this.t('accepted')}` : '') + (val ? ` !! ${this.t('validated')}` : '') + ` !! ${this.t('points')}\n`;
       c.leaderboard.forEach((r, i) => {
-        wt += `|-\n| ${i + 1} || [[m:User:${r.username}|${r.username}]] || ` + doms.map(d => r.projects[d] || 0).join(' || ') + ` || ${r.submitted} || ${r.accepted} || ${bold}${r.points}${bold}\n`;
+        wt += `|-\n| ${i + 1} || [[m:User:${r.username}|${r.username}]] || ` + doms.map(d => r.projects[d] || 0).join(' || ') + ` || ${r.submitted}`
+          + (rev ? ` || ${r.accepted}` : '') + (val ? ` || ${r.validated || 0}` : '') + ` || ${bold}${r.points}${bold}\n`;
       });
       wt += '|}\n\n';
       wt += `== ${this.t('includedProjects')} ==\n{| class="wikitable sortable"\n! ${this.t('project')} !! ${this.t('participants')} !! ${this.t('proofread')} !! ${this.t('accepted')} !! ${this.t('points')}\n`;
@@ -3542,9 +3552,12 @@ createApp({
     generateResultsWikiTables() {
       const bold = '\x27\x27\x27';
       let wt = `== ${this.active.contest.title} — ${this.t('leaderboard')} ==\n`;
-      wt += `{| class="wikitable sortable"\n! # !! ${this.t('user')} !! ${this.t('proofread')} !! ${this.t('accepted')} !! ${this.t('bonus')} !! ${this.t('points')}\n`;
+      const rev = this.active.contest.review_enabled, val = this.active.contest.validation_enabled;
+      wt += `{| class="wikitable sortable"\n! # !! ${this.t('user')} !! ${this.t('proofread')}`
+        + (rev ? ` !! ${this.t('accepted')}` : '') + (val ? ` !! ${this.t('validated')}` : '') + (rev ? ` !! ${this.t('bonus')}` : '') + ` !! ${this.t('points')}\n`;
       this.active.leaderboard.forEach((r, i) => {
-        wt += `|-\n| ${i + 1} || [[User:${r.username}|${r.username}]] || ${r.submitted} || ${r.accepted} || ${r.bonus} || ${bold}${r.points}${bold}\n`;
+        wt += `|-\n| ${i + 1} || [[User:${r.username}|${r.username}]] || ${r.submitted}`
+          + (rev ? ` || ${r.accepted}` : '') + (val ? ` || ${r.validated || 0}` : '') + (rev ? ` || ${r.bonus}` : '') + ` || ${bold}${r.points}${bold}\n`;
       });
       wt += '|}\n';
       if (this.active.contest.review_enabled && this.active.jury_stats.length) {
