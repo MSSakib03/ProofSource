@@ -214,6 +214,7 @@
   .ps-stat.is-warning { --ps-stat-accent: var(--q-proofread); }
   .ps-stat.is-problem { --ps-stat-accent: var(--q-problem); }
   .ps-stat.is-danger { --ps-stat-accent: var(--q-none); }
+  .ps-stat.is-validated { --ps-stat-accent: #8b5cf6; }
 
   /* tabs — Codex Tabs (quiet, progressive underline) */
   .ps-tabs { display: flex; align-items: flex-end; gap: .25rem; border-bottom: 1px solid var(--ps-border-subtle); overflow-x: auto; scrollbar-width: none; }

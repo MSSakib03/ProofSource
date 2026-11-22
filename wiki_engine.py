@@ -533,13 +533,17 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
       4. Credit goes to the person who made that first upgrade. Later backward/forward
          status changes (e.g. validated -> proofread) never move the credit.
       5. The page must still be Proofread/Validated now.
-      6. Validation credit: the first upgrade to level 4 inside the window, after rule 1 is met.
+      6. Validation credit is separate from proofread credit: the FIRST time the page ever goes
+         from Proofread (3) to Validated (4) must happen inside the window, by someone other than
+         the proofreader, and the page must still be Validated now (checked by the caller). It
+         counts even when the page was proofread before the contest (rule 1 only limits proofread
+         credit), so validating older proofread pages earns points too.
     """
     seen_any = False
     prev_level = 1
     prev_key = None
     first = None
-    validator = None
+    first_validation = None       # first 3 -> 4 change ever (or a page created straight as 4)
     text_editors = set()          # users who changed the text at least once so far
     for rev in revisions:          # any iterable: long histories are read page by page, never held in memory
         seen_any = True
@@ -558,25 +562,37 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
                 "in_window": start_time <= rev_dt <= end_time,
                 "content_changed": actor.strip().lower() in text_editors,
             }
-            if lvl == 4 and first["in_window"]:
-                validator = actor
-        elif first is not None and validator is None and prev_level == 3 and lvl == 4:
-            if start_time <= rev_dt <= end_time:
-                validator = actor
+            if lvl == 4:
+                first_validation = {"user": actor, "time": rev_dt}
+        elif first is not None and first_validation is None and prev_level == 3 and lvl == 4:
+            first_validation = {"user": actor, "time": rev_dt}
         prev_level = lvl
         prev_key = key
 
     if not seen_any:
         return {"eligible": False}
     current_level = prev_level
+    validator = None
+    validation_time = None
+    # (callers also check that the page is still level 4; nobody validates their own proofread)
+    if (first_validation and start_time <= first_validation["time"] <= end_time
+            and first_validation["user"].strip().lower() != first["proofreader"].strip().lower()):
+        validator = first_validation["user"]
+        validation_time = first_validation["time"]
+
+    def not_eligible(reason):
+        # proofread credit is not possible, but validation credit may still be
+        return {"eligible": False, "current_level": current_level, "reason": reason,
+                "validator": validator, "validation_time": validation_time}
+
     if not first:
-        return {"eligible": False, "current_level": current_level, "reason": "never_proofread"}
+        return not_eligible("never_proofread")
     if not first["in_window"]:
-        return {"eligible": False, "current_level": current_level, "reason": "first_proofread_outside_window"}
+        return not_eligible("first_proofread_outside_window")
     if not first["content_changed"]:
-        return {"eligible": False, "current_level": current_level, "reason": "status_only_edit"}
+        return not_eligible("status_only_edit")
     if current_level < 3:
-        return {"eligible": False, "current_level": current_level, "reason": "reverted"}
+        return not_eligible("reverted")
     return {
         "eligible": True,
         "current_level": current_level,
@@ -584,6 +600,7 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
         "proofread_time": first["proofread_time"],
         "rev_id": first["rev_id"],
         "validator": validator,
+        "validation_time": validation_time,
     }
 
 
@@ -795,11 +812,14 @@ def fetch_live_book_pages_from_wiki(wiki_domain: str, base_name: str, start_time
                         "rev_latest": rev_latest
                     }
                 else:
+                    # no proofread credit; may still carry validation-only credit
                     results[page_num] = {
                         "page_number": page_num,
                         "page_title": title,
                         "level": check.get("current_level", 1),
                         "eligible": False,
+                        "validator": check.get("validator"),
+                        "validation_time": check.get("validation_time"),
                         "rev_latest": rev_latest
                     }
 

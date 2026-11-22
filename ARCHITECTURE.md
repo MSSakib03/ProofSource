@@ -171,7 +171,7 @@ Uses the page's **full revision history** (oldest → newest, paged up to 500 re
 3. The person who made the upgrade must have **changed the page text themselves**, either in that edit or in any earlier edit of theirs (creating the page counts). Only flipping the status on text written entirely by others does not count.
 4. Credit goes to that first upgrader. Later backward/forward status changes (e.g. Validated → Proofread) never move the credit.
 5. The page must still be Proofread/Validated now.
-6. Validation credit: first upgrade 3 → 4 inside the window.
+6. Validation credit is separate from proofread credit: the first-ever 3 → 4 change must be inside the window, by someone other than the proofreader, and the page must still be level 4. It counts even if the page was proofread before the contest. Such pages are stored as **validation-only rows** (`review_status='unproofread'` + `validator`, `wiki_level=4`), so they never enter the review queue or proofread stats; the leaderboard adds `validated × validate_points` automatically.
 
 ### 5.2 Sync (`sync_book_with_wikisource`, `sync_contest_books`)
 - Lists pages with `generator=allpages` in the Page namespace (prefix `Book/`).

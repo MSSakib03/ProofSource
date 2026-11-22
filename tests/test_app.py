@@ -526,6 +526,152 @@ class AssignmentTests(Base):
         self.assertEqual((j1_new, j2_new), (4, 10))
 
 
+def live_raw(pages, complete=True):
+    """Fake fetch_live_book_pages_from_wiki: pages = {n: dict of fields}, page_title/page_number filled in."""
+    def _f(domain, base, start, end, known_revs=None, deadline=None):
+        out = {}
+        for n, d in pages.items():
+            if known_revs and known_revs.get(n) == d.get("rev_latest"):
+                out[n] = {"page_number": n, "page_title": f"Page:{base}/{n}", "unchanged": True,
+                          "rev_latest": d.get("rev_latest")}
+                continue
+            row = {"page_number": n, "page_title": f"Page:{base}/{n}", "proofread_time": start + timedelta(hours=1)}
+            row.update(d)
+            out[n] = row
+        return out, complete
+    return _f
+
+
+def proofread(user, rev, validator=None):
+    return {"level": 4 if validator else 3, "eligible": True, "proofreader": user, "validator": validator,
+            "rev_id": rev, "rev_latest": rev}
+
+
+def validated_only(validator, rev):
+    """Page proofread before the contest, validated inside it: no proofread credit, validation credit only."""
+    return {"level": 4, "eligible": False, "validator": validator, "rev_latest": rev}
+
+
+class ValidationTests(Base):
+    def contest(self, review, pages, **extra):
+        cid = self.make_contest(review=review, validate_points=1, **extra)
+        self.resync(cid, pages)
+        return cid
+
+    def resync(self, cid, pages):
+        A.fetch_live_book_pages_from_wiki = live_raw(pages)
+        with A.app.app_context():
+            c = db.session.get(Contest, cid)
+            c.sync_started_at = None
+            db.session.commit()
+            A.sync_contest_books(c)
+
+    def board(self, cid):
+        return {x["username"]: x for x in self.c.get(f"/api/contests/{cid}").json["leaderboard"]}
+
+    def test_points_example_no_review(self):
+        # proofread = 3 pts, validation = 1 pt; 5 proofread + 3 validated = 18
+        pages = {n: proofread("Alice", n) for n in range(1, 6)}
+        pages.update({n: validated_only("Alice", n) for n in range(6, 9)})
+        cid = self.contest(False, pages)
+        a = self.board(cid)["Alice"]
+        self.assertEqual((a["submitted"], a["validated"], a["points"]), (5, 3, 18))
+        d = self.c.get(f"/api/contests/{cid}").json
+        self.assertTrue(d["contest"]["validation_enabled"])
+        self.assertEqual(d["stats"]["validated_pages"], 3)
+        self.assertEqual(d["stats"]["listed_pages"], 5)
+
+    def test_validation_of_page_proofread_in_contest_by_other(self):
+        cid = self.contest(False, {1: proofread("Alice", 1, validator="Bob")})
+        b = self.board(cid)
+        self.assertEqual(b["Alice"]["points"], 3)
+        self.assertEqual((b["Bob"]["validated"], b["Bob"]["points"]), (1, 1))
+
+    def test_self_validation_never_counts(self):
+        cid = self.contest(False, {1: proofread("Alice", 1, validator="Alice")})
+        a = self.board(cid)["Alice"]
+        self.assertEqual((a["validated"], a["points"]), (0, 3))
+
+    def test_validated_pages_never_listed_for_review_but_score(self):
+        pages = {1: proofread("Alice", 1), 2: validated_only("Bob", 2), 3: validated_only("Carol", 3)}
+        cid = self.contest(True, pages)
+        self.login("Rev")
+        q = self.c.get(f"/api/contests/{cid}/jury/next-page?status=all").json
+        with A.app.app_context():
+            ids = {p.page_number: p.id for p in ContestPage.query.filter_by(contest_id=cid).all()}
+        self.assertEqual([x["id"] for x in q["queue"]], [ids[1]])
+        r = self.c.post(f"/api/contests/{cid}/jury/submit", json={"page_id": ids[2], "decision": "rejected"})
+        self.assertNotEqual(r.status_code, 200)
+        b = self.board(cid)
+        self.assertEqual(b["Bob"]["points"], 1)       # automatic, no review needed
+        self.assertEqual(b["Alice"]["points"], 0)     # proofread still waits for review
+        self.assertEqual(self.c.get(f"/api/contests/{cid}").json["stats"]["pending_pages"], 1)
+
+    def test_validation_credit_removed_when_page_drops_back(self):
+        cid = self.contest(False, {1: validated_only("Bob", 1)})
+        self.assertEqual(self.board(cid)["Bob"]["points"], 1)
+        self.resync(cid, {1: {"level": 3, "eligible": False, "validator": "Bob", "rev_latest": 2}})
+        self.assertNotIn("Bob", self.board(cid))
+
+    def test_excluded_page_gets_no_validation_credit(self):
+        cid = self.contest(False, {1: validated_only("Bob", 1)})
+        with A.app.app_context():
+            b = IndexBook.query.filter_by(contest_id=cid).first()
+            b.excluded_pages = "1"; db.session.commit()
+        self.resync(cid, {1: validated_only("Bob", 1)})
+        self.assertNotIn("Bob", self.board(cid))
+
+    def test_enrolment_contest_counts_only_enrolled_validators(self):
+        cid = self.contest(False, {1: validated_only("Bob", 1), 2: validated_only("Carol", 2)}, submission_mode="enroll")
+        bob = A.app.test_client()
+        self.login("Bob", bob)
+        self.assertTrue(bob.post(f"/api/contests/{cid}/enroll").json["success"])
+        b = self.board(cid)
+        self.assertEqual(b["Bob"]["points"], 1)
+        self.assertNotIn("Carol", b)
+
+    def test_validator_sees_validation_only_pages(self):
+        cid = self.contest(False, {1: validated_only("Bob", 1)})
+        d = self.c.get(f"/api/contests/{cid}/user/Bob/pages").json
+        self.assertTrue(d["show_validation"])
+        self.assertEqual(d["total"], 1)
+        self.assertEqual(d["pages"][0]["review_status"], "validated")
+        self.assertEqual(d["pages"][0]["total_points"], 1)
+        self.assertEqual(self.c.get(f"/api/contests/{cid}/user/Bob/pages?status=validated").json["total"], 1)
+
+    def test_csv_columns_follow_mode(self):
+        cid = self.contest(False, {1: proofread("Alice", 1), 2: validated_only("Alice", 2)})
+        lines = self.c.get(f"/api/contests/{cid}/export-csv").data.decode("utf-8-sig").splitlines()
+        self.assertEqual(lines[0], "Rank,Participant,Proofread,Validated,Total Points")
+        self.assertEqual(lines[1], "1,Alice,1,1,4")
+        cid2 = self.make_contest(review=True, slug="t2", validate_points=0)
+        head2 = self.c.get(f"/api/contests/{cid2}/export-csv").data.decode("utf-8-sig").splitlines()[0]
+        self.assertEqual(head2, "Rank,Participant,Proofread,Accepted,Pending,Needs Fix,Rejected,Bonus Points,Total Points")
+
+
+class ValidationHistoryTests(unittest.TestCase):
+    S, E = datetime(2026, 1, 10), datetime(2026, 1, 20)
+
+    def a(self, revs):
+        return wiki_engine.analyze_page_history(revs, self.S, self.E)
+
+    def test_validation_of_page_proofread_before_contest_counts(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("X", 3, "t2", 5, 2), rev("Y", 4, "t2", 12, 3)])
+        self.assertFalse(r["eligible"])
+        self.assertEqual(r["reason"], "first_proofread_outside_window")
+        self.assertEqual(r["validator"], "Y")
+
+    def test_validation_before_contest_never_counts(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("X", 3, "t2", 5, 2), rev("Y", 4, "t2", 6, 3),
+                    rev("Z", 3, "t2", 11, 4), rev("W", 4, "t2", 12, 5)])
+        self.assertIsNone(r["validator"])
+
+    def test_self_validation_never_counts(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("X", 3, "t2", 11, 2), rev("X", 4, "t2", 12, 3)])
+        self.assertTrue(r["eligible"])
+        self.assertIsNone(r["validator"])
+
+
 class MyPagesTests(Base):
     def test_validation_hidden_when_not_rewarded(self):
         cid = self.make_contest(entries={1: ("Alice", 4, 1)}, validate_points=0)
