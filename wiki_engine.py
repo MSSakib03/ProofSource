@@ -521,30 +521,39 @@ def _content_key(parsed: dict) -> str:
                          (parsed.get("footer") or "").strip()])
 
 
-def analyze_page_history(revisions: list, start_time: datetime, end_time: datetime) -> dict:
+def _same(a, b) -> bool:
+    return (a or "").strip().lower() == (b or "").strip().lower()
+
+
+def analyze_page_history(revisions: list, start_time: datetime, end_time: datetime, trusted=None) -> dict:
     """
     Contest eligibility rules (revisions must be oldest -> newest):
-      1. Only the FIRST time a page ever reaches Proofread (level >= 3) counts.
-         Pages that were proofread/validated before the contest never count.
-      2. That first upgrade must happen inside the contest window.
-      3. The person who makes that upgrade must have changed the page text themselves — in the
-         upgrading edit or in any of their earlier edits (creating the page counts). Someone who only
-         flips the status on text written entirely by others does not get it.
-      4. Credit goes to the person who made that first upgrade. Later backward/forward
-         status changes (e.g. validated -> proofread) never move the credit.
+      1. The FIRST time a page ever reaches Proofread (level >= 3) must be inside the contest window.
+         Pages that were proofread/validated before the contest never earn proofread credit.
+      2. Each time the page goes up to Proofread from below is a "proofread claim". A claim counts
+         only if its proofreader changed the page text themselves since the page was last opened
+         (since it was created, or since it was last set below Proofread) — in the upgrading edit or
+         an earlier one. Someone who only flips the status on text written by others gets nothing.
+      3. Credit goes to the LAST claim made inside the window. When a proofread page is set back
+         below Proofread (reopened) and someone proofreads it again inside the window, the credit
+         moves to them. Validated -> Proofread changes are not reopenings and never move credit.
+      4. Who reopened it is recorded (see resolve_claims): the proofreader themself or a contest
+         reviewer/admin (`trusted`) = "reopened"; anyone else = "takeover", flagged for reviewers.
+         If, after an outside reopening, the new claim is only a status flip on the old text, the
+         credit returns to the earlier proofreader ("restored"): it is still their text.
       5. The page must still be Proofread/Validated now.
       6. Validation credit is separate from proofread credit: the FIRST time the page ever goes
          from Proofread (3) to Validated (4) must happen inside the window, by someone other than
-         the proofreader, and the page must still be Validated now (checked by the caller). It
-         counts even when the page was proofread before the contest (rule 1 only limits proofread
-         credit), so validating older proofread pages earns points too.
+         the proofreader of the moment, and the page must still be Validated now (checked by the
+         caller). It counts even when the page was proofread before the contest.
+    The result also carries `claims` so the caller can re-decide rule 4 with its own reviewer list.
     """
     seen_any = False
     prev_level = 1
     prev_key = None
-    first = None
+    claims = []                   # proofread claims, oldest first
     first_validation = None       # first 3 -> 4 change ever (or a page created straight as 4)
-    text_editors = set()          # users who changed the text at least once so far
+    text_editors = set()          # users who changed the text since the page was last opened
     for rev in revisions:          # any iterable: long histories are read page by page, never held in memory
         seen_any = True
         parsed = parse_proofread_page(rev.get("slots", {}).get("main", {}).get("*", "") or "")
@@ -552,20 +561,27 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
         key = _content_key(parsed)
         rev_dt = parse_wiki_timestamp(rev.get("timestamp"))
         actor = rev.get("user") or parsed["user"] or "Unknown"
-        if prev_key is None or key != prev_key:
+        text_changed = prev_key is None or key != prev_key
+        if prev_level >= 3 and lvl < 3:
+            # reopened: the next claim must bring its own text changes
+            if claims and claims[-1]["reopened_by"] is None:
+                claims[-1]["reopened_by"] = actor
+            text_editors = set()
+        if text_changed:
             text_editors.add(actor.strip().lower())
-        if first is None and prev_level < 3 and lvl >= 3:
-            first = {
+        if prev_level < 3 and lvl >= 3:
+            claims.append({
                 "proofreader": actor,
                 "proofread_time": rev_dt,
                 "rev_id": rev.get("revid"),
                 "in_window": start_time <= rev_dt <= end_time,
                 "content_changed": actor.strip().lower() in text_editors,
-            }
-            if lvl == 4:
-                first_validation = {"user": actor, "time": rev_dt}
-        elif first is not None and first_validation is None and prev_level == 3 and lvl == 4:
-            first_validation = {"user": actor, "time": rev_dt}
+                "reopened_by": None,
+            })
+            if lvl == 4 and first_validation is None:
+                first_validation = {"user": actor, "time": rev_dt, "proofreader": actor}
+        elif claims and first_validation is None and prev_level == 3 and lvl == 4:
+            first_validation = {"user": actor, "time": rev_dt, "proofreader": claims[-1]["proofreader"]}
         prev_level = lvl
         prev_key = key
 
@@ -576,31 +592,66 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
     validation_time = None
     # (callers also check that the page is still level 4; nobody validates their own proofread)
     if (first_validation and start_time <= first_validation["time"] <= end_time
-            and first_validation["user"].strip().lower() != first["proofreader"].strip().lower()):
+            and not _same(first_validation["user"], first_validation["proofreader"])):
         validator = first_validation["user"]
         validation_time = first_validation["time"]
 
-    def not_eligible(reason):
-        # proofread credit is not possible, but validation credit may still be
-        return {"eligible": False, "current_level": current_level, "reason": reason,
-                "validator": validator, "validation_time": validation_time}
+    out = resolve_claims(claims, current_level, trusted)
+    out.update({"current_level": current_level, "validator": validator, "validation_time": validation_time,
+                "claims": [{**c, "proofread_time": c["proofread_time"].isoformat() if c["proofread_time"] else None}
+                           for c in claims]})
+    return out
 
-    if not first:
-        return not_eligible("never_proofread")
-    if not first["in_window"]:
-        return not_eligible("first_proofread_outside_window")
-    if not first["content_changed"]:
-        return not_eligible("status_only_edit")
+
+def resolve_claims(claims: list, current_level: int, trusted=None) -> dict:
+    """Decides who gets proofread credit from the page's claims (see analyze_page_history).
+    `trusted`: lower-case names of the contest's reviewers/admins, whose reopenings are expected.
+    Returns eligible/reason, plus proofreader, proofread_time, rev_id, credit_note
+    ('' | 'reopened' | 'takeover' | 'restored'), prev_proofreader and reopened_by."""
+    trusted = {t.strip().lower() for t in (trusted or ())}
+
+    def outside(c):
+        # reopened by someone other than its own proofreader or a contest reviewer/admin
+        r = c["reopened_by"]
+        return bool(r) and not _same(r, c["proofreader"]) and r.strip().lower() not in trusted
+
+    if not claims:
+        return {"eligible": False, "reason": "never_proofread"}
+    if not claims[0]["in_window"]:
+        return {"eligible": False, "reason": "first_proofread_outside_window"}
+    in_window = [i for i, c in enumerate(claims) if c["in_window"]]
+    last = in_window[-1]
+    if claims[last]["reopened_by"]:
+        # the last claim made during the contest was reopened later (after the contest) and the page
+        # was proofread again only after the end: nobody earns it
+        return {"eligible": False, "reason": "reverted"}
+    i, note = last, ""
+    if not claims[i]["content_changed"]:
+        # a status-only claim: after an outside reopening the credit goes back to the earlier text
+        while i > 0 and not claims[i]["content_changed"] and outside(claims[i - 1]):
+            i -= 1
+        if not claims[i]["content_changed"]:
+            return {"eligible": False, "reason": "status_only_edit"}
+        note = "restored"
     if current_level < 3:
-        return not_eligible("reverted")
+        return {"eligible": False, "reason": "reverted"}
+    credited = claims[i]
+    prev = None
+    if not note and i > 0 and not _same(claims[i - 1]["proofreader"], credited["proofreader"]):
+        prev = claims[i - 1]
+        note = "takeover" if outside(prev) else "reopened"
+    elif note == "restored":
+        prev = claims[last]
     return {
         "eligible": True,
-        "current_level": current_level,
-        "proofreader": first["proofreader"],
-        "proofread_time": first["proofread_time"],
-        "rev_id": first["rev_id"],
-        "validator": validator,
-        "validation_time": validation_time,
+        "proofreader": credited["proofreader"],
+        "proofread_time": credited["proofread_time"] if isinstance(credited["proofread_time"], datetime)
+        else (datetime.fromisoformat(credited["proofread_time"]) if credited["proofread_time"] else None),
+        "rev_id": credited["rev_id"],
+        "credit_note": note,
+        "prev_proofreader": (prev["proofreader"] if prev else None),
+        "reopened_by": (claims[i - 1]["reopened_by"] if note in ("reopened", "takeover")
+                        else claims[i]["reopened_by"] if note == "restored" else None),
     }
 
 
@@ -809,6 +860,10 @@ def fetch_live_book_pages_from_wiki(wiki_domain: str, base_name: str, start_time
                         "validator": check.get("validator"),
                         "rev_id": check["rev_id"],
                         "proofread_time": check["proofread_time"],
+                        "credit_note": check.get("credit_note", ""),
+                        "prev_proofreader": check.get("prev_proofreader"),
+                        "reopened_by": check.get("reopened_by"),
+                        "claims": check.get("claims"),
                         "rev_latest": rev_latest
                     }
                 else:
@@ -820,6 +875,7 @@ def fetch_live_book_pages_from_wiki(wiki_domain: str, base_name: str, start_time
                         "eligible": False,
                         "validator": check.get("validator"),
                         "validation_time": check.get("validation_time"),
+                        "claims": check.get("claims"),
                         "rev_latest": rev_latest
                     }
 

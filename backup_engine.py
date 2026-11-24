@@ -77,7 +77,7 @@ BOOK_DT_FIELDS = ["start_time", "end_time", "created_at"]
 PAGE_FIELDS = [
     "page_number", "page_title", "wiki_level", "proofreader", "validator", "proofread_rev_id",
     "review_status", "reviewed_by", "base_points", "bonus_points", "jury_note", "last_rev_id",
-    "reverted_from", "revert_reason",
+    "reverted_from", "revert_reason", "credit_note", "prev_proofreader", "reopened_by",
 ]
 PAGE_DT_FIELDS = ["proofread_time", "reviewed_at", "reverted_at"]
 

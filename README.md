@@ -118,9 +118,17 @@ A page does **not** count when:
 
 - ❌ Someone only changes the status on text written by others.
 - ❌ The page was already proofread or validated before the contest.
-- ❌ A validated page is moved back to proofread. The credit stays with whoever proofread it first.
+- ❌ A validated page is moved back to proofread. The credit stays with whoever proofread it.
 - ❌ The page is later reverted to *Not proofread*.
 - ❌ It is an excluded page (e.g. table of contents), or by an excluded user or a bot.
+
+**Proofread again after it was reopened.** If a proofread page is set back below *Proofread* during the contest and someone proofreads it again (still inside the contest, with their own text changes after the reopening), the page moves to that last proofreader. The page shows who had it before and who reopened it:
+
+- *Proofread again* — it was reopened by its own proofreader or by a reviewer/admin of this contest.
+- *Taken over* (highlighted for reviewers) — it was reopened by anyone else. With review on, the page goes back to the review queue; the move is also written to the activity log.
+- *Back to this proofreader* — after an outside reopening the next person only flipped the status on the same text, so the page stays with the person whose text it is.
+
+If a reviewer or the proofreader reopened it and the next person only flips the status, nobody gets the page.
 
 **Reverted pages.** Once a page is in the contest it is never silently removed. If it later stops qualifying — for example someone sets it back to *Not proofread* on the wiki — it stays on record as **Reverted** with **0 points**, it is not sent for review, and the change is written to the activity log. You can see reverted pages in the **Reverted pages** tab, on the leaderboard and on everyone's page list. If the page is proofread again, it returns to the review queue automatically.
 

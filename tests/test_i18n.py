@@ -54,5 +54,6 @@ class DeliveryTests(Base):
             self.assertIn("const I18N = window.PS_I18N", f.read())
 
     def test_page_is_not_larger_than_before_the_move(self):
-        # was 355 KB with the table inside the template; +2 KB for the Validated leaderboard column
-        self.assertLess(len(self.c.get("/").data), 362_000)
+        # was 355 KB with the table inside the template; +2 KB for the Validated leaderboard column,
+        # +1 KB for the re-proofread credit notes (en + bn)
+        self.assertLess(len(self.c.get("/").data), 364_000)
