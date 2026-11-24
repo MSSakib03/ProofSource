@@ -444,8 +444,19 @@ def _in_tool_validation():
                 func.lower(ContestPage.validator) == func.lower(ContestPage.reviewed_by))
 
 
+CLOSED_LOCKED_FIELDS = [
+    # everything that changes who scores what; a closed contest keeps its results as they are
+    "start_time", "end_time", "proofread_points", "validate_points", "max_bonus_points", "wiki_domain",
+    "jury_mode", "jury_gets_points", "reject_action", "juries", "excluded_users", "review_enabled",
+    "bulk_review_enabled", "allow_custom_points", "review_assignment", "submission_mode", "hub_slug", "books",
+]
+
+
 def locked_fields(c: Contest) -> list:
-    """Fields a child contest's admin cannot change (they come from the central contest)."""
+    """Fields the admin cannot change: those that come from the central contest (child contests),
+    and every result-changing field while the contest is closed."""
+    if c.closed_at:
+        return list(CLOSED_LOCKED_FIELDS)
     if not c.hub:
         return []
     out = ["start_time", "end_time", "proofread_points", "validate_points", "wiki_domain", "hub_slug"]
@@ -646,7 +657,7 @@ def sync_deadline():
 
 def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = False, deadline: float = None) -> bool:
     """Returns True if the wiki data was complete. All changes are committed at once."""
-    if not book.is_active:
+    if not book.is_active or contest.closed_at:
         return True
     book.title = normalize_index_title(contest.wiki_domain, book.base_name)
     start_t, end_t = book.window(contest)
@@ -795,6 +806,8 @@ def sync_contest_books(contest: Contest, full: bool = False, deadline: float = N
     With a deadline the sync stops when time is up and reports partial=True; books are taken
     oldest-synced first and pages already read are skipped next time, so repeated calls finish
     the job however large the contest is."""
+    if contest.closed_at:
+        return {"skipped": True, "reason": "closed"}   # results are final: never touched again
     now = utcnow()
     # Taken with one conditional UPDATE: two workers that start at the same moment cannot both
     # get the lock (a check followed by a write could, and both would then insert the same pages).
@@ -1582,13 +1595,15 @@ def contest_payload(c: Contest, current_user):
             "my_pages_count": my_pages_count,
             "last_backup_iso": iso(c.last_backup_at) if is_adm else None,
             "backup_reminder": backup_reminder(c, now) if is_adm else None,
-            "needs_sync": stale and c.approval_status == "approved",
+            "needs_sync": stale and c.approval_status == "approved" and not c.closed_at,
+            "closed": bool(c.closed_at), "closed_iso": iso(c.closed_at), "closed_by": c.closed_by or "",
             "submission_mode": mode,
             "submission_choice": (c.hub.submission_policy or "project") if c.hub else "project",
             "is_enrolled": enrolled_me, "enrolled_count": len(enrolled),
             "my_eligible_count": my_eligible,
-            "can_enroll": mode == "enroll" and c.approval_status == "approved" and now <= c.end_time,
-            "can_submit": mode == "manual" and c.approval_status == "approved" and now <= c.end_time + SUBMIT_GRACE,
+            "can_enroll": mode == "enroll" and c.approval_status == "approved" and now <= c.end_time and not c.closed_at,
+            "can_submit": mode == "manual" and c.approval_status == "approved" and now <= c.end_time + SUBMIT_GRACE
+                          and not c.closed_at,
             "sync_running": bool(c.sync_started_at and (now - c.sync_started_at).total_seconds() < 600),
         },
         "stats": {
@@ -1629,12 +1644,37 @@ def _sync_too_soon(c: Contest, force: bool) -> bool:
     return age < (app.config["FORCED_SYNC_MIN_SECONDS"] if force else 120)
 
 
+@app.route("/api/contests/<int:cid>/close", methods=["POST"])
+def api_close_contest(cid):
+    """Close (results are final: no sync, reviews, submissions or result-changing settings) or reopen.
+    Only the contest's admins and the tool admins."""
+    c = live_contest(cid)
+    user = get_current_user()
+    if not is_contest_admin(c, user):
+        return err("admin_only", 403)
+    close = bool(json_body().get("closed", True))
+    if close == bool(c.closed_at):
+        return jsonify({"success": True, "closed": close, "unchanged": True})
+    if close:
+        c.closed_at, c.closed_by = utcnow(), user
+        c.sync_started_at = None
+        log_action(c.id, "contest_closed", c.slug, new=iso(c.closed_at))
+    else:
+        log_action(c.id, "contest_reopened", c.slug, old={"closed_at": iso(c.closed_at), "closed_by": c.closed_by})
+        c.closed_at, c.closed_by = None, None
+        c.last_synced_at = None          # catch up with the wiki on the next visit
+    db.session.commit()
+    return jsonify({"success": True, "closed": close})
+
+
 @app.route("/api/contests/<int:cid>/sync", methods=["POST"])
 def api_sync_contest(cid):
     """Background sync called by the frontend after showing cached data."""
     c = live_contest(cid)
     if c.approval_status != "approved":
         return jsonify({"success": True, "skipped": True, "reason": "not_approved"})
+    if c.closed_at:
+        return jsonify({"success": True, "skipped": True, "reason": "closed"})
     user = get_current_user()
     force = bool(json_body().get("force")) and bool(user)   # only logged-in users can force a sync
     if _sync_too_soon(c, force):
@@ -1756,7 +1796,8 @@ def api_update_contest_config(cid):
         changes["approval_status"] = (c.approval_status, "pending")
         c.approval_status, c.approved_by = "pending", None
 
-    apply_central_rules(c)   # child contests: central rules always win
+    if not c.closed_at:
+        apply_central_rules(c)   # child contests: central rules always win (not while closed)
 
     if "proofread_points" in changes or "allow_custom_points" in changes:
         for b in c.books:
@@ -1818,6 +1859,8 @@ def _validate_book_input(data, total_pages=0, contest=None):
 @app.route("/api/contests/<int:cid>/books", methods=["POST"])
 def api_add_contest_book(cid):
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     if not is_contest_admin(c, get_current_user()):
         return err("unauthorized", 403)
     data = json_body()
@@ -1859,6 +1902,8 @@ def api_add_contest_book(cid):
 @app.route("/api/contests/<int:cid>/books/<int:bid>/update", methods=["POST"])
 def api_update_contest_book(cid, bid):
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     if not is_contest_admin(c, get_current_user()):
         return err("unauthorized", 403)
     book = IndexBook.query.filter_by(id=bid, contest_id=cid).first_or_404()
@@ -1893,6 +1938,8 @@ def api_update_contest_book(cid, bid):
 @app.route("/api/contests/<int:cid>/books/<int:bid>/remove", methods=["POST"])
 def api_remove_contest_book(cid, bid):
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     if not is_contest_admin(c, get_current_user()):
         return err("unauthorized", 403)
     book = IndexBook.query.filter_by(id=bid, contest_id=cid).first_or_404()
@@ -2041,6 +2088,8 @@ def api_enroll(cid):
     """Semi-automatic submission: from now on this participant's eligible pages are listed automatically
     (including pages they already proofread in this contest)."""
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     user = get_current_user()
     if not user:
         return err("auth_required", 401)
@@ -2082,6 +2131,8 @@ def api_my_eligible(cid):
 def api_submit_pages(cid):
     """Manual submission of selected eligible pages (only the proofreader can submit their pages)."""
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     user = get_current_user()
     if not user:
         return err("auth_required", 401)
@@ -2549,6 +2600,8 @@ def _apply_review(c: Contest, page: ContestPage, reviewer: str, decision: str, b
 @app.route("/api/contests/<int:cid>/jury/submit", methods=["POST"])
 def api_jury_submit(cid):
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     reviewer = get_current_user()
     if not is_reviewer(c, reviewer):
         return err("unauthorized", 403)
@@ -2607,6 +2660,8 @@ def api_bulk_review(cid):
     """Processes up to 50 pages per call (frontend sends chunks). Each page commits on its own,
     so a failure never loses the pages that already succeeded."""
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     reviewer = get_current_user()
     if not is_reviewer(c, reviewer):
         return err("unauthorized", 403)
@@ -2658,6 +2713,8 @@ def api_bulk_review(cid):
 @app.route("/api/contests/<int:cid>/batch-revert", methods=["POST"])
 def api_batch_revert(cid):
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     reviewer = get_current_user()
     if not is_contest_admin(c, reviewer):
         return err("unauthorized", 403)
@@ -2783,6 +2840,8 @@ def api_restore_validate(cid):
 @app.route("/api/contests/<int:cid>/restore", methods=["POST"])
 def api_restore(cid):
     c = live_contest(cid)
+    if c.closed_at:
+        return err("contest_closed", 409)
     user = get_current_user()
     if not is_contest_admin(c, user):
         return err("admin_only", 403)
@@ -3188,11 +3247,14 @@ def sync_children(h: Hub, projects: list, actor: str):
             log_action(c.id, "config_change", "admins", old=c.admins, new=admins, username=actor)
             c.admins = admins
         c.hub = h
-        apply_central_rules(c)
+        if not c.closed_at:
+            apply_central_rules(c)
 
 
 def propagate_central(h: Hub, dates_changed: bool, points_changed: bool):
     for c in h.contests:
+        if c.closed_at:
+            continue        # a closed project keeps its results; it takes the new rules when reopened
         old_mode = submission_mode(c)
         apply_central_rules(c)
         if submission_mode(c) != old_mode:

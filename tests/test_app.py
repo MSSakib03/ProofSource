@@ -716,6 +716,73 @@ class ReproofreadTests(unittest.TestCase):
         self.assertEqual(r["reason"], "first_proofread_outside_window")
 
 
+class SelfReopenTests(unittest.TestCase):
+    """Rule 7: nobody earns a page by reopening it and proofreading it again themself."""
+    S, E = datetime(2026, 1, 10), datetime(2026, 1, 20)
+
+    def a(self, revs, trusted=None):
+        return wiki_engine.analyze_page_history(revs, self.S, self.E, trusted)
+
+    def test_old_page_reopened_before_contest_by_the_same_person_earns_nothing(self):
+        # the abuse case: reopen an old proofread page, change a little, proofread it in the contest
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("X", 3, "t-x", 12, 4)])
+        self.assertFalse(r["eligible"])
+        self.assertEqual(r["reason"], "self_reopened")
+
+    def test_own_old_page_reopened_and_reproofread_earns_nothing(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("A", 1, "t-a", 9, 3),
+                    rev("A", 3, "t-a2", 12, 4)])
+        self.assertFalse(r["eligible"])
+
+    def test_old_page_reopened_by_someone_else_still_counts(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("B", 3, "t-b", 12, 4)])
+        self.assertEqual((r["proofreader"], r["credit_note"]), ("B", ""))
+
+    def test_contest_page_reopened_and_reclaimed_by_an_outsider_stays_with_the_proofreader(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("X", 1, "t-a", 12, 3),
+                    rev("X", 3, "t-x", 13, 4)])
+        self.assertTrue(r["eligible"])
+        self.assertEqual((r["proofreader"], r["credit_note"], r["prev_proofreader"], r["reopened_by"], r["rev_id"]),
+                         ("A", "self_reclaimed", "X", "X", 2))
+
+    def test_also_for_contest_reviewers(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("Jury", 1, "t-a", 12, 3),
+                    rev("Jury", 3, "t-j", 13, 4)], trusted={"jury"})
+        self.assertEqual((r["proofreader"], r["credit_note"]), ("A", "self_reclaimed"))
+
+    def test_proofreader_toggling_own_page_keeps_it_without_a_note(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("A", 1, "t-a", 12, 3),
+                    rev("A", 3, "t-a2", 13, 4)])
+        self.assertEqual((r["proofreader"], r["credit_note"], r["rev_id"]), ("A", "", 2))
+
+    def test_later_reopening_after_a_self_reclaim_is_judged_normally(self):
+        # X reopens A's page and reclaims it (ignored); then Y reopens it and B proofreads with edits
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("X", 1, "t-a", 12, 3),
+                    rev("X", 3, "t-x", 13, 4), rev("Y", 1, "t-x", 14, 5), rev("B", 3, "t-b", 15, 6)])
+        self.assertEqual((r["proofreader"], r["credit_note"], r["prev_proofreader"], r["reopened_by"]),
+                         ("B", "takeover", "A", "Y"))
+
+
+class MissingTagTests(unittest.TestCase):
+    """Rule 8: a revision without a <pagequality> tag does not change the page's level."""
+    S, E = datetime(2026, 1, 10), datetime(2026, 1, 20)
+
+    def test_tagless_revision_is_not_a_reopening(self):
+        bare = {"user": "Z", "revid": 3, "timestamp": "2026-01-12T10:00:00Z", "slots": {"main": {"*": "t-a broken"}}}
+        r = wiki_engine.analyze_page_history(
+            [rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), bare, rev("B", 3, "t-b", 13, 4)], self.S, self.E)
+        self.assertEqual((r["proofreader"], r["credit_note"]), ("A", ""))
+
+    def test_tagless_revision_before_the_contest_does_not_open_an_old_page(self):
+        bare = {"user": "Z", "revid": 3, "timestamp": "2026-01-05T10:00:00Z", "slots": {"main": {"*": "t-a broken"}}}
+        r = wiki_engine.analyze_page_history(
+            [rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), bare, rev("B", 3, "t-b", 13, 4)], self.S, self.E)
+        self.assertFalse(r["eligible"])
+        self.assertEqual(r["reason"], "first_proofread_outside_window")
+
+
 class ReopenedBeforeContestTests(unittest.TestCase):
     """A page proofread earlier but set back below Proofread BEFORE the contest is open again."""
     S, E = datetime(2026, 1, 10), datetime(2026, 1, 20)
@@ -773,6 +840,83 @@ class ReopenedBeforeContestTests(unittest.TestCase):
         r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
                     rev("B", 3, "t-b", 11, 4), rev("V", 4, "t-b", 12, 5)])
         self.assertEqual((r["proofreader"], r["validator"]), ("B", "V"))
+
+
+class CloseContestTests(Base):
+    """A closed contest's results are final until an admin reopens it."""
+
+    def setUp(self):
+        super().setUp()
+        self.cid = self.make_contest(review=True, entries={1: ("Alice", 3, 1), 2: ("Bob", 3, 2)}, validate_points=1)
+
+    def close(self, closed=True, client=None):
+        return (client or self.c).post(f"/api/contests/{self.cid}/close", json={"closed": closed})
+
+    def board(self):
+        return {r["username"]: r for r in self.c.get(f"/api/contests/{self.cid}").json["leaderboard"]}
+
+    def test_only_admins_can_close(self):
+        other = A.app.test_client()
+        self.login("Mallory", other)
+        self.assertEqual(self.close(client=other).status_code, 403)
+        self.assertEqual(A.app.test_client().post(f"/api/contests/{self.cid}/close", json={"closed": True}).status_code, 403)
+        tool_admin = A.app.test_client()
+        self.login(next(iter(A.ROOT_ADMINS)), tool_admin)
+        self.assertTrue(self.close(client=tool_admin).json["success"])
+
+    def test_close_freezes_sync_and_reopen_resumes(self):
+        self.assertTrue(self.close().json["success"])
+        c = self.c.get(f"/api/contests/{self.cid}").json["contest"]
+        self.assertTrue(c["closed"])
+        self.assertEqual(c["closed_by"], "Admin")
+        self.assertFalse(c["needs_sync"])
+        before = self.board()
+        # the wiki changes: Carol proofreads page 3, Bob's page is reverted
+        A.fetch_live_book_pages_from_wiki = live({1: ("Alice", 3, 1), 2: ("Bob", 1, 5), 3: ("Carol", 3, 6)})
+        self.assertEqual(self.c.post(f"/api/contests/{self.cid}/sync", json={"force": True}).json["reason"], "closed")
+        self.c.get(f"/api/contests/{self.cid}?sync=1")
+        with A.app.app_context():
+            self.assertEqual(A.sync_contest_books(db.session.get(Contest, self.cid))["reason"], "closed")
+        self.assertEqual(self.board(), before)
+        # reopening catches up with the wiki
+        self.assertTrue(self.close(False).json["success"])
+        self.assertFalse(self.c.get(f"/api/contests/{self.cid}").json["contest"]["closed"])
+        self.c.post(f"/api/contests/{self.cid}/sync", json={"force": True})
+        self.assertIn("Carol", self.board())
+        with A.app.app_context():
+            actions = [a.action for a in AuditLog.query.filter_by(contest_id=self.cid).all()]
+        self.assertIn("contest_closed", actions)
+        self.assertIn("contest_reopened", actions)
+
+    def test_reviews_and_result_changes_are_refused_while_closed(self):
+        self.close()
+        rev = A.app.test_client()
+        self.login("Rev", rev)
+        with A.app.app_context():
+            pid = ContestPage.query.filter_by(contest_id=self.cid, page_number=1).first().id
+        r = rev.post(f"/api/contests/{self.cid}/jury/submit", json={"page_id": pid, "decision": "accepted"})
+        self.assertEqual((r.status_code, r.json["error_code"]), (409, "contest_closed"))
+        self.assertEqual(self.c.post(f"/api/contests/{self.cid}/books", json={"title": "Index:Other.pdf"}).status_code, 409)
+        self.assertEqual(self.c.post(f"/api/contests/{self.cid}/batch-revert", json={}).status_code, 409)
+
+    def test_settings_that_change_results_are_locked_but_text_is_not(self):
+        self.close()
+        c = self.c.get(f"/api/contests/{self.cid}").json["contest"]
+        self.assertIn("proofread_points", c["locked_fields"])
+        self.assertIn("juries", c["locked_fields"])
+        r = self.c.post(f"/api/contests/{self.cid}/config",
+                        json={"proofread_points": 10, "juries": "Someone", "title": "Final results"})
+        self.assertTrue(r.json["success"])
+        c = self.c.get(f"/api/contests/{self.cid}").json["contest"]
+        self.assertEqual((c["proofread_points"], c["title"]), (3, "Final results"))
+        self.assertEqual(c["juries"], "Admin, Rev")
+
+    def test_rescan_skips_a_closed_contest(self):
+        import manage
+        self.close()
+        A.fetch_live_book_pages_from_wiki = live({1: ("Alice", 1, 9)})
+        self.assertEqual(manage.cmd_rescan([self.cid]), 0)
+        self.assertIn("Alice", self.board())
 
 
 class ReproofreadSyncTests(Base):

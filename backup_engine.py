@@ -67,9 +67,9 @@ CONTEST_FIELDS = [
     "slug", "title", "description", "wiki_domain", "proofread_points", "validate_points",
     "max_bonus_points", "jury_mode", "jury_gets_points", "reject_action", "created_by", "admins",
     "juries", "excluded_users", "approval_status", "approved_by", "review_enabled",
-    "bulk_review_enabled", "announcement_en", "announcement_bn", "submission_mode", "link",
+    "bulk_review_enabled", "announcement_en", "announcement_bn", "submission_mode", "link", "closed_by",
 ]
-CONTEST_DT_FIELDS = ["start_time", "end_time", "last_synced_at", "created_at", "last_backup_at"]
+CONTEST_DT_FIELDS = ["start_time", "end_time", "last_synced_at", "created_at", "last_backup_at", "closed_at"]
 
 BOOK_FIELDS = ["title", "base_name", "total_pages", "custom_points", "excluded_pages", "is_active"]
 BOOK_DT_FIELDS = ["start_time", "end_time", "created_at"]
@@ -235,7 +235,8 @@ def save_json_file(payload: dict, prefix: str, keep: int = JSON_BACKUPS_KEEP) ->
 
 
 # Never taken from a backup: who approved/owns the contest, which wiki it runs on and its URL.
-RESTORE_PROTECTED_FIELDS = {"slug", "approval_status", "approved_by", "created_by", "wiki_domain"}
+RESTORE_PROTECTED_FIELDS = {"slug", "approval_status", "approved_by", "created_by", "wiki_domain",
+                            "closed_by"}   # closing/reopening is only ever an explicit admin action
 
 
 def restore_contest(db, contest, payload, models, username: str) -> dict:

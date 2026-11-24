@@ -550,6 +550,11 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
          from Proofread (3) to Validated (4) must happen inside the window, by someone other than
          the proofreader of the moment, and the page must still be Validated now (checked by the
          caller). It counts even when the page was proofread before the contest.
+      7. Nobody earns a page by reopening it and proofreading it again themself (always, before or
+         during the contest): a claim whose proofreader is the person who set the page below
+         Proofread is not a new claim. The page stays with the earlier proofreader, if any
+         ("self_reclaimed"); otherwise nobody earns it.
+      8. A revision without a <pagequality> tag (broken page markup) does not change the level.
     The result also carries `claims` so the caller can re-decide rule 4 with its own reviewer list.
     """
     seen_any = False
@@ -559,10 +564,13 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
     first_validation = None       # first 3 -> 4 change ever (or a page created straight as 4)
     text_editors = set()          # users who changed the text since the page was last opened
     level_at_start = 1            # the page's level at the moment the contest starts
+    last_reopener = None          # who last set the page below Proofread (until the next claim)
     for rev in revisions:          # any iterable: long histories are read page by page, never held in memory
         seen_any = True
-        parsed = parse_proofread_page(rev.get("slots", {}).get("main", {}).get("*", "") or "")
-        lvl = parsed["level"]
+        text = rev.get("slots", {}).get("main", {}).get("*", "") or ""
+        parsed = parse_proofread_page(text)
+        has_tag = "<pagequality" in text
+        lvl = parsed["level"] if (has_tag or prev_key is None) else prev_level
         key = _content_key(parsed)
         rev_dt = parse_wiki_timestamp(rev.get("timestamp"))
         actor = rev.get("user") or parsed["user"] or "Unknown"
@@ -574,6 +582,7 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
             # reopened: the next claim must bring its own text changes
             if claims and claims[-1]["reopened_by"] is None:
                 claims[-1]["reopened_by"] = actor
+            last_reopener = actor
             text_editors = set()
         # On a page that was proofread before the contest and then reopened, only text changes made
         # inside the contest count: the new proofreader has to do the work during the contest.
@@ -588,7 +597,9 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
                 "in_window": start_time <= rev_dt <= end_time,
                 "content_changed": actor.strip().lower() in text_editors,
                 "reopened_by": None,
+                "opened_by": last_reopener,      # who set it below Proofread before this claim
             })
+            last_reopener = None
             if lvl == 4 and first_validation is None:
                 first_validation = {"user": actor, "time": rev_dt, "proofreader": actor}
         elif claims and first_validation is None and prev_level == 3 and lvl == 4:
@@ -625,7 +636,7 @@ def resolve_claims(claims: list, current_level: int, trusted=None) -> dict:
     """Decides who gets proofread credit from the page's claims (see analyze_page_history).
     `trusted`: lower-case names of the contest's reviewers/admins, whose reopenings are expected.
     Returns eligible/reason, plus proofreader, proofread_time, rev_id, credit_note
-    ('' | 'reopened' | 'takeover' | 'restored'), prev_proofreader and reopened_by."""
+    ('' | 'reopened' | 'takeover' | 'restored' | 'self_reclaimed'), prev_proofreader and reopened_by."""
     trusted = {t.strip().lower() for t in (trusted or ())}
 
     def outside(c):
@@ -633,8 +644,21 @@ def resolve_claims(claims: list, current_level: int, trusted=None) -> dict:
         r = c["reopened_by"]
         return bool(r) and not _same(r, c["proofreader"]) and r.strip().lower() not in trusted
 
+    # Rule 7: reopening a page and proofreading it again yourself is not a new claim. The reopening is
+    # undone: the earlier claim stands (and inherits whatever happened to the page afterwards).
+    had_claims = bool(claims)
+    effective = []
+    for c in claims:
+        if c.get("opened_by") and _same(c["opened_by"], c["proofreader"]):
+            if effective:
+                effective[-1] = {**effective[-1], "reopened_by": c["reopened_by"],
+                                 "self_reclaim": c["proofreader"]}
+            continue
+        effective.append(c)
+    claims = effective
+
     if not claims:
-        return {"eligible": False, "reason": "never_proofread"}
+        return {"eligible": False, "reason": "self_reopened" if had_claims else "never_proofread"}
     if not claims[0]["in_window"]:
         return {"eligible": False, "reason": "first_proofread_outside_window"}
     in_window = [i for i, c in enumerate(claims) if c["in_window"]]
@@ -655,6 +679,15 @@ def resolve_claims(claims: list, current_level: int, trusted=None) -> dict:
         return {"eligible": False, "reason": "reverted"}
     credited = claims[i]
     prev = None
+    if not note and credited.get("self_reclaim") and not _same(credited["self_reclaim"], credited["proofreader"]):
+        # someone reopened this page and proofread it again themself: it stays with this proofreader
+        return {
+            "eligible": True, "proofreader": credited["proofreader"],
+            "proofread_time": credited["proofread_time"] if isinstance(credited["proofread_time"], datetime)
+            else (datetime.fromisoformat(credited["proofread_time"]) if credited["proofread_time"] else None),
+            "rev_id": credited["rev_id"], "credit_note": "self_reclaimed",
+            "prev_proofreader": credited["self_reclaim"], "reopened_by": credited["self_reclaim"],
+        }
     if not note and i > 0 and not _same(claims[i - 1]["proofreader"], credited["proofreader"]):
         prev = claims[i - 1]
         note = "takeover" if outside(prev) else "reopened"

@@ -172,6 +172,8 @@ Uses the page's **full revision history** (oldest → newest, paged up to 500 re
 4. Who reopened the previous claim is recorded (`resolve_claims`; the caller passes the contest's juries + admins as `trusted`): its own proofreader or a trusted user → `credit_note='reopened'`; anyone else → `'takeover'` (flagged in the UI, logged as `credit_moved`, back to `pending_review` when review is on). A status-only claim after an outside reopening gives the credit back to the earlier proofreader (`'restored'`); after a trusted reopening it earns nothing. Columns: `credit_note`, `prev_proofreader`, `reopened_by`.
 5. The page must still be Proofread/Validated now.
 6. Validation credit is separate from proofread credit: the first-ever 3 → 4 change must be inside the window, by someone other than the proofreader, and the page must still be level 4. It counts even if the page was proofread before the contest. Such pages are stored as **validation-only rows** (`review_status='unproofread'` + `validator`, `wiki_level=4`), so they never enter the review queue or proofread stats; the leaderboard adds `validated × validate_points` automatically.
+7. **Nobody reopens and re-claims a page themself**: each claim records `opened_by` (who set the page below Proofread before it). A claim whose proofreader is its `opened_by` is not a claim; the reopening is undone and the earlier claim stands with `credit_note='self_reclaimed'` (or, with no earlier claim — e.g. a page proofread before the contest — nobody earns it, reason `self_reopened`). Applies to everyone, trusted users included.
+8. A revision without a `<pagequality>` tag keeps the previous level (wscontest skips such revisions too).
 
 ### 5.2 Sync (`sync_book_with_wikisource`, `sync_contest_books`)
 - Lists pages with `generator=allpages` in the Page namespace (prefix `Book/`).
@@ -258,6 +260,9 @@ Every permission is checked in the backend; the UI only hides buttons. Tool admi
 - Deletion: a contest admin requests it; the tool admin executes it. A JSON backup is saved first and the audit entry remains.
 
 ---
+
+### 5.x Closing a contest
+`Contest.closed_at` / `closed_by` (POST `/api/contests/<id>/close` `{closed: bool}`, contest admins + tool admins, logged as `contest_closed` / `contest_reopened`). While closed: `sync_contest_books` / `sync_book_with_wikisource` return without touching anything, the routes that change results (books, enroll, submit, jury submit, bulk review, batch revert, restore) answer `409 contest_closed`, `locked_fields` returns `CLOSED_LOCKED_FIELDS` so the config route ignores result-changing fields, central-contest rule changes skip the project, and `manage.py rescan` skips it. Reopening clears `last_synced_at` so the next visit catches up.
 
 ## 6. HTTP routes (summary)
 
