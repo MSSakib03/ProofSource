@@ -716,6 +716,65 @@ class ReproofreadTests(unittest.TestCase):
         self.assertEqual(r["reason"], "first_proofread_outside_window")
 
 
+class ReopenedBeforeContestTests(unittest.TestCase):
+    """A page proofread earlier but set back below Proofread BEFORE the contest is open again."""
+    S, E = datetime(2026, 1, 10), datetime(2026, 1, 20)
+
+    def a(self, revs):
+        return wiki_engine.analyze_page_history(revs, self.S, self.E)
+
+    def test_reopened_before_contest_then_proofread_with_edits_counts(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("B", 3, "t-b", 12, 4)])
+        self.assertTrue(r["eligible"])
+        self.assertEqual((r["proofreader"], r["rev_id"], r["credit_note"]), ("B", 4, ""))
+
+    def test_same_size_substitution_counts_as_a_change(self):
+        # zero byte difference, but the text inside changed
+        r = self.a([rev("OCR", 1, "abcd", 1, 1), rev("A", 3, "abcd", 3, 2), rev("X", 1, "abcd", 5, 3),
+                    rev("B", 3, "abXd", 12, 4)])
+        self.assertTrue(r["eligible"]); self.assertEqual(r["proofreader"], "B")
+
+    def test_edit_in_one_revision_and_status_in_the_next_counts(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("B", 1, "t-b", 11, 4), rev("B", 3, "t-b", 12, 5)])
+        self.assertTrue(r["eligible"]); self.assertEqual((r["proofreader"], r["rev_id"]), ("B", 5))
+
+    def test_status_only_flip_after_pre_contest_reopening_earns_nothing(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("B", 3, "t-a", 12, 4)])
+        self.assertFalse(r["eligible"]); self.assertEqual(r["reason"], "status_only_edit")
+
+    def test_text_changes_made_before_the_contest_do_not_count(self):
+        # B reworked the text before the contest began and only flips the status inside the window
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("B", 1, "t-b", 7, 4), rev("B", 3, "t-b", 12, 5)])
+        self.assertFalse(r["eligible"]); self.assertEqual(r["reason"], "status_only_edit")
+
+    def test_still_proofread_at_contest_start_never_counts(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 12, 3),
+                    rev("B", 3, "t-b", 13, 4)])
+        self.assertFalse(r["eligible"]); self.assertEqual(r["reason"], "first_proofread_outside_window")
+
+    def test_reopened_before_contest_and_proofread_after_it_earns_nothing(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("B", 3, "t-b", 22, 4)])
+        self.assertFalse(r["eligible"])
+
+    def test_claims_are_stored_without_the_pre_contest_proofreading(self):
+        # a rescan re-decides from the stored claims: they must lead to the same answer
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("B", 3, "t-b", 12, 4)])
+        self.assertEqual([c["proofreader"] for c in r["claims"]], ["B"])
+        again = wiki_engine.resolve_claims(r["claims"], r["current_level"])
+        self.assertTrue(again["eligible"]); self.assertEqual(again["proofreader"], "B")
+
+    def test_validation_credit_is_unaffected(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 3, 2), rev("X", 1, "t-a", 5, 3),
+                    rev("B", 3, "t-b", 11, 4), rev("V", 4, "t-b", 12, 5)])
+        self.assertEqual((r["proofreader"], r["validator"]), ("B", "V"))
+
+
 class ReproofreadSyncTests(Base):
     def test_credit_moves_with_note_and_is_logged(self):
         cid = self.make_contest(review=False, entries={1: ("A", 3, 1)})

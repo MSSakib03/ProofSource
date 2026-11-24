@@ -528,8 +528,12 @@ def _same(a, b) -> bool:
 def analyze_page_history(revisions: list, start_time: datetime, end_time: datetime, trusted=None) -> dict:
     """
     Contest eligibility rules (revisions must be oldest -> newest):
-      1. The FIRST time a page ever reaches Proofread (level >= 3) must be inside the contest window.
-         Pages that were proofread/validated before the contest never earn proofread credit.
+      1. The page must be below Proofread (level < 3) when the contest starts. Pages that are
+         proofread/validated at that moment never earn proofread credit. A page that was proofread
+         earlier but set back below Proofread BEFORE the contest counts as open again: if someone
+         changes its text during the contest and proofreads it, they earn it (a status-only flip
+         earns nothing, and text changes made before the contest do not count for such a page).
+         A page that is first proofread inside the window needs no such history, as before.
       2. Each time the page goes up to Proofread from below is a "proofread claim". A claim counts
          only if its proofreader changed the page text themselves since the page was last opened
          (since it was created, or since it was last set below Proofread) — in the upgrading edit or
@@ -554,6 +558,7 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
     claims = []                   # proofread claims, oldest first
     first_validation = None       # first 3 -> 4 change ever (or a page created straight as 4)
     text_editors = set()          # users who changed the text since the page was last opened
+    level_at_start = 1            # the page's level at the moment the contest starts
     for rev in revisions:          # any iterable: long histories are read page by page, never held in memory
         seen_any = True
         parsed = parse_proofread_page(rev.get("slots", {}).get("main", {}).get("*", "") or "")
@@ -561,13 +566,19 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
         key = _content_key(parsed)
         rev_dt = parse_wiki_timestamp(rev.get("timestamp"))
         actor = rev.get("user") or parsed["user"] or "Unknown"
+        # Comparing the stored text itself (not its length): a same-size substitution is a change.
         text_changed = prev_key is None or key != prev_key
+        if rev_dt < start_time:
+            level_at_start = lvl
         if prev_level >= 3 and lvl < 3:
             # reopened: the next claim must bring its own text changes
             if claims and claims[-1]["reopened_by"] is None:
                 claims[-1]["reopened_by"] = actor
             text_editors = set()
-        if text_changed:
+        # On a page that was proofread before the contest and then reopened, only text changes made
+        # inside the contest count: the new proofreader has to do the work during the contest.
+        proofread_before_start = any(c["proofread_time"] < start_time for c in claims)
+        if text_changed and (rev_dt >= start_time or not proofread_before_start):
             text_editors.add(actor.strip().lower())
         if prev_level < 3 and lvl >= 3:
             claims.append({
@@ -596,7 +607,14 @@ def analyze_page_history(revisions: list, start_time: datetime, end_time: dateti
         validator = first_validation["user"]
         validation_time = first_validation["time"]
 
-    out = resolve_claims(claims, current_level, trusted)
+    if level_at_start >= 3:
+        # proofread or validated when the contest began: nothing to earn (validation excepted)
+        out = {"eligible": False, "reason": "first_proofread_outside_window"}
+    else:
+        # The page was open (below Proofread) at the start: earlier proofreadings that were reopened
+        # before the contest are history and do not count against it.
+        claims = [c for c in claims if c["proofread_time"] >= start_time]
+        out = resolve_claims(claims, current_level, trusted)
     out.update({"current_level": current_level, "validator": validator, "validation_time": validation_time,
                 "claims": [{**c, "proofread_time": c["proofread_time"].isoformat() if c["proofread_time"] else None}
                            for c in claims]})
