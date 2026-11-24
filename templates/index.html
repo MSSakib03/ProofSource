@@ -1445,7 +1445,8 @@
             <tr v-if="upages.pages.length === 0"><td colspan="4" class="py-8 text-center text-slate-500">{{ t('noSubmissionsYet') }}</td></tr>
             <tr v-for="p in upages.pages" :key="p.id + p.role" class="hover:bg-slate-50 dark:hover:bg-slate-800/50">
               <td data-label="" class="ps-c-title py-2.5 px-4 max-w-[16rem]"><a :href="'https://' + active.contest.wiki_domain + '/wiki/' + encodeURIComponent(p.page_title)" target="_blank" rel="noopener" class="font-medium text-ws-cerulean dark:text-ws-nature hover:underline block truncate" :title="p.page_title"><span class="max-sm:hidden">{{ p.page_title }}</span><span class="sm:hidden">{{ shortPageTitle(p.page_title) }}</span></a>
-                <span v-if="p.role === 'validator'" class="text-[0.625rem] text-slate-500">{{ t('validated') }}</span></td>
+                <span v-if="p.role === 'validator'" class="text-[0.625rem] text-slate-500">{{ t('validated') }}</span>
+                <span v-if="p.credit_note" class="block text-[0.625rem]" :class="p.credit_note === 'takeover' ? 'text-amber-700 dark:text-amber-400' : 'text-slate-500'">{{ creditNote(p) }}</span></td>
               <td data-label="" class="ps-c-inline py-2.5 px-4 whitespace-nowrap"><span class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="reviewStatusClass(p.review_status)">{{ statusLabel(p.review_status) }}</span></td>
               <td :data-label="t('points')" class="ps-c-inline py-2.5 px-4 text-right tabular-nums font-semibold">{{ fmtNum(p.total_points) }}</td>
               <td :data-label="t('reviewerNote')" v-if="upages.review_enabled" :class="p.jury_note ? '' : 'ps-empty'" class="ps-c-text ps-c-note py-2.5 px-4 text-slate-500">{{ p.jury_note || '—' }}</td>
@@ -1555,6 +1556,7 @@
             </a>
             <div class="flex items-center gap-2.5 flex-wrap">
               <span class="text-slate-500">{{ t('proofreader') }}: <strong class="text-slate-800 dark:text-slate-200">{{ juryPage.proofreader }}</strong></span>
+              <span v-if="juryPage.credit_note" class="px-2 py-0.5 rounded-full border text-[0.6875rem]" :class="juryPage.credit_note === 'takeover' ? 'border-amber-500/40 text-amber-700 dark:text-amber-400' : 'border-slate-300 text-slate-600 dark:text-slate-400'">{{ creditNote(juryPage) }}</span>
               <span class="px-2 py-0.5 rounded-full font-medium"
                     :class="juryPage.wiki_level === 4 ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border border-emerald-500/20' : 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20'">
                 {{ wikiLevelLabel(juryPage.wiki_level) }}
@@ -2743,6 +2745,10 @@ createApp({
     wikiLevelLabel(lvl) {
       if (lvl === 4) return this.t('lvlValidated'); if (lvl === 3) return this.t('lvlProofread');
       if (lvl === 2) return this.t('lvlProblematic'); return this.t('lvlUnproofread');
+    },
+    creditNote(p) {
+      const k = { reopened: 'creditReopened', takeover: 'creditTakeover', restored: 'creditRestored' }[p.credit_note];
+      return k ? this.t(k).replace('{a}', p.prev_proofreader || '?').replace('{x}', p.reopened_by || '?') : '';
     },
     statusLabel(st) {
       return { accepted: this.t('accepted'), pending_review: this.t('pending'), needs_fix: this.t('needsFix'), rejected: this.t('rejected'),

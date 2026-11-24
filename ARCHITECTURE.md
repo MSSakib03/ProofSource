@@ -166,10 +166,10 @@ Indexes for scale: `(contest_id, review_status)`, `(contest_id, proofreader)`, p
 ### 5.1 Proofread eligibility (`wiki_engine.analyze_page_history`)
 Uses the page's **full revision history** (oldest → newest, paged up to 500 revisions):
 
-1. Only the **first time ever** a page reaches Proofread (level ≥ 3) can count. Pages proofread/validated before the contest never count.
-2. That first upgrade must be **inside the contest window** (book window if set, else contest window).
-3. The person who made the upgrade must have **changed the page text themselves**, either in that edit or in any earlier edit of theirs (creating the page counts). Only flipping the status on text written entirely by others does not count.
-4. Credit goes to that first upgrader. Later backward/forward status changes (e.g. Validated → Proofread) never move the credit.
+1. The **first time ever** a page reaches Proofread (level ≥ 3) must be **inside the contest window** (book window if set, else contest window). Pages proofread/validated before the contest never earn proofread credit.
+2. Every change from below Proofread to Proofread is a *claim*. A claim counts only if its proofreader **changed the page text themselves** since the page was last opened (created, or set below Proofread) — in that edit or an earlier one. Only flipping the status on text written by others does not count.
+3. Credit goes to the **last claim inside the window**. Validated → Proofread is not a reopening and never moves credit.
+4. Who reopened the previous claim is recorded (`resolve_claims`; the caller passes the contest's juries + admins as `trusted`): its own proofreader or a trusted user → `credit_note='reopened'`; anyone else → `'takeover'` (flagged in the UI, logged as `credit_moved`, back to `pending_review` when review is on). A status-only claim after an outside reopening gives the credit back to the earlier proofreader (`'restored'`); after a trusted reopening it earns nothing. Columns: `credit_note`, `prev_proofreader`, `reopened_by`.
 5. The page must still be Proofread/Validated now.
 6. Validation credit is separate from proofread credit: the first-ever 3 → 4 change must be inside the window, by someone other than the proofreader, and the page must still be level 4. It counts even if the page was proofread before the contest. Such pages are stored as **validation-only rows** (`review_status='unproofread'` + `validator`, `wiki_level=4`), so they never enter the review queue or proofread stats; the leaderboard adds `validated × validate_points` automatically.
 

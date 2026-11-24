@@ -432,13 +432,16 @@ def get_book_points(contest: Contest, book: IndexBook) -> int:
 
 
 def validation_visible(c: Contest, user: str = None) -> bool:
-    """Validation stats are shown only when validation earns points, and never as a jury's own work
-    when juries don't get validation points."""
-    if not c.validate_points or c.validate_points <= 0:
-        return False
-    if user and user_in_list(user, c.juries) and not c.jury_gets_points:
-        return False
-    return True
+    """Validation stats are shown whenever validation earns points. (A reviewer's in-tool validations
+    are left out separately when reviewers get no validation points; see _in_tool_validation.)"""
+    return bool(c.validate_points and c.validate_points > 0)
+
+
+def _in_tool_validation():
+    """SQL condition: the page was validated by the same person who reviewed it in ProofSource,
+    i.e. a reviewer's in-tool work rather than their own contribution on the wiki."""
+    return and_(ContestPage.reviewed_by.isnot(None),
+                func.lower(ContestPage.validator) == func.lower(ContestPage.reviewed_by))
 
 
 def locked_fields(c: Contest) -> list:
@@ -581,6 +584,14 @@ def _reset_page(p_obj, level=1):
     p_obj.jury_lock_expires = None
 
 
+def _apply_claims(lp: dict, trusted: set):
+    """Re-decides proofread credit for one synced page (see wiki_engine.resolve_claims)."""
+    res = wiki_engine.resolve_claims(lp["claims"], lp.get("level", 1), trusted)
+    lp["eligible"] = res["eligible"]
+    for k in ("proofreader", "rev_id", "proofread_time", "credit_note", "prev_proofreader", "reopened_by"):
+        lp[k] = res.get(k)
+
+
 def _clear_revert(p_obj):
     p_obj.reverted_from = None
     p_obj.revert_reason = None
@@ -653,6 +664,12 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
 
     excluded_page_nums = parse_excluded_pages_spec(book.excluded_pages)
     excluded_usernames = {u.lower() for u in split_users(contest.excluded_users)}
+    # Re-decide who gets a re-proofread page with this contest's reviewers/admins: their reopening
+    # of a page is expected ("reopened"); anyone else's is flagged ("takeover").
+    trusted = {u.lower() for u in split_users(contest.juries) + split_users(contest.admins)}
+    for lp in live_map.values():
+        if lp.get("claims") is not None and not lp.get("unchanged"):
+            _apply_claims(lp, trusted)
     candidate_users = [lp["proofreader"] for lp in live_map.values() if lp.get("eligible") and lp.get("proofreader")]
     bot_usernames = identify_bot_users(contest.wiki_domain, candidate_users)
     blocked_users = excluded_usernames.union(bot_usernames)
@@ -691,12 +708,20 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
                 p_obj.page_title = lp["page_title"]
                 p_obj.wiki_level = lp["level"]
                 p_obj.proofread_rev_id = lp.get("rev_id")
-                if not same_user(p_obj.proofreader, proofreader_name) and p_obj.review_status in LISTED_STATUSES:
+                moved = p_obj.proofreader and not same_user(p_obj.proofreader, proofreader_name) \
+                    and p_obj.review_status in LISTED_STATUSES + ('eligible', 'reverted')
+                if moved:
+                    log_action(contest.id, "credit_moved", p_obj.page_title, old=p_obj.proofreader, new=proofreader_name,
+                               details={"note": lp.get("credit_note") or "", "reopened_by": lp.get("reopened_by")},
+                               username=SYNC_ACTOR)
+                    p_obj.proofread_time = when
+                if moved and p_obj.review_status in LISTED_STATUSES:
                     # a different person now owns the proofread revision -> review again
                     p_obj.review_status = 'pending_review'
                     p_obj.reviewed_by = None
                     p_obj.reviewed_at = None
                     p_obj.bonus_points = 0
+                    p_obj.jury_note = None
                 p_obj.proofreader = proofreader_name
                 if lp.get("validator"):
                     p_obj.validator = lp.get("validator")
@@ -718,6 +743,9 @@ def sync_book_with_wikisource(contest: Contest, book: IndexBook, full: bool = Fa
                     p_obj.proofread_time = when
                 elif p_obj.review_status in ('accepted', 'pending_review'):
                     p_obj.base_points = book_pts
+            p_obj.credit_note = lp.get("credit_note") or None
+            p_obj.prev_proofreader = lp.get("prev_proofreader")
+            p_obj.reopened_by = lp.get("reopened_by")
             p_obj.last_rev_id = lp.get("rev_latest")
         else:
             level = lp.get("level", 1)
@@ -858,7 +886,8 @@ def compute_contest_leaderboard(contest: Contest) -> list:
         # status. Sync keeps `validator` only while the validation qualifies (first Proofread ->
         # Validated inside the window, page not excluded); pages proofread before the contest are
         # 'unproofread' rows that carry only a validator.
-        vrows = (db.session.query(ContestPage.validator, func.count(ContestPage.id))
+        vrows = (db.session.query(ContestPage.validator, func.count(ContestPage.id),
+                                  func.sum(case((_in_tool_validation(), 1), else_=0)))
                  .filter(ContestPage.contest_id == contest.id,
                          ContestPage.wiki_level == 4,
                          ContestPage.validator.isnot(None),
@@ -892,11 +921,16 @@ def compute_contest_leaderboard(contest: Contest) -> list:
         s["points"] += int(pts or 0)
 
     enrolled_low = enrolled_names(contest) if vrows and submission_mode(contest) == "enroll" else None
-    for v, n in vrows:
+    for v, n, in_tool in vrows:
         if not v or v.lower() in blocked_low:
             continue
         if v.lower() in juries_low and not contest.jury_gets_points:
-            continue
+            # "Award validation points to reviewers when validating in tool" is off: drop only the
+            # pages this reviewer validated while reviewing them here. Their own validations on the
+            # wiki (e.g. in a contest without review) still count like anyone else's.
+            n = int(n or 0) - int(in_tool or 0)
+            if n <= 0:
+                continue
         if enrolled_low is not None and v.strip().lower() not in enrolled_low:
             continue                                  # enrolment contests: only enrolled people score
         s = ensure(v)
@@ -2081,7 +2115,10 @@ def _user_pages_query(c: Contest, username: str):
     cond = and_(ContestPage.proofreader == username, ContestPage.review_status.in_(LISTED_STATUSES + ('reverted',)))
     if validation_visible(c, username):
         # includes validation-only rows ('unproofread' + validator: proofread before the contest)
-        cond = or_(cond, and_(ContestPage.validator == username, ContestPage.wiki_level == 4))
+        vcond = and_(ContestPage.validator == username, ContestPage.wiki_level == 4)
+        if user_in_list(username, c.juries) and not c.jury_gets_points:
+            vcond = and_(vcond, ~_in_tool_validation())
+        cond = or_(cond, vcond)
     return ContestPage.query.filter(ContestPage.contest_id == c.id, cond)
 
 
@@ -2132,6 +2169,8 @@ def api_contest_user_pages(cid, username):
             "id": p.id, "book_id": p.book_id, "book_title": titles.get(p.book_id, ""),
             "page_number": p.page_number, "page_title": p.page_title, "wiki_level": p.wiki_level,
             "proofreader": p.proofreader, "role": "proofreader" if is_proof else "validator",
+            "credit_note": (p.credit_note or "") if is_proof else "", "prev_proofreader": p.prev_proofreader,
+            "reopened_by": p.reopened_by,
             "proofread_rev_id": p.proofread_rev_id, "proofread_iso": iso(p.proofread_time),
             "review_status": ("accepted" if acc else p.review_status) if is_proof else "validated",
             "total_points": ((p.base_points + p.bonus_points) if acc else 0) if is_proof else c.validate_points,
@@ -2417,6 +2456,8 @@ def api_jury_next_page(cid):
             "id": next_page.id, "book_id": next_page.book_id, "book_title": next_page.book.title,
             "page_number": next_page.page_number, "page_title": next_page.page_title,
             "wiki_level": next_page.wiki_level, "proofreader": next_page.proofreader,
+            "credit_note": next_page.credit_note or "", "prev_proofreader": next_page.prev_proofreader,
+            "reopened_by": next_page.reopened_by,
             "review_status": next_page.review_status, "reviewed_by": next_page.reviewed_by,
             "bonus_points": next_page.bonus_points, "jury_note": next_page.jury_note or "",
             "header": wiki_data["header"], "body": wiki_data["body"], "footer": wiki_data["footer"],

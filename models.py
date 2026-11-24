@@ -182,6 +182,10 @@ class ContestPage(db.Model):
     reverted_from = db.Column(db.String(30), nullable=True)     # status it had before
     revert_reason = db.Column(db.String(30), nullable=True)     # not_proofread | ineligible | excluded
     reverted_at = db.Column(db.DateTime, nullable=True)
+    # --- v11: proofread again after it was reopened (set below Proofread) during the contest ---
+    credit_note = db.Column(db.String(20), nullable=True)       # reopened | takeover | restored
+    prev_proofreader = db.Column(db.String(100), nullable=True) # the other proofreader involved
+    reopened_by = db.Column(db.String(100), nullable=True)      # who set it below Proofread
     # --- v10: the proofreader was told on their talk page that this page needs a fix / was not accepted ---
     notified_at = db.Column(db.DateTime, nullable=True)
 

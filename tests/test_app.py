@@ -649,6 +649,128 @@ class ValidationTests(Base):
         self.assertEqual(head2, "Rank,Participant,Proofread,Accepted,Pending,Needs Fix,Rejected,Bonus Points,Total Points")
 
 
+class ReproofreadTests(unittest.TestCase):
+    """A proofread page set back below Proofread during the contest and proofread again."""
+    S, E = datetime(2026, 1, 10), datetime(2026, 1, 20)
+
+    def a(self, revs, trusted=None):
+        return wiki_engine.analyze_page_history(revs, self.S, self.E, trusted)
+
+    def test_reopened_by_outsider_and_reproofread_with_edits_is_a_takeover(self):
+        # the as.wikisource case: A proofreads, a third person reopens, B proofreads again with edits
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("X", 1, "t-a", 12, 3),
+                    rev("B", 3, "t-b", 13, 4)])
+        self.assertTrue(r["eligible"])
+        self.assertEqual((r["proofreader"], r["credit_note"], r["prev_proofreader"], r["reopened_by"]),
+                         ("B", "takeover", "A", "X"))
+        self.assertEqual(r["rev_id"], 4)
+
+    def test_reopened_by_reviewer_is_a_plain_reopening(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("Jury", 1, "t-a", 12, 3),
+                    rev("B", 3, "t-b", 13, 4)], trusted={"jury"})
+        self.assertEqual((r["proofreader"], r["credit_note"]), ("B", "reopened"))
+
+    def test_reopened_by_own_proofreader_is_a_plain_reopening(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("A", 1, "t-a", 12, 3),
+                    rev("B", 3, "t-b", 13, 4)])
+        self.assertEqual((r["proofreader"], r["credit_note"]), ("B", "reopened"))
+
+    def test_status_flip_after_outside_reopening_restores_the_first_proofreader(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("X", 1, "t-a", 12, 3),
+                    rev("B", 3, "t-a", 13, 4)])
+        self.assertEqual((r["proofreader"], r["credit_note"], r["prev_proofreader"], r["reopened_by"]),
+                         ("A", "restored", "B", "X"))
+        self.assertEqual(r["rev_id"], 2)
+
+    def test_status_flip_after_reviewer_reopening_earns_nothing(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("Jury", 1, "t-a", 12, 3),
+                    rev("B", 3, "t-a", 13, 4)], trusted={"jury"})
+        self.assertFalse(r["eligible"])
+        self.assertEqual(r["reason"], "status_only_edit")
+
+    def test_own_text_before_reopening_does_not_count_after_it(self):
+        # B wrote text before A proofread; after the reopening B only flips the status
+        r = self.a([rev("B", 1, "t-b", 11, 1), rev("A", 3, "t-a", 12, 2), rev("A", 1, "t-a", 13, 3),
+                    rev("B", 3, "t-a", 14, 4)])
+        self.assertFalse(r["eligible"])
+
+    def test_same_person_proofreading_again_has_no_note(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("X", 1, "t-a", 12, 3),
+                    rev("A", 3, "t-a2", 13, 4)])
+        self.assertEqual((r["proofreader"], r["credit_note"]), ("A", ""))
+
+    def test_reproofread_after_the_contest_earns_nothing(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("X", 1, "t-a", 21, 3),
+                    rev("B", 3, "t-b", 22, 4)])
+        self.assertFalse(r["eligible"])
+
+    def test_validated_to_proofread_is_not_a_reopening(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 11, 2), rev("V", 4, "t-a", 12, 3),
+                    rev("Z", 3, "t-z", 13, 4)])
+        self.assertEqual((r["proofreader"], r["credit_note"], r["validator"]), ("A", "", "V"))
+
+    def test_pre_contest_pages_still_never_count(self):
+        r = self.a([rev("OCR", 1, "t", 1, 1), rev("A", 3, "t-a", 5, 2), rev("X", 1, "t-a", 12, 3),
+                    rev("B", 3, "t-b", 13, 4)])
+        self.assertFalse(r["eligible"])
+        self.assertEqual(r["reason"], "first_proofread_outside_window")
+
+
+class ReproofreadSyncTests(Base):
+    def test_credit_moves_with_note_and_is_logged(self):
+        cid = self.make_contest(review=False, entries={1: ("A", 3, 1)})
+        claims = [{"proofreader": "A", "proofread_time": (utcnow() - timedelta(days=2)).isoformat(), "rev_id": 1,
+                   "in_window": True, "content_changed": True, "reopened_by": "X"},
+                  {"proofreader": "B", "proofread_time": (utcnow() - timedelta(days=1)).isoformat(), "rev_id": 3,
+                   "in_window": True, "content_changed": True, "reopened_by": None}]
+        A.fetch_live_book_pages_from_wiki = live_raw({1: {"level": 3, "eligible": True, "proofreader": "A",
+                                                          "rev_id": 1, "rev_latest": 3, "claims": claims}})
+        with A.app.app_context():
+            c = db.session.get(Contest, cid)
+            A.sync_contest_books(c)
+        board = {r["username"]: r for r in self.c.get(f"/api/contests/{cid}").json["leaderboard"]}
+        self.assertNotIn("A", board)
+        self.assertEqual(board["B"]["points"], 3)
+        p = self.c.get(f"/api/contests/{cid}/user/B/pages").json["pages"][0]
+        self.assertEqual((p["credit_note"], p["prev_proofreader"], p["reopened_by"]), ("takeover", "A", "X"))
+        with A.app.app_context():
+            self.assertEqual(AuditLog.query.filter_by(contest_id=cid, action="credit_moved").count(), 1)
+
+    def test_rescan_rechecks_unchanged_pages(self):
+        import manage
+        cid = self.make_contest(review=False, entries={1: ("A", 3, 7)})
+        claims = [{"proofreader": "A", "proofread_time": utcnow().isoformat(), "rev_id": 1,
+                   "in_window": True, "content_changed": True, "reopened_by": "A"},
+                  {"proofreader": "B", "proofread_time": utcnow().isoformat(), "rev_id": 7,
+                   "in_window": True, "content_changed": True, "reopened_by": None}]
+        # same latest revision as the first sync: a normal sync would skip the page
+        A.fetch_live_book_pages_from_wiki = live_raw({1: {"level": 3, "eligible": True, "proofreader": "A",
+                                                          "rev_id": 1, "rev_latest": 7, "claims": claims}})
+        with A.app.app_context():
+            A.sync_contest_books(db.session.get(Contest, cid))
+        self.assertIn("A", {r["username"] for r in self.c.get(f"/api/contests/{cid}").json["leaderboard"]
+                            if r["points"]})
+        self.assertEqual(manage.cmd_rescan([cid]), 0)
+        board = {r["username"]: r for r in self.c.get(f"/api/contests/{cid}").json["leaderboard"]}
+        self.assertEqual(board["B"]["points"], 3)
+
+    def test_contest_reviewer_reopening_is_trusted(self):
+        cid = self.make_contest(review=False, entries={1: ("A", 3, 1)})   # juries: Admin, Rev
+        claims = [{"proofreader": "A", "proofread_time": utcnow().isoformat(), "rev_id": 1,
+                   "in_window": True, "content_changed": True, "reopened_by": "Rev"},
+                  {"proofreader": "B", "proofread_time": utcnow().isoformat(), "rev_id": 3,
+                   "in_window": True, "content_changed": False, "reopened_by": None}]
+        A.fetch_live_book_pages_from_wiki = live_raw({1: {"level": 3, "eligible": True, "proofreader": "A",
+                                                          "rev_id": 1, "rev_latest": 3, "claims": claims}})
+        with A.app.app_context():
+            A.sync_contest_books(db.session.get(Contest, cid))
+        # B only flipped the status after a reviewer reopened it: nobody earns the page (A's listed page
+        # is kept on record as reverted with 0 points)
+        board = {r["username"]: r for r in self.c.get(f"/api/contests/{cid}").json["leaderboard"]}
+        self.assertNotIn("B", board)
+        self.assertEqual((board["A"]["points"], board["A"]["reverted"]), (0, 1))
+
+
 class ValidationHistoryTests(unittest.TestCase):
     S, E = datetime(2026, 1, 10), datetime(2026, 1, 20)
 
@@ -681,13 +803,28 @@ class MyPagesTests(Base):
         self.assertFalse(self.c.get(f"/api/contests/{cid}").json["contest"]["validation_visible"])
 
     def test_jury_validation_not_in_my_pages(self):
+        # a reviewer's in-tool validation (they reviewed the page here) is not their own contest work
         cid = self.make_contest(entries={1: ("Alice", 3, 1)}, validate_points=1)
         with A.app.app_context():
             p = ContestPage.query.filter_by(contest_id=cid).first()
-            p.wiki_level = 4; p.validator = "Rev"; db.session.commit()
+            p.wiki_level = 4; p.validator = "Rev"; p.reviewed_by = "Rev"; db.session.commit()
         d = self.c.get(f"/api/contests/{cid}/user/Rev/pages").json
         self.assertEqual(d["total"], 0)
-        self.assertFalse(d["show_validation"])
+        board = {r["username"]: r for r in self.c.get(f"/api/contests/{cid}").json["leaderboard"]}
+        self.assertNotIn("Rev", board)
+
+    def test_jury_own_wiki_validation_counts_without_review(self):
+        # the contest creator is the jury by default; in a contest without review, their validations
+        # on the wiki are ordinary contributions and must score even with no proofread pages
+        cid = self.make_contest(review=False, entries={1: ("Alice", 3, 1)}, validate_points=1)
+        with A.app.app_context():
+            p = ContestPage.query.filter_by(contest_id=cid).first()
+            p.wiki_level = 4; p.validator = "Rev"; db.session.commit()
+        board = {r["username"]: r for r in self.c.get(f"/api/contests/{cid}").json["leaderboard"]}
+        self.assertEqual((board["Rev"]["submitted"], board["Rev"]["validated"], board["Rev"]["points"]), (0, 1, 1))
+        d = self.c.get(f"/api/contests/{cid}/user/Rev/pages").json
+        self.assertTrue(d["show_validation"])
+        self.assertEqual(d["total"], 1)
 
 
 class DeleteTests(Base):

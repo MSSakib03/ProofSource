@@ -175,6 +175,33 @@ def cmd_sync(stale_minutes: int = 10, include_ended: bool = False) -> int:
     return 1 if failed else 0
 
 
+def cmd_rescan(contest_ids: list) -> int:
+    """Re-check every page of the given contests against the current counting rules (normally pages
+    whose latest revision is unchanged are skipped). Use after a rule change, e.g. for ended contests."""
+    import app as web
+    from models import Contest, ContestPage, migrate_schema
+    failed = 0
+    with web.app.app_context():
+        migrate_schema()
+        for cid in contest_ids:
+            c = web.db.session.get(Contest, cid)
+            if not c or c.deleted_at:
+                print(f"contest {cid}: not found")
+                failed += 1
+                continue
+            ContestPage.query.filter_by(contest_id=c.id).update({"last_rev_id": None}, synchronize_session=False)
+            c.sync_started_at = None
+            web.db.session.commit()
+            try:
+                res = web.sync_contest_books(c, full=True)
+                print(f"contest {c.id} ({c.slug}): {res}")
+            except Exception as e:
+                web.db.session.rollback()
+                failed += 1
+                print(f"contest {c.id} ({c.slug}): FAILED {e!r}")
+    return 1 if failed else 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(description="ProofSource maintenance")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -188,6 +215,8 @@ def main(argv=None):
     sy = sub.add_parser("sync")
     sy.add_argument("--stale-minutes", type=int, default=10)
     sy.add_argument("--all", action="store_true")
+    rs = sub.add_parser("rescan", help="re-check all pages of these contests with the current rules")
+    rs.add_argument("contest_ids", type=int, nargs="+")
     sub.add_parser("check-i18n")
     args = ap.parse_args(argv)
 
@@ -216,6 +245,8 @@ def main(argv=None):
         return 0
     if args.cmd == "sync":
         return cmd_sync(args.stale_minutes, args.all)
+    if args.cmd == "rescan":
+        return cmd_rescan(args.contest_ids)
     if args.cmd == "snapshot":
         import backup_engine
         res = backup_engine.snapshot_database(_engine(url), args.reason)
