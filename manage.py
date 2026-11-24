@@ -189,6 +189,9 @@ def cmd_rescan(contest_ids: list) -> int:
                 print(f"contest {cid}: not found")
                 failed += 1
                 continue
+            if c.closed_at:
+                print(f"contest {c.id} ({c.slug}): closed by {c.closed_by}, skipped (reopen it first)")
+                continue
             ContestPage.query.filter_by(contest_id=c.id).update({"last_rev_id": None}, synchronize_session=False)
             c.sync_started_at = None
             web.db.session.commit()

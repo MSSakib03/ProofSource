@@ -55,5 +55,5 @@ class DeliveryTests(Base):
 
     def test_page_is_not_larger_than_before_the_move(self):
         # was 355 KB with the table inside the template; +2 KB for the Validated leaderboard column,
-        # +1 KB for the re-proofread credit notes (en + bn)
-        self.assertLess(len(self.c.get("/").data), 364_000)
+        # +1 KB for the re-proofread credit notes (en + bn), +5.5 KB for closing a contest (en + bn)
+        self.assertLess(len(self.c.get("/").data), 370_000)

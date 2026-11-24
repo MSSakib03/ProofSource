@@ -130,6 +130,10 @@ A page does **not** count when:
 
 If a reviewer or the proofreader reopened it and the next person only flips the status, nobody gets the page.
 
+**Nobody earns a page by reopening it and proofreading it again themself** — before or during the contest, reviewers and admins included. The status has to be set back by someone else. If you do it yourself, the page stays with its earlier proofreader (marked *Kept*, highlighted for reviewers) or, for a page proofread before the contest, with nobody.
+
+A revision without a quality tag (broken page markup) does not change the page's status.
+
 **Reverted pages.** Once a page is in the contest it is never silently removed. If it later stops qualifying — for example someone sets it back to *Not proofread* on the wiki — it stays on record as **Reverted** with **0 points**, it is not sent for review, and the change is written to the activity log. You can see reverted pages in the **Reverted pages** tab, on the leaderboard and on everyone's page list. If the page is proofread again, it returns to the review queue automatically.
 
 **Points:** in contests *with review*, points are added when a page is **accepted**. In contests *without review*, every eligible page counts directly. Validation earns points only if the contest gives validation points. Validation points are automatic: validated pages are never listed for review, and validating a page that was proofread *before* the contest still counts (the first Proofread → Validated change must happen inside the contest, by someone other than the proofreader). Example: 3 points per proofread and 1 per validation, 5 proofread + 3 validated = 18 points.
@@ -232,6 +236,9 @@ With **Equal share**, pending pages are divided equally among reviewers, keeping
 
 ### Messages to participants
 On a participant's page, reviewers and admins see **Message about pages** when that person has pages that *need a fix* or were *not accepted*. A message is prefilled (with the reviewer's reasons), freely editable wikitext, and is posted on the participant's talk page on the wiki with your account. A page already mentioned is not offered again until it gets a new decision.
+
+### Closing a contest
+In **⚙ Configuration → Close**, a contest admin or a tool admin can **close** a contest once its results are final. A closed contest no longer reads Wikisource, accepts no reviews, submissions, enrolments, book changes or backup restores, and its result-changing settings (dates, points, reviewers, books…) are locked; title, description, link, announcements and admins stay editable. The contest page shows *Closed — results are final*. It can be **reopened** at any time from the same tab; reopening catches up with the wiki. Both actions are written to the activity log. `manage.py rescan` skips closed contests.
 
 ### Deleting a contest (tool admin)
 Deleting moves a contest to the **Trash** (visible to tool admins only). It is restorable for 7 days, after which it is removed for good; the trash can also be emptied at any time.

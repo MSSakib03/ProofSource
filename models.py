@@ -95,6 +95,9 @@ class Contest(db.Model):
     delete_requested_by = db.Column(db.String(100), nullable=True)
     delete_requested_at = db.Column(db.DateTime, nullable=True)
     delete_reason = db.Column(db.Text, default="")
+    # --- v12: closed = results are final; nothing (sync, reviews, settings) changes them ---
+    closed_at = db.Column(db.DateTime, nullable=True)
+    closed_by = db.Column(db.String(100), nullable=True)
     # --- v8: how eligible pages enter the contest ---
     #   auto   = every eligible page is listed automatically (original behaviour)
     #   enroll = semi-automatic: only pages of participants who enrolled are listed automatically
