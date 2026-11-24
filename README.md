@@ -111,13 +111,13 @@ Pages a reviewer sends back appear at the top of the contest page under **Pages 
 
 A page counts for you when **both** of these are true:
 
-- ✅ It reaches *Proofread* **for the first time ever** inside the contest window (or the book's own window).
-- ✅ **You worked on the text yourself.** You can set *Proofread* in the first edit that creates the page, in the same edit as your corrections, or after several edits of your own.
+- ✅ It is below *Proofread* when the contest (or the book's own window) starts, and reaches *Proofread* inside the window. A page that was proofread earlier but set back below *Proofread* **before** the contest counts as open again.
+- ✅ **You worked on the text yourself.** You can set *Proofread* in the first edit that creates the page, in the same edit as your corrections, or after several edits of your own. Any change to the text counts, even one that leaves the size unchanged. On a page that was reopened before the contest, the text changes must be made inside the contest.
 
 A page does **not** count when:
 
 - ❌ Someone only changes the status on text written by others.
-- ❌ The page was already proofread or validated before the contest.
+- ❌ The page is still proofread or validated when the contest starts.
 - ❌ A validated page is moved back to proofread. The credit stays with whoever proofread it.
 - ❌ The page is later reverted to *Not proofread*.
 - ❌ It is an excluded page (e.g. table of contents), or by an excluded user or a bot.
